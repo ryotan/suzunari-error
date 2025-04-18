@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="BiomeSettings">
+    <option name="applySafeFixesOnSave" value="true" />
+    <option name="formatOnSave" value="true" />
+  </component>
+  <component name="CodeInsightWorkspaceSettings">
+    <option name="optimizeImportsOnTheFly" value="true" />
+  </component>
+  <component name="GoVcsConfiguration">
+    <option name="GO_FMT" value="false" />
+  </component>
+  <component name="GroovyCompilerProjectConfiguration">
+    <option name="invokeDynamic" value="true" />
+  </component>
+  <component name="JavaScriptSettings">
+    <option name="languageLevel" value="JSX" />
+  </component>
+  <component name="JsBowerSettings">
+    <bower-package value="" />
+    <bower.json value="" />
+  </component>
+  <component name="MarkdownSettings">
+    <option name="splitLayout" value="SHOW_EDITOR" />
+  </component>
+  <component name="PrettierConfiguration">
+    <option name="myRunOnSave" value="true" />
+    <option name="myRunOnReformat" value="true" />
+  </component>
+  <component name="ProjectInspectionProfilesVisibleTreeState">
+    <entry key="Project Default">
+      <profile-state>
+        <selected-state>
+          <State>
+            <id>User defined</id>
+          </State>
+        </selected-state>
+      </profile-state>
+    </entry>
+  </component>
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_17" default="true" project-jdk-name="zulu-17.56.15 (mise)" project-jdk-type="JavaSDK">
+    <output url="file://$PROJECT_DIR$/out" />
+  </component>
+  <component name="RsExternalLinterProjectSettings">
+    <option name="tool" value="Clippy" />
+  </component>
+  <component name="RustProjectSettings">
+    <option name="toolchainHomeDirectory" value="$USER_HOME$/scoop/persist/rustup/.cargo/bin" />
+  </component>
+  <component name="RustfmtProjectSettings">
+    <option name="useRustfmt" value="true" />
+  </component>
+  <component name="TypeScriptCompiler">
+    <option name="enableServiceForProjectsWithoutConfig" value="false" />
+    <option name="recompileOnChanges" value="true" />
+  </component>
+</project>
