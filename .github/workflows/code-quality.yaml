@@ -48,6 +48,7 @@ jobs:
         continue-on-error: true
 
       - name: Check for lint results
+        shell: bash
         run: |
           echo "Checking outcomes of all steps..."
           if [[ "${{ steps.fmt.outcome }}" == "failure" || \
