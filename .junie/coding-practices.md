@@ -12,12 +12,12 @@ development approach and help maintain code quality and consistency.
 
 We prefer a functional programming approach for its clarity, testability, and reduced side effects:
 
-- Function-first (classes only if necessary)
-- Ensure type safety
+- Function-first (structs and enums for data representation)
+- Leverage Rust's strong type system
 - Preference for pure functions (functions that always return the same output for the same input and have no side
   effects)
-- Use invariant data structures
-- Use of invariant update patterns
+- Use immutable data structures when possible
+- Use of functional update patterns (e.g., with struct updates)
 - Isolate side-effects (keep I/O operations separate from business logic)
 - Flatten conditional branches with early returns
 
@@ -85,9 +85,189 @@ The recommended sequence is:
 3.**Separate side-effects**.
 
 - Push IO operations to function boundaries
-- Wrap operations with side-effects in Promise.
+- Use Result or Option types for operations with side-effects
+- Consider using async/await for asynchronous operations
 
 4.**Adapter implementation**
 
-- Abstraction of access to external services and DB
-- Prepare mock for testing.
+- Use traits for abstraction of external dependencies
+- Implement traits for concrete implementations
+- Create mock implementations for testing
+
+## Rust Examples
+
+Below are concrete Rust examples that demonstrate the principles outlined above:
+
+### Functional Programming Example
+
+```rust
+// Example of pure function with immutable data
+fn calculate_total(items: &[Item]) -> f64 {
+    items.iter()
+        .map(|item| item.price * item.quantity as f64)
+        .sum()
+}
+
+// Example of using Option for safe operations
+fn find_item_by_id(items: &[Item], id: u32) -> Option<&Item> {
+    items.iter().find(|item| item.id == id)
+}
+
+// Example of functional update pattern with structs
+fn apply_discount(item: Item, discount_percent: f64) -> Item {
+    Item {
+        price: item.price * (1.0 - discount_percent / 100.0),
+        ..item // Rest of the fields remain the same
+    }
+}
+```
+
+### Domain-Driven Design Example
+
+```rust
+// Value Object example
+#[derive(Debug, Clone, PartialEq)]
+struct Money {
+    amount: f64,
+    currency: Currency,
+}
+
+impl Money {
+    fn new(amount: f64, currency: Currency) -> Self {
+        Self { amount, currency }
+    }
+
+    fn add(&self, other: &Money) -> Result<Money, DomainError> {
+        if self.currency != other.currency {
+            return Err(DomainError::CurrencyMismatch);
+        }
+        Ok(Money::new(self.amount + other.amount, self.currency.clone()))
+    }
+}
+
+// Entity example
+#[derive(Debug)]
+struct Order {
+    id: OrderId,
+    items: Vec<OrderItem>,
+    status: OrderStatus,
+}
+
+impl Order {
+    fn add_item(&mut self, item: OrderItem) -> Result<(), DomainError> {
+        if self.status != OrderStatus::Draft {
+            return Err(DomainError::OrderNotModifiable);
+        }
+        self.items.push(item);
+        Ok(())
+    }
+
+    fn submit(&mut self) -> Result<(), DomainError> {
+        if self.items.is_empty() {
+            return Err(DomainError::EmptyOrder);
+        }
+        self.status = OrderStatus::Submitted;
+        Ok(())
+    }
+}
+
+// Repository trait example
+trait OrderRepository {
+    fn find_by_id(&self, id: &OrderId) -> Result<Option<Order>, RepositoryError>;
+    fn save(&self, order: &Order) -> Result<(), RepositoryError>;
+}
+
+// In-memory implementation for testing
+struct InMemoryOrderRepository {
+    orders: std::collections::HashMap<OrderId, Order>,
+}
+
+impl OrderRepository for InMemoryOrderRepository {
+    fn find_by_id(&self, id: &OrderId) -> Result<Option<Order>, RepositoryError> {
+        Ok(self.orders.get(id).cloned())
+    }
+
+    fn save(&self, order: &Order) -> Result<(), RepositoryError> {
+        let mut orders = self.orders.clone();
+        orders.insert(order.id.clone(), order.clone());
+        Ok(())
+    }
+}
+```
+
+### Testing Example
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_total() {
+        // Arrange
+        let items = vec![
+            Item { id: 1, name: "Item 1".to_string(), price: 10.0, quantity: 2 },
+            Item { id: 2, name: "Item 2".to_string(), price: 15.0, quantity: 1 },
+        ];
+
+        // Act
+        let total = calculate_total(&items);
+
+        // Assert
+        assert_eq!(total, 35.0);
+    }
+
+    #[test]
+    fn test_order_cannot_be_submitted_when_empty() {
+        // Arrange
+        let mut order = Order {
+            id: OrderId::new(),
+            items: vec![],
+            status: OrderStatus::Draft,
+        };
+
+        // Act
+        let result = order.submit();
+
+        // Assert
+        assert!(matches!(result, Err(DomainError::EmptyOrder)));
+    }
+}
+```
+
+### Error Handling Example
+
+```rust
+use snafu::{Snafu, ResultExt};
+use suzunari::{StackError, suzunari_location};
+
+#[derive(Debug, Snafu, StackError)]
+#[suzunari_location]
+enum ApiError {
+    #[snafu(display("Failed to fetch data: {}", source))]
+    FetchFailed {
+        #[snafu(source)]
+        source: reqwest::Error,
+    },
+
+    #[snafu(display("Failed to parse response: {}", source))]
+    ParseFailed {
+        #[snafu(source)]
+        source: serde_json::Error,
+    },
+}
+
+async fn fetch_data(url: &str) -> Result<Data, ApiError> {
+    let response = reqwest::get(url)
+        .await
+        .context(FetchFailedSnafu)?;
+
+    let data = response.json::<Data>()
+        .await
+        .context(ParseFailedSnafu)?;
+
+    Ok(data)
+}
+```
+
+These examples demonstrate how to apply the coding practices and principles in Rust code, focusing on type safety, immutability, error handling, and testability.
