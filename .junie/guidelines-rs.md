@@ -19,21 +19,76 @@ guidelines will ensure code consistency, readability, and maintainability across
 
 - Organize code into modules based on functionality
 - Keep files focused on a single responsibility
-- Follow the standard Tauri application structure:
-  - `main.rs`: Application entry point
-  - `lib.rs`: Core application logic
+- Follow the standard Rust library structure:
+  - `lib.rs`: Main library entry point and API
   - Organize related functionality into separate modules
 
 ## Error Handling
 
+### Core Principles
+
 - Use `Result<T, E>` for operations that can fail
 - Create custom error types using `snafu` for domain-specific errors with context
-- Use the StackError pattern for better error tracing and context (see `app/src-tauri/src/error.rs` for implementation)
 - Prefer using the `?` operator for error propagation over `match` or `unwrap()`
 - Avoid using `unwrap()` or `expect()` in production code
 - Use meaningful error messages that help with debugging
-- Add context to errors when propagating them up the call stack
-- Implement the StackError pattern for complex applications to improve error tracing
+
+### Suzunari Error Approach
+
+- Use the `StackError` trait for error location-aware contextual chained errors
+  - Apply the `#[derive(Snafu, StackError)]` derive macros to error types
+  - Add the `#[suzunari_location]` attribute to include location information
+- Structure error types to capture relevant context:
+  - Include fields that provide context about the error situation
+  - Use the `source` field to chain errors
+  - Use descriptive display messages with context variables
+- Add context when propagating errors up the call stack:
+  - Use `.context(ErrorContextSnafu { context_var })` to add context
+  - Use `ensure!()` for validation checks that can result in errors
+- Design error types for optimal debugging:
+  - Implement Debug to log error location, stack depth, and contextual message
+  - Keep error types focused and specific to their domain
+  - Group related errors in enum variants
+- Use the memory-efficient `Location` structure for error context
+  - Compatible with SNAFU's implicit context
+  - Minimizes memory overhead while providing traceability
+
+### Example Pattern
+
+```rust
+#[derive(Snafu, StackError)]
+#[suzunari_location]
+enum ApiError {
+    #[snafu(display("Failed to fetch data: {}", source))]
+    FetchFailed {
+        #[snafu(source)]
+        source: reqwest::Error,
+    },
+
+    #[snafu(display("Invalid parameter '{}': {}", param_name, reason))]
+    ValidationFailed {
+        param_name: String,
+        reason: String,
+    },
+}
+
+fn fetch_data(url: &str) -> Result<Data, ApiError> {
+    let response = reqwest::get(url)
+        .await
+        .context(FetchFailedSnafu)?;
+
+    // Validation example
+    ensure!(
+        response.status().is_success(),
+        ValidationFailedSnafu {
+            param_name: "url".to_string(),
+            reason: format!("Received status code {}", response.status())
+        }
+    );
+
+    Ok(Data::from_response(response))
+}
+```
 
 ## Documentation
 
@@ -58,7 +113,7 @@ guidelines will ensure code consistency, readability, and maintainability across
 
 ## Concurrency
 
-- Use `async`/`await` for asynchronous operations, especially when interacting with Tauri APIs
+- Use `async`/`await` for asynchronous operations when appropriate
 - Be explicit about thread safety using appropriate types (`Arc`, `Mutex`, etc.)
 - Prefer message passing over shared state when possible
 - Document thread safety assumptions in multi-threaded code
@@ -70,13 +125,14 @@ guidelines will ensure code consistency, readability, and maintainability across
 - Name test functions descriptively, using the pattern `test_<functionality_being_tested>`
 - Use meaningful assertions that clearly indicate what's being tested
 
-## Tauri-Specific Guidelines
+## Library-Specific Guidelines
 
-- Register commands with appropriate permissions
-- Use proper error handling in commands that can be called from the frontend
-- Serialize/deserialize data using `serde` with consistent patterns
-- Keep command handlers small and focused on a single responsibility
-- Use Tauri's logging facilities for debugging and error reporting
+- Design clear and intuitive public APIs
+- Use proper error handling for library functions
+- Serialize/deserialize data using `serde` with consistent patterns when needed
+- Keep public functions focused on a single responsibility
+- Use appropriate logging levels for debugging and error reporting
+- Consider API stability and backward compatibility
 
 ## Common Pitfalls to Avoid
 
