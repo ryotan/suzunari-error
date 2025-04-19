@@ -33,3 +33,9 @@ When working with different file types, please refer to the appropriate language
 
 These language-specific files contain detailed information about code formatting, naming conventions, best practices,
 and more for each language.
+
+### Project-Specific Guidelines
+
+For guidelines specific to this project's domain and purpose:
+
+- For Suzunari Error library specific guidelines, see [guidelines-suzunari.md](./guidelines-suzunari.md)
