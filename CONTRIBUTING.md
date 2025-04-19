@@ -6,39 +6,53 @@ This document provides guidelines for contributors to this project. It includes 
 
 ```
 <root>/
-├── app/                      # フロントエンドのソースコード
-│   │                         # Frontend source code
-│   ├── src/                  # Reactコンポーネント、スタイル、ルーティングなど
-│   │                         # React components, styles, routing, etc.
-│   ├── public/               # 静的アセット
-│   │                         # Static assets
-│   ├── index.html            # HTMLエントリポイント
-│   │                         # HTML entry point
-│   ├── package.json          # npm依存関係とスクリプト
-│   │                         # npm dependencies and scripts
-│   └── vite.config.ts        # Viteの設定
-│                             # Vite configuration
-├── app/src-tauri/            # Tauriバックエンドのソースコード
-│   │                         # Tauri backend source code
-│   ├── src/                  # Rustのソースコード
-│   │                         # Rust source code
-│   ├── Cargo.toml            # Rustの依存関係
-│   │                         # Rust dependencies
-│   └── tauri.conf.json       # Tauriの設定
-│                             # Tauri configuration
-├── CONTRIBUTING.md           # 貢献ガイドライン
-│                             # Contribution guidelines
-└── README.md                 # プロジェクトの概要とセットアップ手順
-                              # Project overview and setup instructions
+├── .github/                  # GitHub-related files (workflows, templates, etc.)
+├── .junie/                   # Project guidelines and documentation
+│   ├── coding-practices.md   # General coding practices
+│   ├── guidelines-general.md # High-level development guidelines
+│   ├── guidelines-git.md     # Git and commit conventions
+│   ├── guidelines-rs.md      # Rust-specific guidelines
+│   └── guidelines.md         # Main guidelines document with references
+├── macro-impl/               # Macro implementation crate
+│   ├── src/                  # Source code for macros
+│   │   └── lib.rs            # Main library file for macros
+│   └── Cargo.toml            # Cargo configuration for macro-impl
+├── src/                      # Main library source code
+│   └── lib.rs                # Main library file
+├── target/                   # Build artifacts (generated)
+├── CONTRIBUTING.md           # Contribution guidelines
+├── Cargo.toml                # Cargo configuration for main crate
+├── Cargo.lock                # Locked dependencies
+├── README.md                 # Project overview and setup instructions
+└── rust-toolchain.toml       # Rust toolchain configuration
 ```
 
 ## Development Environment Setup
 
-1. Clone the repository:
+1. Install Rust (if not already installed):
+   - Visit [rustup.rs](https://rustup.rs/) and follow the instructions for your platform
+   - This project uses a specific Rust version defined in `rust-toolchain.toml`
+
+2. Clone the repository:
    ```
    git clone https://github.com/ryotan/suzunari-error.git
    cd suzunari-error
    ```
+
+3. Build the project:
+   ```
+   cargo build
+   ```
+
+4. Run tests:
+   ```
+   cargo test
+   ```
+
+5. Optional: Install development tools:
+   - Install [mise](https://mise.jdx.dev/) for running predefined project commands
+   - Install [rustfmt](https://github.com/rust-lang/rustfmt) for code formatting: `rustup component add rustfmt`
+   - Install [Clippy](https://github.com/rust-lang/rust-clippy) for linting: `rustup component add clippy`
 
 
 ## Coding Conventions
@@ -59,7 +73,7 @@ See [Commit Message Conventions](./.junie/guidelines-git.md)
 2. Implement changes and commit:
    ```
    git add .
-   git commit -m "feat: Gitの差分表示機能を追加"
+   git commit -m "feat: Add Git diff display feature"
    ```
 
 3. Push to remote branch:
@@ -78,9 +92,11 @@ See [Commit Message Conventions](./.junie/guidelines-git.md)
 
 See "Testing" section in [Rust Style Guide](./.junie/guidelines-rs.md)
 
-- Run Rust tests with `mise test`.
-- Use `mise clippy` for code quality checks.
-- To ensure code quality, be sure to run `mise lint` and `mise test`. These commands run code quality checks and tests to ensure there are no issues.
+- Run tests with `cargo test`
+- Use `cargo clippy` for code quality checks
+- Use `cargo fmt --check` to verify code formatting
+
+Note: While the project includes a `.mise.toml` file for potential command shortcuts, these commands are not currently configured. You can set up your own mise commands or use the standard cargo commands above.
 
 ## Release
 
