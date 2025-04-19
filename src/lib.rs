@@ -12,7 +12,7 @@ pub use suzunari_error_macro_impl::*;
 pub enum Error {
     #[snafu(display("IO error: {source}"))]
     Io { source: std::io::Error },
-    
+
     #[snafu(display("Custom error: {message}"))]
     Custom { message: String },
 }
@@ -29,7 +29,7 @@ pub fn example() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn it_works() {
         let result = example();
