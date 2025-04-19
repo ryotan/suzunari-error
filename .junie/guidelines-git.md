@@ -52,79 +52,113 @@ Example:
 - Display untracked files
 ```
 
-### GitMoji meanings
+### GitMoji Categories
+
+GitMoji are organized into categories to help you find the appropriate emoji for your commit message.
+
+#### 🚀 Features and Improvements
+
+- ✨: Introduce new features.
+- 🚀: Deploy stuff.
+- 💄: Add or update the UI and style files.
+- 🎉: Begin a project.
+- 🚸: Improve user experience / usability.
+- 📱: Work on responsive design.
+- 🥚: Add or update an easter egg.
+- 💫: Add or update animations and transitions.
+- 👔: Add or update business logic.
+- ✈️: Improve offline support.
+- 🚩: Add, update, or remove feature flags.
+
+#### 🐛 Bug Fixes and Critical Changes
+
+- 🐛: Fix a bug.
+- 🚑️: Critical hotfix.
+- 🩹: Simple fix for a non-critical issue.
+- 🔒️: Fix security or privacy issues.
+- 🥅: Catch errors.
+- 💥: Introduce breaking changes.
+
+#### 🧹 Code Quality and Maintenance
 
 - 🎨: Improve structure / format of the code.
 - ⚡️: Improve performance.
 - 🔥: Remove code or files.
-- 🐛: Fix a bug.
-- 🚑️: Critical hotfix.
-- ✨: Introduce new features.
-- 📝: Add or update documentation.
-- 🚀: Deploy stuff.
-- 💄: Add or update the UI and style files.
-- 🎉: Begin a project.
-- ✅: Add, update, or pass tests.
-- 🔒️: Fix security or privacy issues.
-- 🔐: Add or update secrets.
-- 🔖: Release / Version tags.
+- ♻️: Refactor code.
+- ✏️: Fix typos.
+- 💩: Write bad code that needs to be improved.
+- 🗑️: Deprecate code that needs to be cleaned up.
+- ⚰️: Remove dead code.
 - 🚨: Fix compiler / linter warnings.
-- 🚧: Work in progress.
-- 💚: Fix CI Build.
+- 🧑‍💻: Improve developer experience.
+- 🏗️: Make architectural changes.
+
+#### 📝 Documentation and Comments
+
+- 📝: Add or update documentation.
+- 💡: Add or update comments in source code.
+- 💬: Add or update text and literals.
+- 📄: Add or update license.
+- 👥: Add or update contributor(s).
+
+#### 🧪 Testing and Validation
+
+- ✅: Add, update, or pass tests.
+- 🧪: Add a failing test.
+- 📸: Add or update snapshots.
+- ⚗️: Perform experiments.
+- 🦺: Add or update code related to validation.
+- 🩺: Add or update healthcheck.
+- 🧐: Data exploration/inspection.
+- 🤡: Mock things.
+
+#### 📦 Dependencies and Assets
+
 - ⬇️: Downgrade dependencies.
 - ⬆️: Upgrade dependencies.
 - 📌: Pin dependencies to specific versions.
-- 👷: Add or update CI build system.
-- 📈: Add or update analytics or track code.
-- ♻️: Refactor code.
 - ➕: Add a dependency.
 - ➖: Remove a dependency.
+- 🍱: Add or update assets.
+- 📦️: Add or update compiled files or packages.
+- 🌱: Add or update seed files.
+
+#### ⚙️ Configuration and Infrastructure
+
 - 🔧: Add or update configuration files.
 - 🔨: Add or update development scripts.
-- 🌐: Internationalization and localization.
-- ✏️: Fix typos.
-- 💩: Write bad code that needs to be improved.
+- 🙈: Add or update a .gitignore file.
+- 🧱: Infrastructure related changes.
+- 💸: Add sponsorships or money related infrastructure.
+- 🔐: Add or update secrets.
+
+#### 🔄 Version Control and CI/CD
+
+- 🚧: Work in progress.
 - ⏪️: Revert changes.
 - 🔀: Merge branches.
-- 📦️: Add or update compiled files or packages.
-- 👽️: Update code due to external API changes.
-- 🚚: Move or rename resources (e.g.: files, paths, routes).
-- 📄: Add or update license.
-- 💥: Introduce breaking changes.
-- 🍱: Add or update assets.
-- ♿️: Improve accessibility.
-- 💡: Add or update comments in source code.
-- 🍻: Write code drunkenly.
-- 💬: Add or update text and literals.
+- 💚: Fix CI Build.
+- 👷: Add or update CI build system.
+- 🔖: Release / Version tags.
+
+#### 🌐 Internationalization and Data
+
+- 🌐: Internationalization and localization.
 - 🗃️: Perform database related changes.
 - 🔊: Add or update logs.
 - 🔇: Remove logs.
-- 👥: Add or update contributor(s).
-- 🚸: Improve user experience / usability.
-- 🏗️: Make architectural changes.
-- 📱: Work on responsive design.
-- 🤡: Mock things.
-- 🥚: Add or update an easter egg.
-- 🙈: Add or update a .gitignore file.
-- 📸: Add or update snapshots.
-- ⚗️: Perform experiments.
+- 📈: Add or update analytics or track code.
 - 🔍️: Improve SEO.
-- 🏷️: Add or update types.
-- 🌱: Add or update seed files.
-- 🚩: Add, update, or remove feature flags.
-- 🥅: Catch errors.
-- 💫: Add or update animations and transitions.
-- 🗑️: Deprecate code that needs to be cleaned up.
-- 🛂: Work on code related to authorization, roles and permissions.
-- 🩹: Simple fix for a non-critical issue.
-- 🧐: Data exploration/inspection.
-- ⚰️: Remove dead code.
-- 🧪: Add a failing test.
-- 👔: Add or update business logic.
-- 🩺: Add or update healthcheck.
-- 🧱: Infrastructure related changes.
-- 🧑‍💻: Improve developer experience.
-- 💸: Add sponsorships or money related infrastructure.
+
+#### 🧵 Advanced Programming
+
 - 🧵: Add or update code related to multithreading or concurrency.
-- 🦺: Add or update code related to validation.
-- ✈️: Improve offline support.
+- 🏷️: Add or update types.
+- 👽️: Update code due to external API changes.
+- 🚚: Move or rename resources (e.g.: files, paths, routes).
+- 🛂: Work on code related to authorization, roles and permissions.
+- ♿️: Improve accessibility.
+
+#### 🍻 Miscellaneous
+
+- 🍻: Write code drunkenly.
