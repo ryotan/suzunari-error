@@ -27,7 +27,7 @@ aspects of the project, regardless of the programming language or technology use
 - E2E tests are mandatory only for important features
 - Target test coverage of 80% or higher
 
-## 5. Documentation Conventions)
+## 5. Documentation Conventions
 
 - Prepare README.md for each feature
 - Generate API documentation automatically
