@@ -5,14 +5,13 @@
 extern crate proc_macro;
 
 use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
-use proc_macro_crate::crate_name;
 use snafu::prelude::*;
+use syn::{DeriveInput, parse_macro_input};
 
 /// Error type for macro implementation
 #[derive(Debug, Snafu)]
+#[allow(dead_code)]
 enum MacroError {
     #[snafu(display("Failed to parse input: {source}"))]
     ParseError { source: syn::Error },
@@ -26,7 +25,7 @@ enum MacroError {
 /// This is a placeholder for actual macro implementation.
 #[proc_macro_derive(ExampleMacro)]
 pub fn example_macro(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
+    let _input = parse_macro_input!(input as DeriveInput);
 
     // Placeholder implementation
     let expanded = quote! {
