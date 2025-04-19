@@ -60,6 +60,27 @@ aspects of the project, regardless of the programming language or technology use
 
 ## 8. Cross-Platform Support
 
-- Ensure library works consistently across Windows/macOS/Linux
-- Use conditional compilation for platform-specific code
+- Ensure library works consistently across all supported platforms
+  - Primary targets: Windows, macOS, Linux
+  - Consider compatibility with WebAssembly (wasm32) targets
+  - Support embedded and no_std environments where feasible
+- Use Rust's platform abstraction features
+  - Leverage std::path for filesystem path handling
+  - Use std::env for environment variables
+  - Rely on std::fs for filesystem operations
+- Handle platform-specific error types appropriately
+  - Abstract platform-specific errors into common error types
+  - Provide context about the originating platform when relevant
+  - Test error conversion on different platforms
+- Use conditional compilation judiciously
+  - Use #[cfg(target_os = "...")] for platform-specific code
+  - Isolate platform-specific code in separate modules
+  - Document platform-specific behavior clearly
 - Test on all supported platforms before release
+  - Set up CI to test on multiple platforms
+  - Consider using cross-compilation for testing
+  - Verify error handling works correctly on each platform
+- Avoid assumptions about platform behavior
+  - Don't assume specific error codes or messages
+  - Be cautious with assumptions about filesystem behavior
+  - Consider differences in threading and async behavior
