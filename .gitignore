@@ -53,3 +53,8 @@ gen/
 out/
 
 _[sS]cratch*.*
+
+
+# Added by cargo
+
+/target

@@ -1,0 +1,32 @@
+[workspace.package]
+description = "A highly traceable and noise-free error system that propagates error locations as error contexts and minimizes information output to the log"
+version = "0.1.0"
+edition = "2024"
+repository = "https://github.com/ryotan/suzunari-error"
+license = "MIT OR Apache-2.0"
+authors = ["ryotan"]
+
+[workspace]
+members = ["macro-impl"]
+
+[workspace.dependencies]
+snafu = "0.8"
+proc-macro2 = "1.0"
+proc-macro-crate = "3.3"
+quote = "1.0"
+syn = "2.0"
+# Workspace local crates
+suzunari-error-macro-impl = { path = "./macro-impl" }
+
+[package]
+name = "suzunari-error"
+description.workspace = true
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+snafu.workspace = true
+suzunari-error-macro-impl.workspace = true
