@@ -10,6 +10,9 @@ pub use suzunari_error_macro_impl::*;
 mod location;
 pub use location::Location;
 
+mod stack_error;
+pub use stack_error::StackError;
+
 /// Example error type
 #[derive(Debug, Snafu)]
 pub enum Error {
