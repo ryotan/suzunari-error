@@ -7,6 +7,9 @@ use snafu::prelude::*;
 /// Re-export macros from the macro-impl crate
 pub use suzunari_error_macro_impl::*;
 
+mod location;
+pub use location::Location;
+
 /// Example error type
 #[derive(Debug, Snafu)]
 pub enum Error {
