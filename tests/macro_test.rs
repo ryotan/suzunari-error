@@ -1,5 +1,5 @@
 use snafu::prelude::*;
-use suzunari_error::{Location, StackError, suzunari_location};
+use suzunari_error::{Location, StackError, suzunari_error, suzunari_location};
 
 // Test struct with StackError derive macro
 #[suzunari_location]
@@ -20,8 +20,7 @@ struct TestErrorWithLocation {
 // No need to implement Error manually, Snafu already does this
 
 // Test enum with StackError derive macro
-#[suzunari_location]
-#[derive(Snafu, StackError)]
+#[suzunari_error]
 enum TestErrorEnum {
     Variant1 { message: String },
     Variant2 { context: String },

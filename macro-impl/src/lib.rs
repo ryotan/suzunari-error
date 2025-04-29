@@ -20,3 +20,8 @@ pub fn derive_stack_error(input: TokenStream) -> TokenStream {
 pub fn suzunari_location(_attr: TokenStream, item: TokenStream) -> TokenStream {
     suzunari_location_impl(item.into()).into()
 }
+
+#[proc_macro_attribute]
+pub fn suzunari_error(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    suzunari_error_impl(item.into()).into()
+}
