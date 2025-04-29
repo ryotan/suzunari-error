@@ -16,3 +16,6 @@ proc-macro2.workspace = true
 quote.workspace = true
 snafu.workspace = true
 syn = { workspace = true, features = ["full"] }
+
+[dev-dependencies]
+suzunari-error.workspace = true
