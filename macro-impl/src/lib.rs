@@ -6,10 +6,10 @@ mod derive_stack_error_impl;
 mod helper;
 mod suzunari_location_impl;
 
-use proc_macro::TokenStream;
 use crate::derive_stack_error_impl::derive_stack_error_impl;
 use crate::helper::{get_crate_name, has_location};
 use crate::suzunari_location_impl::suzunari_location_impl;
+use proc_macro::TokenStream;
 
 #[proc_macro_derive(StackError)]
 pub fn derive_stack_error(input: TokenStream) -> TokenStream {

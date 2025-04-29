@@ -1,5 +1,5 @@
+use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::Ident;
-use proc_macro_crate::{crate_name, FoundCrate};
 use quote::format_ident;
 use syn::FieldsNamed;
 
@@ -14,6 +14,9 @@ pub(crate) fn get_crate_name(original_name: &str) -> Result<Ident, proc_macro_cr
 
 pub(crate) fn has_location(fields: &FieldsNamed) -> bool {
     fields.named.iter().any(|field| {
-        field.ident.as_ref().is_some_and(|ident| ident == "location")
+        field
+            .ident
+            .as_ref()
+            .is_some_and(|ident| ident == "location")
     })
 }

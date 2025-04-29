@@ -1,6 +1,6 @@
 use core::error::Error;
 use snafu::{ResultExt, Snafu};
-use suzunari_error::{Location, StackError, write_stack_error_log, write_error_log};
+use suzunari_error::{Location, StackError, write_error_log, write_stack_error_log};
 
 #[derive(Snafu)]
 struct NestedError {
