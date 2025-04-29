@@ -56,7 +56,7 @@ fn test_nested_stack_trace() {
     let file = file!();
     assert_eq!(
         format!("{err:?}"),
-        format!("1: ErrorAggregate, at {file}:37:18\n0: Variant2 message, at {file}:27:5\n")
+        format!("1: ErrorAggregate, at {file}:39:10\n0: Variant2 message, at {file}:27:5\n")
     );
 }
 
