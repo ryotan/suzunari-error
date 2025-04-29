@@ -5,11 +5,11 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Fields};
 
-pub(crate) fn suzunari_location_impl(stream: TokenStream) -> TokenStream {
-    let mut input: DeriveInput = syn::parse2(stream.clone()).unwrap();
+pub(crate) fn suzunari_location_impl(stream: TokenStream) -> Result<TokenStream, Error> {
+    let mut input: DeriveInput = syn::parse2(stream.clone())?;
 
     // Try to find the suzunari_error crate
-    let crate_path = get_crate_name("suzunari-error").unwrap();
+    let crate_path = get_crate_name("suzunari-error", &stream)?;
 
     // Add the location field based on whether it's a struct or enum
     match &mut input.data {
@@ -27,11 +27,10 @@ pub(crate) fn suzunari_location_impl(stream: TokenStream) -> TokenStream {
                 }
                 _ => {
                     // Return an error for non-named fields
-                    let error = Error::new(
+                    return Err(Error::new(
                         data_struct.fields.span(),
                         "suzunari_location can only be used on structs with named fields",
-                    );
-                    return error.to_compile_error();
+                    ));
                 }
             }
         }
@@ -61,35 +60,36 @@ pub(crate) fn suzunari_location_impl(stream: TokenStream) -> TokenStream {
                     }
                     _ => {
                         // Return an error for non-named fields
-                        let error = Error::new(
+                        return Err(Error::new(
                             variant.span(),
                             "suzunari_location can only be used on enum variants with named fields",
-                        );
-                        return error.to_compile_error();
+                        ));
                     }
                 }
             }
         }
         Data::Union(_) => {
             // Return an error for unions
-            let error = Error::new(input.span(), "suzunari_location cannot be used on unions");
-            return error.to_compile_error();
+            return Err(Error::new(
+                input.span(),
+                "suzunari_location cannot be used on unions",
+            ));
         }
     }
 
     // Return the modified input
-    quote! {
+    Ok(quote! {
         #input
-    }
+    })
 }
 
-pub(crate) fn suzunari_error_impl(stream: TokenStream) -> TokenStream {
+pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = syn::parse2(stream.clone()).unwrap();
 
     // Snafu と StackError を追加
     // Try to find the suzunari_error crate
-    let crate_path = get_crate_name("suzunari-error").unwrap();
-    let snafu_path = get_crate_name("snafu").unwrap();
+    let crate_path = get_crate_name("suzunari-error", &stream)?;
+    let snafu_path = get_crate_name("snafu", &stream)?;
 
     // #[suzunari_location] attributeを生成
     let location_attribute = quote! { #[#crate_path::suzunari_location] };
@@ -98,11 +98,11 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> TokenStream {
     let derive_attribute = quote! { #[derive(#snafu_path::Snafu, #crate_path::StackError)] };
 
     // 構造体/enumの定義と新しいattributeを合わせてTokenStreamとして返す
-    quote! {
+    Ok(quote! {
         #location_attribute
         #derive_attribute
         #input
-    }
+    })
 }
 
 fn location_field_impl(crate_path: &Ident) -> syn::Field {

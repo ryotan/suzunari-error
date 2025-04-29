@@ -13,15 +13,21 @@ use proc_macro::TokenStream;
 
 #[proc_macro_derive(StackError)]
 pub fn derive_stack_error(input: TokenStream) -> TokenStream {
-    stack_error_impl(input.into()).into()
+    stack_error_impl(input.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
 }
 
 #[proc_macro_attribute]
 pub fn suzunari_location(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    suzunari_location_impl(item.into()).into()
+    suzunari_location_impl(item.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
 }
 
 #[proc_macro_attribute]
 pub fn suzunari_error(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    suzunari_error_impl(item.into()).into()
+    suzunari_error_impl(item.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
 }

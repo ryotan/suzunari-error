@@ -4,33 +4,34 @@ use quote::quote;
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Fields, FieldsNamed, Variant};
 
-pub(crate) fn stack_error_impl(stream: TokenStream) -> TokenStream {
-    let input: DeriveInput = syn::parse2(stream.clone()).unwrap();
+pub(crate) fn stack_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
+    let input: DeriveInput = syn::parse2(stream.clone())?;
     let name = &input.ident;
 
     // Try to find the suzunari_error crate
-    let crate_path = get_crate_name("suzunari-error").unwrap();
+    let crate_path = get_crate_name("suzunari-error", &stream)?;
 
     // Generate the implementation based on whether it's a struct or enum
     match &input.data {
         Data::Struct(data_struct) => {
             match &data_struct.fields {
-                Fields::Named(fields) => generate_struct_impl(name, fields, &crate_path),
+                Fields::Named(fields) => Ok(generate_struct_impl(name, fields, &crate_path)),
                 _ => {
                     // Return an error for non-named fields
-                    let error = Error::new(
+                    Err(Error::new(
                         data_struct.fields.span(),
                         "StackError can only be derived for structs with named fields",
-                    );
-                    error.to_compile_error()
+                    ))
                 }
             }
         }
-        Data::Enum(data_enum) => generate_enum_impl(name, &data_enum.variants, &crate_path),
+        Data::Enum(data_enum) => Ok(generate_enum_impl(name, &data_enum.variants, &crate_path)),
         Data::Union(_) => {
             // Return an error for unions
-            let error = Error::new(stream.span(), "StackError cannot be derived for unions");
-            error.to_compile_error()
+            Err(Error::new(
+                stream.span(),
+                "StackError cannot be derived for unions",
+            ))
         }
     }
 }
