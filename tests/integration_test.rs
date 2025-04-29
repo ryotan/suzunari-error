@@ -94,3 +94,25 @@ fn validate() -> Result<(), BoxedStackError> {
     ensure!(false, ValidationFailedSnafu { param });
     Ok(())
 }
+
+#[test]
+fn test_retrieve_data() {
+    let err = retrieve_data().unwrap_err();
+    let file = file!();
+    assert_eq!(
+        format!("{err:?}"),
+        format!(
+            "2: Failed to retrieve, at {file}:82:21\n1: after 3sec, at {file}:88:14\nCustom {{ kind: TimedOut, error: \"timeout\" }}"
+        )
+    );
+}
+
+#[test]
+fn test_validate() {
+    let err = validate().unwrap_err();
+    let file = file!();
+    assert_eq!(
+        format!("{err:?}"),
+        format!("0: 0 is an invalid value. Must be larger than 1, at {file}:94:5\n")
+    )
+}
