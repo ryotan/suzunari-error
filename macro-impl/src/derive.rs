@@ -4,7 +4,7 @@ use quote::quote;
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Fields, FieldsNamed, Variant};
 
-pub(crate) fn derive_stack_error_impl(stream: TokenStream) -> TokenStream {
+pub(crate) fn stack_error_impl(stream: TokenStream) -> TokenStream {
     let input: DeriveInput = syn::parse2(stream.clone()).unwrap();
     let name = &input.ident;
 
@@ -58,6 +58,11 @@ fn generate_struct_impl(name: &Ident, fields: &FieldsNamed, crate_path: &Ident) 
                 #crate_path::write_stack_error_log(f, self)
             }
         }
+        impl From<#name> for #crate_path::BoxedStackError {
+            fn from(error: #name) -> Self {
+                #crate_path::BoxedStackError::new(error)
+            }
+        }
     }
 }
 
@@ -103,6 +108,11 @@ fn generate_enum_impl(
         impl core::fmt::Debug for #name {
             fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
                 #crate_path::write_stack_error_log(f, self)
+            }
+        }
+        impl From<#name> for #crate_path::BoxedStackError {
+            fn from(error: #name) -> Self {
+                #crate_path::BoxedStackError::new(error)
             }
         }
     }

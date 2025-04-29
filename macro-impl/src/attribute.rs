@@ -1,6 +1,7 @@
 use crate::helper::{get_crate_name, has_location};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Fields};
 
@@ -47,6 +48,16 @@ pub(crate) fn suzunari_location_impl(stream: TokenStream) -> TokenStream {
                             // Add the field to the variant
                             fields.named.push(location_field);
                         }
+                    }
+                    Fields::Unit => {
+                        // Create a new field with the #[snafu(implicit)] attribute
+                        let location_field = location_field_impl(&crate_path);
+                        let mut fields = Punctuated::new();
+                        fields.push(location_field);
+                        variant.fields = Fields::Named(syn::FieldsNamed {
+                            brace_token: Default::default(),
+                            named: fields,
+                        });
                     }
                     _ => {
                         // Return an error for non-named fields
