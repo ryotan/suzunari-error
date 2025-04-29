@@ -48,7 +48,7 @@ fn test_stack_error_derive() {
     assert_eq!(error.location().file(), file);
     assert_eq!(
         format!("{error:?}"),
-        format!("0: Test error, at {file}:{line}:7\n")
+        format!("0: Test error, at {file}:{line}:6\n")
     );
 }
 
@@ -64,7 +64,7 @@ fn test_suzunari_location_attribute() {
     assert_eq!(error.location().file(), file);
     assert_eq!(
         format!("{error:?}"),
-        format!("0: TestErrorWithLocation, at {file}:{line}:7\n")
+        format!("0: TestErrorWithLocation, at {file}:{line}:6\n")
     );
 }
 
@@ -80,7 +80,7 @@ fn test_stack_error_enum_derive() {
     assert_eq!(error.location().file(), file);
     assert_eq!(
         format!("{error:?}"),
-        format!("0: Variant1, at {file}:{line}:7\n")
+        format!("0: Variant1, at {file}:{line}:6\n")
     );
 
     let error = Variant2Snafu {
@@ -93,7 +93,7 @@ fn test_stack_error_enum_derive() {
     assert_eq!(error.location().file(), file);
     assert_eq!(
         format!("{error:?}"),
-        format!("0: Variant2, at {file}:{line}:7\n")
+        format!("0: Variant2, at {file}:{line}:6\n")
     );
 }
 
