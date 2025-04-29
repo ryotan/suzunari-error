@@ -1,12 +1,14 @@
-use snafu::{ensure, ResultExt, Snafu};
-use std::error::Error;
-use suzunari_error::{Location, StackError};
+use core::error::Error;
+use snafu::{ResultExt, Snafu};
+use suzunari_error::{Location, StackError, write_stack_error_log, write_error_log};
 
-#[derive(Debug, Snafu)]
-struct NestedError {}
+#[derive(Snafu)]
+struct NestedError {
+    source: std::io::Error,
+}
 
 // A simple error type for testing
-#[derive(Debug, Snafu)]
+#[derive(Snafu)]
 enum TestError {
     Simple {
         #[snafu(implicit)]
@@ -57,8 +59,8 @@ fn test_chain_context() {
 }
 
 // Test error propagation through multiple functions
-fn function_c() -> Result<(), NestedError> {
-    NestedSnafu.fail()
+fn function_c() -> Result<Vec<u8>, NestedError> {
+    std::fs::read("not exist").context(NestedSnafu)
 }
 
 fn function_b() -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -67,8 +69,20 @@ fn function_b() -> Result<(), Box<dyn Error + Send + Sync>> {
 }
 
 fn function_a() -> Result<(), TestError> {
-    function_b().context(ExternalSnafu {message: "Whoops"})?;
+    function_b().context(ExternalSnafu { message: "Whoops" })?;
     Ok(())
+}
+
+impl core::fmt::Debug for NestedError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write_error_log(f, self)
+    }
+}
+
+impl core::fmt::Debug for TestError {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        write_stack_error_log(f, self)
+    }
 }
 
 #[test]
@@ -79,5 +93,12 @@ fn test_error_propagation() {
     let error = result.unwrap_err();
 
     // Test final context message
-    assert_eq!(format!("{error:?}"), "Whoops");
+    let file = file!();
+    let expected = format!(
+        "3: Whoops, at {file}:72:18
+2: Internal, at {file}:67:18
+1: NestedError
+Os {{ code: 2, kind: NotFound, message: \""
+    );
+    assert!(format!("{error:?}").starts_with(&expected));
 }

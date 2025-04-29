@@ -2,17 +2,16 @@
 //!
 //! This crate provides error handling utilities for Rust applications.
 
-use snafu::prelude::*;
+mod boxed_stack_error;
+mod location;
+mod stack_error;
 
-/// Re-export macros from the macro-impl crate
+pub use boxed_stack_error::*;
+pub use location::*;
+pub use stack_error::*;
 pub use suzunari_error_macro_impl::*;
 
-mod location;
-pub use location::Location;
-
-mod stack_error;
-pub use stack_error::StackError;
-
+use snafu::Snafu;
 /// Example error type
 #[derive(Debug, Snafu)]
 pub enum Error {
