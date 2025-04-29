@@ -16,6 +16,7 @@ proc-macro-crate = "3.3"
 quote = "1.0"
 syn = "2.0"
 # Workspace local crates
+suzunari-error = { path = "." }
 suzunari-error-macro-impl = { path = "./macro-impl" }
 
 [package]

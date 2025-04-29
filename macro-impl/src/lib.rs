@@ -2,35 +2,32 @@
 //!
 //! This crate provides procedural macros for the suzunari-error crate.
 
-extern crate proc_macro;
+mod attribute;
+mod derive;
+mod helper;
 
+use crate::attribute::{suzunari_error_impl, suzunari_location_impl};
+use crate::derive::stack_error_impl;
+use crate::helper::{get_crate_name, has_location};
 use proc_macro::TokenStream;
-use quote::quote;
-use snafu::prelude::*;
-use syn::{DeriveInput, parse_macro_input};
 
-/// Error type for macro implementation
-#[derive(Debug, Snafu)]
-#[allow(dead_code)]
-enum MacroError {
-    #[snafu(display("Failed to parse input: {source}"))]
-    ParseError { source: syn::Error },
-
-    #[snafu(display("Failed to find crate: {message}"))]
-    CrateError { message: String },
+#[proc_macro_derive(StackError)]
+pub fn derive_stack_error(input: TokenStream) -> TokenStream {
+    stack_error_impl(input.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
 }
 
-/// Example procedural macro
-///
-/// This is a placeholder for actual macro implementation.
-#[proc_macro_derive(ExampleMacro)]
-pub fn example_macro(input: TokenStream) -> TokenStream {
-    let _input = parse_macro_input!(input as DeriveInput);
+#[proc_macro_attribute]
+pub fn suzunari_location(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    suzunari_location_impl(item.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
 
-    // Placeholder implementation
-    let expanded = quote! {
-        // Generated code will go here
-    };
-
-    expanded.into()
+#[proc_macro_attribute]
+pub fn suzunari_error(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    suzunari_error_impl(item.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
 }

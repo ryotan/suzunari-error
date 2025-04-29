@@ -1,0 +1,259 @@
+use crate::Location;
+use core::error::Error;
+use snafu::{AsErrorSource, ErrorCompat};
+use std::sync::Arc;
+
+pub trait StackError: Error {
+    fn location(&self) -> &Location;
+}
+
+impl<T: StackError> StackError for Box<T> {
+    fn location(&self) -> &Location {
+        self.as_ref().location()
+    }
+}
+impl<T: ?Sized + StackError> StackError for Arc<T> {
+    fn location(&self) -> &Location {
+        self.as_ref().location()
+    }
+}
+
+impl Error for Box<dyn StackError> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Error::source(Box::as_ref(self))
+    }
+}
+impl StackError for Box<dyn StackError> {
+    fn location(&self) -> &Location {
+        self.as_ref().location()
+    }
+}
+
+impl Error for Box<dyn StackError + Send + Sync> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Error::source(Box::as_ref(self))
+    }
+}
+impl StackError for Box<dyn StackError + Send + Sync> {
+    fn location(&self) -> &Location {
+        self.as_ref().location()
+    }
+}
+
+pub fn write_stack_error_log<T: StackError + ErrorCompat + AsErrorSource>(
+    f: &mut core::fmt::Formatter,
+    err: &T,
+) -> core::fmt::Result {
+    write_error_log_impl(f, err, Some(err.location()))
+}
+
+pub fn write_error_log<T: Error + ErrorCompat + AsErrorSource>(
+    f: &mut core::fmt::Formatter,
+    err: &T,
+) -> core::fmt::Result {
+    write_error_log_impl(f, err, None)
+}
+
+fn write_error_log_impl<T: Error + ErrorCompat + AsErrorSource>(
+    f: &mut core::fmt::Formatter,
+    err: &T,
+    location: Option<&Location>,
+) -> core::fmt::Result {
+    let depth = err.iter_chain().count() - 1;
+    match location {
+        Some(location) => {
+            writeln!(f, "{depth}: {err}, at {:?}", location)?;
+        }
+        None => {
+            writeln!(f, "{depth}: {err}")?;
+        }
+    }
+    if let Some(source) = err.source() {
+        write!(f, "{source:?}")?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snafu::prelude::*;
+    use std::error::Error;
+    use std::fmt::{Debug, Formatter};
+    use std::sync::Arc;
+
+    #[derive(Snafu)]
+    #[snafu(display("Simple test error: {}", message))]
+    struct SimpleError {
+        message: String,
+        #[snafu(implicit)]
+        location: Location,
+    }
+    impl Debug for SimpleError {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write_stack_error_log(f, self)
+        }
+    }
+    impl StackError for SimpleError {
+        fn location(&self) -> &Location {
+            &self.location
+        }
+    }
+
+    #[derive(Snafu)]
+    #[snafu(display("Wrapper error: {}", message))]
+    struct WrapperError {
+        message: String,
+        source: Box<dyn StackError + Send + Sync>,
+        #[snafu(implicit)]
+        location: Location,
+    }
+    impl Debug for WrapperError {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            write_stack_error_log(f, self)
+        }
+    }
+    impl StackError for WrapperError {
+        fn location(&self) -> &Location {
+            &self.location
+        }
+    }
+
+    #[test]
+    fn test_basic_location() {
+        let error = SimpleSnafu {
+            message: "Something went wrong",
+        }
+        .build();
+        assert_eq!(error.location().file(), file!());
+        assert!(error.location().line() > 0);
+        assert!(format!("{}", error).contains("Simple test error"));
+        assert!(format!("{}", error).contains("Something went wrong"));
+
+        handle_stack_error(error)
+    }
+
+    #[test]
+    fn test_error_boxing() {
+        let concrete_error = SimpleSnafu {
+            message: "Original error",
+        }
+        .build();
+        let boxed_error: Box<dyn StackError> = Box::new(concrete_error);
+
+        assert_eq!(boxed_error.location().file(), file!());
+        assert!(boxed_error.location().line() > 0);
+        assert!(format!("{}", boxed_error).contains("Simple test error"));
+        assert!(format!("{}", boxed_error).contains("Original error"));
+
+        handle_stack_error(boxed_error)
+    }
+
+    #[test]
+    fn test_error_chaining() {
+        fn gen_root_error() -> Result<(), Box<dyn StackError + Send + Sync + 'static>> {
+            let root_error = SimpleSnafu {
+                message: "Root cause",
+            }
+            .build();
+            Err(Box::new(root_error))
+        }
+        let root_error = gen_root_error();
+        let root_location = root_error.unwrap_err().location().line();
+
+        let wrapper_error = gen_root_error()
+            .context(WrapperSnafu {
+                message: "Something failed",
+            })
+            .unwrap_err();
+
+        assert!(wrapper_error.location().file().ends_with("stack_error.rs"));
+        assert_ne!(wrapper_error.location().line(), root_location);
+
+        assert!(format!("{wrapper_error:?}").contains(file!()));
+        assert!(format!("{wrapper_error:?}").contains("Wrapper error: "));
+        assert!(format!("{wrapper_error:?}").contains("Something failed"));
+        assert!(format!("{wrapper_error:?}").contains("Simple test error: "));
+        assert!(format!("{wrapper_error:?}").contains("Root cause"));
+
+        let file = file!();
+        assert_eq!(
+            format!("{wrapper_error:?}"),
+            format!(
+                "1: Wrapper error: Something failed, at {file}:165:14\n\
+                 0: Simple test error: Root cause, at {file}:158:14\n"
+            )
+        );
+
+        handle_stack_error(wrapper_error);
+    }
+
+    #[test]
+    fn test_arc_errors() {
+        let error = SimpleSnafu {
+            message: "Arc-wrapped error",
+        }
+        .build();
+        let original_location = error.location().line();
+        let arc_error = Arc::new(error);
+
+        assert_eq!(arc_error.location().line(), original_location);
+
+        let cloned_arc = arc_error.clone();
+        assert_eq!(cloned_arc.location().line(), original_location);
+
+        handle_stack_error(arc_error);
+
+        let arc_error: Arc<dyn StackError> = Arc::new(SimpleSnafu { message: "Simple" }.build());
+        handle_stack_error(arc_error);
+    }
+
+    #[test]
+    fn test_from_implementation() {
+        let concrete_error = SimpleSnafu {
+            message: "Converted error",
+        }
+        .build();
+        let original_location = concrete_error.location().line();
+        let boxed_error: Box<dyn StackError + Send + Sync + 'static> = Box::new(concrete_error);
+
+        assert_eq!(boxed_error.location().line(), original_location);
+        handle_stack_error(boxed_error);
+    }
+
+    #[test]
+    fn test_practical_error_handling() {
+        fn may_fail(input: i32) -> Result<i32, Box<dyn StackError + Send + Sync + 'static>> {
+            if input < 0 {
+                return Err(Box::new(
+                    SimpleSnafu {
+                        message: "Input must be non-negative",
+                    }
+                    .build(),
+                ));
+            }
+            Ok(input * 2)
+        }
+
+        fn process(input: i32) -> Result<i32, Box<WrapperError>> {
+            let result = may_fail(input).context(WrapperSnafu {
+                message: "Processing failed",
+            })?;
+
+            Ok(result + 10)
+        }
+
+        assert_eq!(process(5).unwrap(), 20);
+
+        let err: Box<WrapperError> = process(-1).unwrap_err();
+        assert!(format!("{}", err).contains("Processing failed"));
+
+        let source = err.source().unwrap();
+        assert!(format!("{source:?}").contains("Simple test error: "));
+        assert!(format!("{source:?}").contains("Input must be non-negative"));
+
+        handle_stack_error(err);
+    }
+
+    fn handle_stack_error<T: StackError>(_: T) {}
+}
