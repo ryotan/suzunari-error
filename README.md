@@ -9,7 +9,7 @@ policy on error design. If you want to know more about my approach to error desi
 Design."
 
 Suzunari Error uses SNAFU as a foundation for easily constructing traceable errors. We were inspired by the ideas in the
-articles [Error Handling for Large Rust Projects - Best Practice in GreptimeDB](https://greptime.com/blogs/2024-05-07-error-rust)
+articles [Error Handling for Large Rust Projects - Best Practice in GreptimeDB](https://greptime.com/blogs/2024-05-07-error-rust),
 and [tamanegi-error - crates.io](https://crates.io/crates/tamanegi-error) when we came up with the features we provide
 in this crate.
 
