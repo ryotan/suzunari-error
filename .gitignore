@@ -51,6 +51,7 @@ gen/
 
 # Rust
 out/
+Cargo.lock
 
 _[sS]cratch*.*
 
