@@ -55,6 +55,8 @@ out/
 _[sS]cratch*.*
 
 
+.config/local/
+
 # Added by cargo
 
 /target
