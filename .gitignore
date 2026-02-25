@@ -56,6 +56,9 @@ Cargo.lock
 _[sS]cratch*.*
 
 
+# Claude Code
+.claude/settings.local.json
+
 # Added by cargo
 
 /target
