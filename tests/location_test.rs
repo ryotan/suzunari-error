@@ -1,3 +1,4 @@
+#![cfg(feature = "std")]
 //! Integration tests for the Location struct and its integration with snafu.
 //!
 //! These tests verify that the Location struct properly captures source code locations

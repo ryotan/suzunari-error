@@ -84,20 +84,19 @@ pub(crate) fn suzunari_location_impl(stream: TokenStream) -> Result<TokenStream,
 }
 
 pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse2(stream.clone()).unwrap();
+    let input: DeriveInput = syn::parse2(stream.clone())?;
 
-    // Snafu と StackError を追加
-    // Try to find the suzunari_error crate
+    // Append Snafu and StackError derives
     let crate_path = get_crate_name("suzunari-error", &stream)?;
     let snafu_path = get_crate_name("snafu", &stream)?;
 
-    // #[suzunari_location] attributeを生成
+    // Generate #[suzunari_location] attribute
     let location_attribute = quote! { #[#crate_path::suzunari_location] };
 
-    // 新しい #[derive(...)] attributeを生成
+    // Generate #[derive(Snafu, StackError)] attribute
     let derive_attribute = quote! { #[derive(#snafu_path::Snafu, #crate_path::StackError)] };
 
-    // 構造体/enumの定義と新しいattributeを合わせてTokenStreamとして返す
+    // Combine attributes with the original struct/enum definition
     Ok(quote! {
         #location_attribute
         #derive_attribute

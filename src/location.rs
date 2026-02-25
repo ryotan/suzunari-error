@@ -46,15 +46,6 @@ mod tests {
     }
 
     #[test]
-    fn test_debug_format() {
-        let loc = Location::current();
-        assert_eq!(
-            format!("{:?}", loc),
-            format!("{}:{}:{}", loc.file(), loc.line(), loc.column())
-        );
-    }
-
-    #[test]
     fn test_deref() {
         let loc = Location::current();
 
@@ -80,26 +71,41 @@ mod tests {
         assert!(loc.column() > 0, "Column should be a positive number");
     }
 
-    #[test]
-    fn test_method_consistency() {
-        let loc = Location::current();
+    #[cfg(feature = "alloc")]
+    mod alloc_tests {
+        use super::*;
+        use alloc::format;
 
-        let direct_format = format!("{}:{}:{}", loc.file(), loc.line(), loc.column());
-        let debug_format = format!("{:?}", loc);
-
-        assert_eq!(
-            direct_format, debug_format,
-            "Direct format and Debug format should match"
-        );
-
-        fn get_another_location() -> Location {
-            Location::current()
+        #[test]
+        fn test_debug_format() {
+            let loc = Location::current();
+            assert_eq!(
+                format!("{:?}", loc),
+                format!("{}:{}:{}", loc.file(), loc.line(), loc.column())
+            );
         }
-        let another_loc = get_another_location();
-        assert_ne!(
-            format!("{:?}", loc),
-            format!("{:?}", another_loc),
-            "Locations from different call sites should differ"
-        );
+
+        #[test]
+        fn test_method_consistency() {
+            let loc = Location::current();
+
+            let direct_format = format!("{}:{}:{}", loc.file(), loc.line(), loc.column());
+            let debug_format = format!("{:?}", loc);
+
+            assert_eq!(
+                direct_format, debug_format,
+                "Direct format and Debug format should match"
+            );
+
+            fn get_another_location() -> Location {
+                Location::current()
+            }
+            let another_loc = get_another_location();
+            assert_ne!(
+                format!("{:?}", loc),
+                format!("{:?}", another_loc),
+                "Locations from different call sites should differ"
+            );
+        }
     }
 }
