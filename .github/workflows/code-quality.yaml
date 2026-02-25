@@ -47,6 +47,51 @@ jobs:
         run: cargo test --all-features
         continue-on-error: true
 
+      - name: Check no_std (core-only)
+        id: check-core
+        run: cargo check -p suzunari-error --no-default-features
+        continue-on-error: true
+
+      - name: Check no_std (alloc)
+        id: check-alloc
+        run: cargo check -p suzunari-error --no-default-features --features alloc
+        continue-on-error: true
+
+      - name: Clippy (core-only)
+        id: clippy-core
+        run: cargo clippy -p suzunari-error --no-default-features -- -D warnings
+        continue-on-error: true
+
+      - name: Clippy (alloc)
+        id: clippy-alloc
+        run: cargo clippy -p suzunari-error --no-default-features --features alloc -- -D warnings
+        continue-on-error: true
+
+      - name: Check feature tests (core-only)
+        id: check-feature-core
+        run: cargo check -p suzunari-error-feature-tests --no-default-features --features test-core-only
+        continue-on-error: true
+
+      - name: Check feature tests (alloc)
+        id: check-feature-alloc
+        run: cargo check -p suzunari-error-feature-tests --no-default-features --features test-alloc
+        continue-on-error: true
+
+      - name: Test feature tests (core-only)
+        id: test-feature-core
+        run: cargo test -p suzunari-error-feature-tests --no-default-features --features test-core-only
+        continue-on-error: true
+
+      - name: Test feature tests (alloc)
+        id: test-feature-alloc
+        run: cargo test -p suzunari-error-feature-tests --no-default-features --features test-alloc
+        continue-on-error: true
+
+      - name: Test feature tests (std)
+        id: test-feature-std
+        run: cargo test -p suzunari-error-feature-tests --features test-std
+        continue-on-error: true
+
       - name: Check for lint results
         shell: bash
         run: |
@@ -54,8 +99,17 @@ jobs:
           if [[ "${{ steps.fmt.outcome }}" == "failure" || \
                 "${{ steps.clippy.outcome }}" == "failure" || \
                 "${{ steps.build.outcome }}" == "failure" || \
-                "${{ steps.test.outcome }}" == "failure" ]]; then
-            echo "One or more lints failed."
+                "${{ steps.test.outcome }}" == "failure" || \
+                "${{ steps.check-core.outcome }}" == "failure" || \
+                "${{ steps.check-alloc.outcome }}" == "failure" || \
+                "${{ steps.clippy-core.outcome }}" == "failure" || \
+                "${{ steps.clippy-alloc.outcome }}" == "failure" || \
+                "${{ steps.check-feature-core.outcome }}" == "failure" || \
+                "${{ steps.check-feature-alloc.outcome }}" == "failure" || \
+                "${{ steps.test-feature-core.outcome }}" == "failure" || \
+                "${{ steps.test-feature-alloc.outcome }}" == "failure" || \
+                "${{ steps.test-feature-std.outcome }}" == "failure" ]]; then
+            echo "One or more checks failed."
             exit 1
           else
             echo "All steps succeeded."
