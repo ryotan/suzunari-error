@@ -69,8 +69,8 @@ chore/update-dependencies
 GitMoji + Conventional Commits:
 
 ```
-✨(macro): Add suzunari_error attribute macro
-🐛(location): Fix column tracking in nested calls
+✨: Add suzunari_error attribute macro
+🐛: Fix column tracking in nested calls
 ♻️: Simplify StackError trait bounds
 ```
 
@@ -80,16 +80,16 @@ GitMoji + Conventional Commits:
 2. Implement changes and commit
 3. Push and open a pull request on GitHub
 4. Include in the PR description:
-   - Summary of changes
+   - Purpose and context of the change
    - Related issue number (if any)
    - How to test
 
 ## Release
 
-- The `main` branch is always kept in a stable state
+- The `main` branch should be kept in a stable state
 - Releases are tagged: `v1.0.0`, `v1.0.1`, etc.
 - Follow [Semantic Versioning](https://semver.org/)
 
 ## Questions?
 
-If you have questions or need help, feel free to [create an issue](https://github.com/ryotan/suzunari-error/issues).
+If you have questions or need help, feel free to [start a discussion](https://github.com/ryotan/suzunari-error/discussions).
