@@ -21,15 +21,11 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 - Tracks error propagation through the call stack
 - Enables rich debugging information while keeping error messages clean
 
-### Derive Macros
+### Macros
 
+- **`#[suzunari_error]`**: The main entry point for defining error types. Combines `#[suzunari_location]` + `#[derive(Snafu, StackError)]`
 - `#[derive(StackError)]`: Implements the StackError trait for structs and enums
-- Used in conjunction with SNAFU's derive macro: `#[derive(Snafu, StackError)]`
-
-### Attribute Macros
-
-- `#[suzunari_location]`: Adds a location field to error types
-- Works with SNAFU's implicit context to capture error locations
+- `#[suzunari_location]`: Adds a location field to error types with SNAFU's implicit context
 
 ### Location Structure
 
@@ -65,27 +61,24 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 ### Error Type Definition
 
 ```rust
-#[derive(Debug, Snafu, StackError)]
-#[suzunari_location]
+#[suzunari_error]
 pub enum DatabaseError {
-    #[snafu(display("Failed to connect to database at {}: {}", connection_string, source))]
+    #[snafu(display("connection to {connection_string} failed"))]
     ConnectionFailed {
         connection_string: String,
-        #[snafu(source)]
         source: std::io::Error,
     },
-    
-    #[snafu(display("Query execution failed: {}", source))]
+
+    #[snafu(display("query execution failed"))]
     QueryFailed {
-        query: String,  // Not displayed but available for debugging
-        #[snafu(source)]
+        query: String,
         source: sqlx::Error,
     },
-    
-    #[snafu(display("Record not found with ID: {}", id))]
+
+    #[snafu(display("record {id} not found in {table}"))]
     RecordNotFound {
         id: String,
-        table: String,  // Not displayed but available for debugging
+        table: String,
     },
 }
 ```
@@ -93,17 +86,18 @@ pub enum DatabaseError {
 ### Error Propagation
 
 ```rust
+use snafu::OptionExt;
+
 fn get_user(id: &str, conn: &Connection) -> Result<User, DatabaseError> {
     let query = format!("SELECT * FROM users WHERE id = '{}'", id);
-    
+
     let result = conn.execute(&query)
         .context(QueryFailedSnafu { query })?;
-        
-    result.first()
-        .ok_or_else(|| RecordNotFoundSnafu {
-            id: id.to_string(),
-            table: "users".to_string(),
-        }.build())
+
+    result.first().context(RecordNotFoundSnafu {
+        id: id.to_string(),
+        table: "users".to_string(),
+    })
 }
 ```
 

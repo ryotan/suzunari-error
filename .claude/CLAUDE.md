@@ -92,7 +92,7 @@ The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc"
 ## Error Handling Rules
 
 - **Always use `#[suzunari_error]`** for defining error types. Do NOT define errors with raw `#[derive(Snafu)]` alone or hand-written `impl Error`.
-- **Always propagate errors with `?` and `.context()`** (`snafu::ResultExt`). Do NOT use `unwrap()`, `expect()`, `.build()`, or `.fail()` in production code.
+- **Always propagate errors with `?` and `.context()`** (`snafu::ResultExt`). Use `ensure!()` for validation checks. Do NOT use `unwrap()`, `expect()`, `.build()`, or `.fail()` in production code.
 - **Test code**: `unwrap()` is acceptable. But prefer `.context()` propagation even in tests when it improves clarity.
 
 ## Error Design Principles
