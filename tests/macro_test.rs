@@ -3,18 +3,18 @@
 // independently from proc-macro layer. .build() is snafu's standard test pattern.
 
 use snafu::prelude::*;
-use suzunari_error::{Location, StackError, suzunari_error, suzunari_location};
+use suzunari_error::{Location, StackError, StackReport, suzunari_error, suzunari_location};
 
 // Test struct with StackError derive macro
 #[suzunari_location]
-#[derive(Snafu, StackError)]
+#[derive(Debug, Snafu, StackError)]
 #[snafu(display("{}", message))]
 struct TestError {
     message: String,
 }
 
 // Test struct with manual location field
-#[derive(Snafu, StackError)]
+#[derive(Debug, Snafu, StackError)]
 struct TestErrorWithLocation {
     message: String,
     #[snafu(implicit)]
@@ -31,7 +31,7 @@ enum TestErrorEnum {
 }
 
 // Test enum with manual location field
-#[derive(Snafu, StackError)]
+#[derive(Debug, Snafu, StackError)]
 enum TestErrorEnumWithLocation {
     Variant3 { message: String, location: Location },
     Variant4 { context: String, location: Location },
@@ -50,8 +50,8 @@ fn test_stack_error_derive() {
     let line = line!() - 3;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{error:?}"),
-        format!("0: Test error, at {file}:{line}:6\n")
+        format!("{:?}", StackReport::from_error(error)),
+        format!("Error: TestError: Test error, at {file}:{line}:6\n")
     );
 }
 
@@ -66,8 +66,8 @@ fn test_suzunari_location_attribute() {
     let line = line!() - 3;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{error:?}"),
-        format!("0: TestErrorWithLocation, at {file}:{line}:6\n")
+        format!("{:?}", StackReport::from_error(error)),
+        format!("Error: TestErrorWithLocation: TestErrorWithLocation, at {file}:{line}:6\n")
     );
 }
 
@@ -82,8 +82,8 @@ fn test_stack_error_enum_derive() {
     let line = line!() - 3;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{error:?}"),
-        format!("0: Variant1, at {file}:{line}:6\n")
+        format!("{:?}", StackReport::from_error(error)),
+        format!("Error: TestErrorEnum::Variant1: Variant1, at {file}:{line}:6\n")
     );
 
     let error = Variant2Snafu {
@@ -95,8 +95,8 @@ fn test_stack_error_enum_derive() {
     let line = line!() - 3;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{error:?}"),
-        format!("0: Variant2, at {file}:{line}:6\n")
+        format!("{:?}", StackReport::from_error(error)),
+        format!("Error: TestErrorEnum::Variant2: Variant2, at {file}:{line}:6\n")
     );
 }
 
@@ -111,8 +111,8 @@ fn test_suzunari_location_enum_attribute() {
     let line = line!() - 4;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{error:?}"),
-        format!("0: Variant3, at {file}:{line}:19\n")
+        format!("{:?}", StackReport::from_error(error)),
+        format!("Error: TestErrorEnumWithLocation::Variant3: Variant3, at {file}:{line}:19\n")
     );
 
     let error = TestErrorEnumWithLocation::Variant4 {
@@ -124,8 +124,8 @@ fn test_suzunari_location_enum_attribute() {
     let line = line!() - 4;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{error:?}"),
-        format!("0: Variant4, at {file}:{line}:19\n")
+        format!("{:?}", StackReport::from_error(error)),
+        format!("Error: TestErrorEnumWithLocation::Variant4: Variant4, at {file}:{line}:19\n")
     );
 }
 
@@ -140,7 +140,7 @@ fn test_chain_context() {
     let line = line!() - 4;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{error:?}"),
-        format!("0: Root error, at {file}:{line}:19\n")
+        format!("{:?}", StackReport::from_error(error)),
+        format!("Error: TestError: Root error, at {file}:{line}:19\n")
     );
 }

@@ -30,8 +30,8 @@ fn test_stack_trace_single() {
     }
     let err = make_error().unwrap_err();
     assert_eq!(
-        format!("{err:?}"),
-        format!("0: ErrorStruct, at {file}:{ensure_line}:9\n")
+        format!("{:?}", StackReport::from_error(err)),
+        format!("Error: ErrorStruct: ErrorStruct, at {file}:{ensure_line}:9\n")
     );
 }
 
@@ -54,9 +54,14 @@ fn test_nested_stack_trace() {
     }
     let err = nested_error().unwrap_err();
     let file = file!();
-    let debug = format!("{err:?}");
-    assert!(debug.contains(&format!("1: ErrorAggregate, at {file}:")));
-    assert!(debug.contains(&format!("0: Variant2 message, at {file}:")));
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains(&format!(
+        "Error: ErrorAggregate: ErrorAggregate, at {file}:"
+    )));
+    assert!(report.contains("Caused by"));
+    assert!(report.contains(&format!(
+        "1| ErrorEnum::Variant2NamedField: Variant2 message, at {file}:"
+    )));
 }
 
 #[suzunari_error]
@@ -92,10 +97,16 @@ fn read_external() -> Result<(), SomeError> {
 fn test_retrieve_data() {
     let err = retrieve_data().unwrap_err();
     let file = file!();
-    let debug = format!("{err:?}");
-    assert!(debug.contains(&format!("2: Failed to retrieve, at {file}:")));
-    assert!(debug.contains(&format!("1: after 3sec, at {file}:")));
-    assert!(debug.contains("timeout"));
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains(&format!(
+        "Error: RetrieveFailed: Failed to retrieve, at {file}:"
+    )));
+    assert!(report.contains("Caused by"));
+    assert!(report.contains(&format!(
+        "1| SomeError::ReadTimeout: after 3sec, at {file}:"
+    )));
+    // io::Error is not StackError — no location, no type name prefix
+    assert!(report.contains("2| timeout"));
 }
 
 #[test]
@@ -109,7 +120,9 @@ fn test_validate() {
     }
     let err = validate().unwrap_err();
     assert_eq!(
-        format!("{err:?}"),
-        format!("0: 0 is an invalid value. Must be larger than 1, at {file}:{ensure_line}:9\n")
+        format!("{:?}", StackReport::from_error(err)),
+        format!(
+            "Error: SomeError::ValidationFailed: 0 is an invalid value. Must be larger than 1, at {file}:{ensure_line}:9\n"
+        )
     );
 }

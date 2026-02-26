@@ -8,7 +8,6 @@ mod helper;
 
 use crate::attribute::{suzunari_error_impl, suzunari_location_impl};
 use crate::derive::stack_error_impl;
-use crate::helper::{get_crate_name, has_location};
 use proc_macro::TokenStream;
 
 #[proc_macro_derive(StackError)]

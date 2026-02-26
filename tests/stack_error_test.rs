@@ -4,9 +4,9 @@
 
 use core::error::Error;
 use snafu::{ResultExt, Snafu};
-use suzunari_error::{Location, StackError};
+use suzunari_error::{Location, StackError, StackReport};
 
-#[derive(Snafu)]
+#[derive(Debug, Snafu)]
 struct NestedError {
     source: std::io::Error,
     #[snafu(implicit)]
@@ -14,7 +14,7 @@ struct NestedError {
 }
 
 // A simple error type for testing
-#[derive(Snafu)]
+#[derive(Debug, Snafu)]
 enum TestError {
     Simple {
         #[snafu(implicit)]
@@ -44,6 +44,32 @@ impl StackError for TestError {
             TestError::Simple { location, .. } => location,
         }
     }
+    fn type_name(&self) -> &'static str {
+        match self {
+            TestError::External { .. } => "TestError::External",
+            TestError::Internal { .. } => "TestError::Internal",
+            TestError::Simple { .. } => "TestError::Simple",
+        }
+    }
+    fn stack_source(&self) -> Option<&dyn StackError> {
+        match self {
+            // Box<dyn Error + Send + Sync> does NOT implement StackError
+            TestError::External { .. } => None,
+            // NestedError implements StackError
+            TestError::Internal { source, .. } => Some(source),
+            TestError::Simple { .. } => None,
+        }
+    }
+}
+
+impl StackError for NestedError {
+    fn location(&self) -> &Location {
+        &self.location
+    }
+    fn type_name(&self) -> &'static str {
+        "NestedError"
+    }
+    // source is io::Error (not StackError) → default None
 }
 
 #[test]
@@ -79,24 +105,6 @@ fn function_a() -> Result<(), TestError> {
     Ok(())
 }
 
-impl StackError for NestedError {
-    fn location(&self) -> &Location {
-        &self.location
-    }
-}
-
-impl core::fmt::Debug for NestedError {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        self.fmt_stack(f)
-    }
-}
-
-impl core::fmt::Debug for TestError {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        self.fmt_stack(f)
-    }
-}
-
 #[test]
 fn test_error_propagation() {
     let result = function_a();
@@ -104,10 +112,15 @@ fn test_error_propagation() {
     assert!(result.is_err());
     let error = result.unwrap_err();
 
-    // Test final context message
     let file = file!();
-    let debug = format!("{error:?}");
-    assert!(debug.contains(&format!("3: Whoops, at {file}:")));
-    assert!(debug.contains(&format!("2: Internal, at {file}:")));
-    assert!(debug.contains(&format!("1: NestedError, at {file}:")));
+    let report = format!("{:?}", StackReport::from_error(error));
+
+    // TestError::External's source is Box<dyn Error + Send + Sync>,
+    // so stack_source() returns None. The rest of the chain is
+    // traversed via Error::source() without location info.
+    assert!(report.contains(&format!("Error: TestError::External: Whoops, at {file}:")));
+    assert!(report.contains("Caused by"));
+    assert!(report.contains("1| Internal"));
+    assert!(report.contains("2| NestedError"));
+    assert!(report.contains("3| "));
 }

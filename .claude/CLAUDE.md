@@ -47,7 +47,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 # Feature-tier tests (tests-features crate)
 cargo test -p suzunari-error-feature-tests --features test-std
 cargo test -p suzunari-error-feature-tests --features test-alloc
-cargo test -p suzunari-error-feature-tests --no-default-features  # core-only
+cargo test -p suzunari-error-feature-tests --no-default-features --features test-core-only  # core-only
 ```
 
 ## Architecture
@@ -57,7 +57,7 @@ A snafu-based error handling library with automatic location tracking. `#![no_st
 ### Core Concepts
 
 - **`Location`** — Wrapper around `core::panic::Location`. Uses `#[track_caller]` + snafu's `GenerateImplicitData` to automatically capture error origin
-- **`StackError` trait** — Extends `Error` with `location()`, `depth()`, and `fmt_stack()`. `Debug` impl uses `fmt_stack()` to output error chains with stack depth and location
+- **`StackError` trait** — Extends `Error` with `location()`, `type_name()`, `stack_source()`, and `depth()`. Use `StackReport` to format error chains with location info
 - **`BoxedStackError`** — Wrapper around `Box<dyn StackError + Send + Sync>` for uniform handling of heterogeneous errors (requires alloc)
 - **`DisplayError<E>`** — Adapter that wraps `Debug + Display` types (without `Error` impl) into `core::error::Error`
 
@@ -65,9 +65,9 @@ A snafu-based error handling library with automatic location tracking. `#![no_st
 
 Provides 3 proc-macros:
 
-- **`#[suzunari_error]`** — The main entry point. Combines `#[suzunari_location]` + `#[derive(Snafu, StackError)]`. Use this by default
+- **`#[suzunari_error]`** — The main entry point. Combines `#[suzunari_location]` + `#[derive(Debug, Snafu, StackError)]`. Use this by default
 - **`#[suzunari_location]`** — Auto-adds `location: Location` field with `#[snafu(implicit)]` to structs and each enum variant
-- **`#[derive(StackError)]`** — Generates `StackError` impl, `Debug` impl (via `fmt_stack()`), and `From<T> for BoxedStackError` (when alloc enabled)
+- **`#[derive(StackError)]`** — Generates `StackError` impl and `From<T> for BoxedStackError` (when alloc enabled). Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
 
 The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc")` controls whether `From<T> for BoxedStackError` impl is generated.
 

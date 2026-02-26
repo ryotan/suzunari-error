@@ -94,7 +94,7 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
     let location_attribute = quote! { #[#crate_path::suzunari_location] };
 
     // Generate #[derive(Snafu, StackError)] attribute
-    let derive_attribute = quote! { #[derive(#snafu_path::Snafu, #crate_path::StackError)] };
+    let derive_attribute = quote! { #[derive(Debug, #snafu_path::Snafu, #crate_path::StackError)] };
 
     // Combine attributes with the original struct/enum definition
     Ok(quote! {

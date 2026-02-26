@@ -18,13 +18,24 @@ Suzunari Error is designed to provide:
 The `StackError` trait is the foundation of the Suzunari Error approach:
 
 - Provides error location awareness for contextual chained errors
-- Tracks error propagation through the call stack
-- Enables rich debugging information while keeping error messages clean
+- `location()` — returns the `Location` where this error was constructed
+- `type_name()` — returns the error type name for display in stack traces
+- `stack_source()` — returns the source error as a `StackError` if it implements the trait (uses Deref-based specialization in generated code)
+- `depth()` — counts the full `Error::source()` chain length
+
+### StackReport
+
+`StackReport<E>` formats a `StackError` chain as a stack-trace-like report. Use at error display boundaries (e.g., `main()`, HTTP handlers, log output).
+
+- Wraps `Result<(), E>` and provides `Debug`/`Display` output
+- Phase 1: traverses `stack_source()` chain (with type name + location)
+- Phase 2: traverses remaining `Error::source()` chain (without location)
+- Create via `StackReport::from_error(e)` or `Result::into()`
 
 ### Macros
 
-- **`#[suzunari_error]`**: The main entry point for defining error types. Combines `#[suzunari_location]` + `#[derive(Snafu, StackError)]`
-- `#[derive(StackError)]`: Implements the StackError trait for structs and enums
+- **`#[suzunari_error]`**: The main entry point for defining error types. Combines `#[suzunari_location]` + `#[derive(Debug, Snafu, StackError)]`
+- `#[derive(StackError)]`: Implements the StackError trait for structs and enums. Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
 - `#[suzunari_location]`: Adds a location field to error types with SNAFU's implicit context
 
 ### Location Structure

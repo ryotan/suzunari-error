@@ -16,11 +16,11 @@ fn _use_display_error() {
     let _: DisplayError<&str> = DisplayError::new("test");
 }
 
-// depth() and fmt_stack() are available as StackError default methods
+// depth() and stack_source() are available as StackError default methods
 fn _use_trait_methods(err: &CoreOnlyError) {
     let _: usize = err.depth();
-    let _ =
-        StackError::fmt_stack as fn(&CoreOnlyError, &mut core::fmt::Formatter) -> core::fmt::Result;
+    let _: Option<&dyn StackError> = err.stack_source();
+    let _: &str = err.type_name();
 }
 
 // --- alloc tier ---

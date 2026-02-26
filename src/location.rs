@@ -1,3 +1,7 @@
+/// Source code location captured via `#[track_caller]`.
+///
+/// A newtype wrapper around `core::panic::Location` that integrates with
+/// snafu's `GenerateImplicitData` for automatic capture at error construction sites.
 pub struct Location(&'static core::panic::Location<'static>);
 
 impl Location {
