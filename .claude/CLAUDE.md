@@ -4,7 +4,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Language Rules
 
-- Always respond in Japanese, even when asked in English
 - Code comments: English
 - Commit messages, PR titles, PR bodies: English
 - Variable and function names: English
