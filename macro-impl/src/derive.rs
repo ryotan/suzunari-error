@@ -1,12 +1,13 @@
-use crate::helper::{find_source_field, get_crate_name, has_location};
+use crate::helper::{find_source_field, get_crate_name, validate_location};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Error, Fields, FieldsNamed, Variant};
+use syn::{Data, DeriveInput, Error, Fields, FieldsNamed, Generics, Variant};
 
 pub(crate) fn stack_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = syn::parse2(stream.clone())?;
     let name = &input.ident;
+    let generics = &input.generics;
 
     // Try to find the suzunari_error crate
     let crate_path = get_crate_name("suzunari-error", &stream)?;
@@ -14,13 +15,18 @@ pub(crate) fn stack_error_impl(stream: TokenStream) -> Result<TokenStream, Error
     // Generate the implementation based on whether it's a struct or enum
     match &input.data {
         Data::Struct(data_struct) => match &data_struct.fields {
-            Fields::Named(fields) => Ok(generate_struct_impl(name, fields, &crate_path)),
+            Fields::Named(fields) => Ok(generate_struct_impl(name, fields, &crate_path, generics)),
             _ => Err(Error::new(
                 data_struct.fields.span(),
                 "StackError can only be derived for structs with named fields",
             )),
         },
-        Data::Enum(data_enum) => Ok(generate_enum_impl(name, &data_enum.variants, &crate_path)),
+        Data::Enum(data_enum) => Ok(generate_enum_impl(
+            name,
+            &data_enum.variants,
+            &crate_path,
+            generics,
+        )),
         Data::Union(_) => Err(Error::new(
             stream.span(),
             "StackError cannot be derived for unions",
@@ -29,16 +35,18 @@ pub(crate) fn stack_error_impl(stream: TokenStream) -> Result<TokenStream, Error
 }
 
 /// Generates the StackError implementation for a struct
-fn generate_struct_impl(name: &Ident, fields: &FieldsNamed, crate_path: &Ident) -> TokenStream {
-    if !has_location(fields) {
-        let error = Error::new(
-            fields.span(),
-            "StackError requires a 'location' field of type Location",
-        );
-        return error.to_compile_error();
+fn generate_struct_impl(
+    name: &Ident,
+    fields: &FieldsNamed,
+    crate_path: &Ident,
+    generics: &Generics,
+) -> TokenStream {
+    if let Err(e) = validate_location(fields) {
+        return e.to_compile_error();
     }
 
     let type_name_str = name.to_string();
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     let stack_source_impl = match find_source_field(fields) {
         Some(field) => {
@@ -55,10 +63,10 @@ fn generate_struct_impl(name: &Ident, fields: &FieldsNamed, crate_path: &Ident) 
         None => quote! {},
     };
 
-    let boxed_impl = boxed_stack_error_impl(name, crate_path);
+    let boxed_impl = boxed_stack_error_impl(name, crate_path, generics);
 
     quote! {
-        impl #crate_path::StackError for #name {
+        impl #impl_generics #crate_path::StackError for #name #ty_generics #where_clause {
             fn location(&self) -> &#crate_path::Location {
                 &self.location
             }
@@ -76,6 +84,7 @@ fn generate_enum_impl(
     name: &Ident,
     variants: &syn::punctuated::Punctuated<Variant, syn::token::Comma>,
     crate_path: &Ident,
+    generics: &Generics,
 ) -> TokenStream {
     // Check all variants have named fields
     if let Some(variant) = variants
@@ -89,19 +98,17 @@ fn generate_enum_impl(
         .to_compile_error();
     }
 
-    // Check all variants have a location field
-    if let Some(variant) = variants
-        .iter()
-        .find(|v| matches!(&v.fields, Fields::Named(fields) if !has_location(fields)))
-    {
-        return Error::new(
-            variant.span(),
-            "StackError requires a 'location' field in each enum variant",
-        )
-        .to_compile_error();
+    // Validate all variants have a correctly-typed location field
+    for variant in variants {
+        if let Fields::Named(fields) = &variant.fields {
+            if let Err(e) = validate_location(fields) {
+                return e.to_compile_error();
+            }
+        }
     }
 
     let enum_name_str = name.to_string();
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     // Analyze each variant once: extract source field info for code generation
     struct VariantInfo<'a> {
@@ -161,10 +168,10 @@ fn generate_enum_impl(
         quote! {}
     };
 
-    let boxed_impl = boxed_stack_error_impl(name, crate_path);
+    let boxed_impl = boxed_stack_error_impl(name, crate_path, generics);
 
     quote! {
-        impl #crate_path::StackError for #name {
+        impl #impl_generics #crate_path::StackError for #name #ty_generics #where_clause {
             fn location(&self) -> &#crate_path::Location {
                 match self {
                     #(#location_match_arms)*
@@ -189,16 +196,30 @@ fn generate_enum_impl(
 /// - Adding `#[cfg(feature = "alloc")]` to generated code would check the
 ///   downstream crate's features, which is incorrect — downstream crates
 ///   do not declare their own `alloc` feature
-fn boxed_stack_error_impl(name: &Ident, crate_path: &Ident) -> TokenStream {
-    if cfg!(feature = "alloc") {
-        quote! {
-            impl From<#name> for #crate_path::BoxedStackError {
-                fn from(error: #name) -> Self {
-                    #crate_path::BoxedStackError::new(error)
-                }
+fn boxed_stack_error_impl(name: &Ident, crate_path: &Ident, generics: &Generics) -> TokenStream {
+    if !cfg!(feature = "alloc") {
+        return quote! {};
+    }
+
+    let (impl_generics, ty_generics, _) = generics.split_for_impl();
+
+    // For generic types, add explicit bounds required by BoxedStackError::new.
+    // For non-generic types, the where clause is redundant but harmless.
+    let existing_predicates: Vec<_> = generics
+        .where_clause
+        .iter()
+        .flat_map(|wc| wc.predicates.iter())
+        .collect();
+
+    quote! {
+        impl #impl_generics From<#name #ty_generics> for #crate_path::BoxedStackError
+        where
+            #(#existing_predicates,)*
+            #name #ty_generics: #crate_path::StackError + Send + Sync + 'static,
+        {
+            fn from(error: #name #ty_generics) -> Self {
+                #crate_path::BoxedStackError::new(error)
             }
         }
-    } else {
-        quote! {}
     }
 }

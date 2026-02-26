@@ -36,3 +36,6 @@ alloc = ["snafu/alloc", "suzunari-error-macro-impl/alloc"]
 [dependencies]
 snafu = { workspace = true, features = ["rust_1_81"] }
 suzunari-error-macro-impl.workspace = true
+
+[dev-dependencies]
+trybuild = "1.0"

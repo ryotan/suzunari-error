@@ -11,7 +11,7 @@ pub trait StackError: Error {
 
     /// Returns the error type name for display in stack traces.
     ///
-    /// The derive macro generates this using `stringify!`.
+    /// The derive macro generates this as a `&'static str` literal from the type name.
     fn type_name(&self) -> &'static str;
 
     /// Returns the source error as a StackError, if available.
@@ -19,6 +19,12 @@ pub trait StackError: Error {
     /// This enables StackReport to traverse the error chain with
     /// location info. The derive macro generates this automatically
     /// using Deref-based specialization.
+    ///
+    /// # Contract
+    /// If `stack_source()` returns `Some(s)`, then `Error::source()`
+    /// must also return `Some` pointing to the same error. The derive
+    /// macro upholds this automatically; manual impls must ensure
+    /// consistency.
     fn stack_source(&self) -> Option<&dyn StackError> {
         None
     }
@@ -28,6 +34,9 @@ pub trait StackError: Error {
     /// Counts the full chain via `Error::source()`, including both
     /// `StackError` and non-`StackError` causes.
     fn depth(&self) -> usize {
+        // successors() can't be used here due to trait object lifetime constraints:
+        // source() returns Option<&dyn Error> with a lifetime tied to &self,
+        // but successors requires the closure output lifetime to match its input.
         let mut count = 0;
         let mut current = self.source();
         while let Some(e) = current {

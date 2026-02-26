@@ -22,7 +22,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 # Feature-tier tests
 cargo test -p suzunari-error-feature-tests --features test-std
 cargo test -p suzunari-error-feature-tests --features test-alloc
-cargo test -p suzunari-error-feature-tests --no-default-features  # core-only
+cargo test -p suzunari-error-feature-tests --no-default-features --features test-core-only  # core-only
 ```
 
 ## Project Structure
@@ -41,6 +41,7 @@ cargo test -p suzunari-error-feature-tests --no-default-features  # core-only
 │       ├── lib.rs        # Macro entry points
 │       ├── attribute.rs  # #[suzunari_error], #[suzunari_location]
 │       ├── derive.rs     # #[derive(StackError)]
+│       ├── report.rs     # #[suzunari_error::report]
 │       └── helper.rs     # Shared utilities
 ├── tests/                # Integration tests (std)
 ├── tests-features/       # Feature-tier compile checks and integration tests

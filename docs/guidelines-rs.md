@@ -44,7 +44,7 @@ guidelines will ensure code consistency, readability, and maintainability across
   - Use `.context(ErrorContextSnafu { context_var })` to add context
   - Use `ensure!()` for validation checks that can result in errors
 - Design error types for optimal debugging:
-  - Implement Debug to log error location, stack depth, and contextual message
+  - Use `StackReport` to format error chains with location info at display boundaries
   - Keep error types focused and specific to their domain
   - Group related errors in enum variants
 - Use the memory-efficient `Location` structure for error context

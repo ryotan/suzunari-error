@@ -31,12 +31,14 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 - Phase 1: traverses `stack_source()` chain (with type name + location)
 - Phase 2: traverses remaining `Error::source()` chain (without location)
 - Create via `StackReport::from_error(e)` or `Result::into()`
+- Implements `Termination` (std only) for use as `main()` return type
 
 ### Macros
 
 - **`#[suzunari_error]`**: The main entry point for defining error types. Combines `#[suzunari_location]` + `#[derive(Debug, Snafu, StackError)]`
 - `#[derive(StackError)]`: Implements the StackError trait for structs and enums. Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
 - `#[suzunari_location]`: Adds a location field to error types with SNAFU's implicit context
+- `#[suzunari_error::report]`: Transforms `fn main() -> Result<(), E>` to return `StackReport<E>`. Prints formatted error chain to stderr on failure (std only)
 
 ### Location Structure
 

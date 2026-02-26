@@ -1,5 +1,6 @@
 #![cfg(feature = "std")]
 
+use core::error::Error;
 use snafu::{ResultExt, ensure};
 use suzunari_error::*;
 
@@ -110,6 +111,37 @@ fn test_retrieve_data() {
 }
 
 #[test]
+fn test_unit_variant_location() {
+    fn make_unit_error() -> Result<(), ErrorEnum> {
+        ensure!(false, Variant1UnitSnafu);
+        Ok(())
+    }
+    let err = make_unit_error().unwrap_err();
+    // Unit variant should still have a location captured by suzunari_location
+    assert!(err.location().file().ends_with("integration_test.rs"));
+    assert!(err.location().line() > 0);
+    assert_eq!(err.type_name(), "ErrorEnum::Variant1Unit");
+    assert_eq!(err.depth(), 0);
+}
+
+#[test]
+fn test_depth_no_source() {
+    fn make_error() -> Result<(), ErrorStruct> {
+        ensure!(false, ErrorStructSnafu);
+        Ok(())
+    }
+    let err = make_error().unwrap_err();
+    assert_eq!(err.depth(), 0);
+}
+
+#[test]
+fn test_depth_with_chain() {
+    let err = retrieve_data().unwrap_err();
+    // RetrieveFailed -> SomeError::ReadTimeout -> io::Error = depth 2
+    assert_eq!(err.depth(), 2);
+}
+
+#[test]
 fn test_validate() {
     let file = file!();
     let ensure_line = line!() + 3;
@@ -124,5 +156,43 @@ fn test_validate() {
         format!(
             "Error: SomeError::ValidationFailed: 0 is an invalid value. Must be larger than 1, at {file}:{ensure_line}:9\n"
         )
+    );
+}
+
+/// E-2: stack_source() and Error::source() must be consistent —
+/// when stack_source() returns Some, Error::source() must also return Some.
+#[test]
+fn test_stack_source_and_error_source_are_consistent() {
+    let err = retrieve_data().unwrap_err();
+    // RetrieveFailed has stack_source() -> Some(SomeError)
+    assert!(
+        err.stack_source().is_some(),
+        "RetrieveFailed should have a stack source"
+    );
+    assert!(
+        err.source().is_some(),
+        "stack_source() returned Some but Error::source() returned None — contract violated"
+    );
+
+    // Walk the chain: for every node, verify the contract
+    let mut current: &dyn StackError = &err;
+    while let Some(next) = current.stack_source() {
+        assert!(
+            current.source().is_some(),
+            "stack_source() returned Some for {} but Error::source() returned None",
+            current.type_name()
+        );
+        current = next;
+    }
+}
+
+/// E-3: StackReport output should end with a trailing newline
+#[test]
+fn test_report_ends_with_newline() {
+    let err = retrieve_data().unwrap_err();
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(
+        report.ends_with('\n'),
+        "StackReport output should end with a newline"
     );
 }

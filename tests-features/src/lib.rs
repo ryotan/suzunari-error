@@ -39,6 +39,21 @@ mod alloc_tests {
     }
 }
 
-// std tier is a superset of alloc.
-// std = ["alloc", ...] ensures all alloc features are available by definition,
-// so no separate compile-check module is needed.
+// --- std tier ---
+#[cfg(feature = "test-std")]
+mod std_tests {
+    extern crate std;
+
+    use suzunari_error::StackReport;
+
+    // StackReport implements Termination (std-only)
+    fn _report_is_termination() -> StackReport<super::CoreOnlyError> {
+        (|| -> Result<(), super::CoreOnlyError> { Ok(()) })().into()
+    }
+
+    // #[suzunari_error::report] macro works
+    #[suzunari_error::report]
+    fn _report_macro_works() -> Result<(), super::CoreOnlyError> {
+        Ok(())
+    }
+}

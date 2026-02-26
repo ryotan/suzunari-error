@@ -74,6 +74,23 @@ fn main() {
 }
 ```
 
+### `#[suzunari_error::report]` — Simplified main with error reporting
+
+Use `#[suzunari_error::report]` on `main()` to automatically convert the return type to `StackReport<E>`, which prints a formatted error chain to stderr and exits with a non-zero code on failure:
+
+```rust
+use suzunari_error::*;
+use snafu::ResultExt;
+
+#[suzunari_error::report]
+fn main() -> Result<(), RetrieveFailed> {
+    retrieve_data()?;
+    Ok(())
+}
+```
+
+This is equivalent to `snafu::report` but uses `StackReport` for location-aware output.
+
 ### `BoxedStackError` — Uniform error handling across module boundaries
 
 ```rust
@@ -113,7 +130,7 @@ struct HashError {
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `std`   | Yes     | Enables `alloc` + `snafu/std` |
+| `std`   | Yes     | Enables `alloc` + `snafu/std` + `StackReport` `Termination` impl + `#[report]` macro |
 | `alloc` | No      | Enables `BoxedStackError` and `From<T> for BoxedStackError` macro generation |
 
 For `no_std` usage, disable default features:

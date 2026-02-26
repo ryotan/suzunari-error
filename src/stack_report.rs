@@ -1,10 +1,15 @@
 use crate::StackError;
 use core::fmt;
 
-/// Formats a StackError chain as a stack trace with depth and location.
+/// Formats a [`StackError`] chain as a stack-trace-like report with type names and locations.
 ///
-/// Wraps `Result<(), E>` and provides formatted error output via
-/// Debug and Display. Used at error display boundaries.
+/// Wraps `Result<(), E>` and provides formatted output via `Display` (and `Debug`, which
+/// delegates to `Display`). Used at error display boundaries such as `main()`.
+///
+/// Create via [`StackReport::from_error`] or `Result<(), E>::into()`.
+///
+/// With the `std` feature, implements [`std::process::Termination`] for use as the
+/// return type of `main()`. See also [`#[suzunari_error::report]`](crate::report).
 pub struct StackReport<E: StackError>(Result<(), E>);
 
 impl<E: StackError> StackReport<E> {
@@ -20,6 +25,12 @@ impl<E: StackError> From<Result<(), E>> for StackReport<E> {
     }
 }
 
+impl<E: StackError> From<E> for StackReport<E> {
+    fn from(error: E) -> Self {
+        Self::from_error(error)
+    }
+}
+
 impl<E: StackError> fmt::Debug for StackReport<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt::Display::fmt(self, f)
@@ -31,6 +42,24 @@ impl<E: StackError> fmt::Display for StackReport<E> {
         match &self.0 {
             Ok(()) => Ok(()),
             Err(e) => fmt::Display::fmt(&StackReportFormatter(e), f),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl<E: StackError> std::process::Termination for StackReport<E> {
+    fn report(self) -> std::process::ExitCode {
+        match self.0 {
+            Ok(()) => std::process::ExitCode::SUCCESS,
+            Err(e) => {
+                // Ignore write errors — stderr may be closed, and
+                // panicking here would mask the original error.
+                let _ = std::io::Write::write_fmt(
+                    &mut std::io::stderr(),
+                    format_args!("{}\n", StackReportFormatter(&e)),
+                );
+                std::process::ExitCode::FAILURE
+            }
         }
     }
 }
@@ -51,7 +80,7 @@ impl fmt::Display for StackReportFormatter<'_> {
         // Top-level error with type name and location (no index)
         write!(
             f,
-            "Error: {}: {error}, at {:?}",
+            "Error: {}: {error}, at {}",
             error.type_name(),
             error.location()
         )?;
@@ -75,7 +104,7 @@ impl fmt::Display for StackReportFormatter<'_> {
         while let Some(next) = current_stack.stack_source() {
             writeln!(
                 f,
-                "  {index}| {}: {next}, at {:?}",
+                "  {index}| {}: {next}, at {}",
                 next.type_name(),
                 next.location()
             )?;
