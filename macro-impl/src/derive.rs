@@ -47,6 +47,8 @@ fn generate_struct_impl(name: &Ident, fields: &FieldsNamed, crate_path: &Ident) 
         return error.to_compile_error();
     }
 
+    let boxed_impl = boxed_stack_error_impl(name, crate_path);
+
     // Generate the implementation
     quote! {
         impl #crate_path::StackError for #name {
@@ -56,14 +58,10 @@ fn generate_struct_impl(name: &Ident, fields: &FieldsNamed, crate_path: &Ident) 
         }
         impl core::fmt::Debug for #name {
             fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-                #crate_path::write_stack_error_log(f, self)
+                #crate_path::StackError::fmt_stack(self, f)
             }
         }
-        impl From<#name> for #crate_path::BoxedStackError {
-            fn from(error: #name) -> Self {
-                #crate_path::BoxedStackError::new(error)
-            }
-        }
+        #boxed_impl
     }
 }
 
@@ -97,6 +95,8 @@ fn generate_enum_impl(
         }
     });
 
+    let boxed_impl = boxed_stack_error_impl(name, crate_path);
+
     // Generate the implementation
     quote! {
         impl #crate_path::StackError for #name {
@@ -108,13 +108,28 @@ fn generate_enum_impl(
         }
         impl core::fmt::Debug for #name {
             fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-                #crate_path::write_stack_error_log(f, self)
+                #crate_path::StackError::fmt_stack(self, f)
             }
         }
-        impl From<#name> for #crate_path::BoxedStackError {
-            fn from(error: #name) -> Self {
-                #crate_path::BoxedStackError::new(error)
+        #boxed_impl
+    }
+}
+
+/// Generates `From<T> for BoxedStackError` only when the alloc feature is enabled.
+///
+/// The branch is based on the proc-macro crate's own feature flag, not the
+/// expansion-site's cfg. Controlled by `suzunari-error-macro-impl/alloc`,
+/// so downstream crates do not need to declare an `alloc` feature themselves.
+fn boxed_stack_error_impl(name: &Ident, crate_path: &Ident) -> TokenStream {
+    if cfg!(feature = "alloc") {
+        quote! {
+            impl From<#name> for #crate_path::BoxedStackError {
+                fn from(error: #name) -> Self {
+                    #crate_path::BoxedStackError::new(error)
+                }
             }
         }
+    } else {
+        quote! {}
     }
 }

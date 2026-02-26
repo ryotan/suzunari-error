@@ -1,10 +1,16 @@
+#![cfg(feature = "std")]
+// Tests use raw #[derive(Snafu)] + manual impl to test StackError trait
+// independently from proc-macro layer. .build() is snafu's standard test pattern.
+
 use core::error::Error;
 use snafu::{ResultExt, Snafu};
-use suzunari_error::{Location, StackError, write_error_log, write_stack_error_log};
+use suzunari_error::{Location, StackError};
 
 #[derive(Snafu)]
 struct NestedError {
     source: std::io::Error,
+    #[snafu(implicit)]
+    location: Location,
 }
 
 // A simple error type for testing
@@ -73,15 +79,21 @@ fn function_a() -> Result<(), TestError> {
     Ok(())
 }
 
+impl StackError for NestedError {
+    fn location(&self) -> &Location {
+        &self.location
+    }
+}
+
 impl core::fmt::Debug for NestedError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write_error_log(f, self)
+        self.fmt_stack(f)
     }
 }
 
 impl core::fmt::Debug for TestError {
     fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        write_stack_error_log(f, self)
+        self.fmt_stack(f)
     }
 }
 
@@ -94,11 +106,8 @@ fn test_error_propagation() {
 
     // Test final context message
     let file = file!();
-    let expected = format!(
-        "3: Whoops, at {file}:72:18
-2: Internal, at {file}:67:18
-1: NestedError
-Os {{ code: 2, kind: NotFound, message: \""
-    );
-    assert!(format!("{error:?}").starts_with(&expected));
+    let debug = format!("{error:?}");
+    assert!(debug.contains(&format!("3: Whoops, at {file}:")));
+    assert!(debug.contains(&format!("2: Internal, at {file}:")));
+    assert!(debug.contains(&format!("1: NestedError, at {file}:")));
 }

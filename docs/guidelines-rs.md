@@ -35,9 +35,7 @@ guidelines will ensure code consistency, readability, and maintainability across
 
 ### Suzunari Error Approach
 
-- Use the `StackError` trait for error location-aware contextual chained errors
-  - Apply the `#[derive(Snafu, StackError)]` derive macros to error types
-  - Add the `#[suzunari_location]` attribute to include location information
+- Use `#[suzunari_error]` for defining error types (combines `#[suzunari_location]` + `#[derive(Snafu, StackError)]`)
 - Structure error types to capture relevant context:
   - Include fields that provide context about the error situation
   - Use the `source` field to chain errors
@@ -56,16 +54,14 @@ guidelines will ensure code consistency, readability, and maintainability across
 ### Example Pattern
 
 ```rust
-#[derive(Snafu, StackError)]
-#[suzunari_location]
+#[suzunari_error]
 enum ApiError {
-    #[snafu(display("Failed to fetch data: {}", source))]
+    #[snafu(display("data fetch failed"))]
     FetchFailed {
-        #[snafu(source)]
         source: reqwest::Error,
     },
 
-    #[snafu(display("Invalid parameter '{}': {}", param_name, reason))]
+    #[snafu(display("invalid parameter '{param_name}': {reason}"))]
     ValidationFailed {
         param_name: String,
         reason: String,
@@ -81,8 +77,8 @@ fn fetch_data(url: &str) -> Result<Data, ApiError> {
     ensure!(
         response.status().is_success(),
         ValidationFailedSnafu {
-            param_name: "url".to_string(),
-            reason: format!("Received status code {}", response.status())
+            param_name: "url",
+            reason: format!("received status code {}", response.status())
         }
     );
 

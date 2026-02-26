@@ -1,3 +1,7 @@
+#![cfg(feature = "std")]
+// Tests use raw #[derive(Snafu)] + manual impl to test StackError trait
+// independently from proc-macro layer. .build() is snafu's standard test pattern.
+
 use snafu::prelude::*;
 use suzunari_error::{Location, StackError, suzunari_error, suzunari_location};
 

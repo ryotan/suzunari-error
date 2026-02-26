@@ -17,7 +17,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -32,31 +32,112 @@ jobs:
         run: cargo fmt --all -- --check
         continue-on-error: true
 
-      - name: Run clippy
-        id: clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+      - name: Check (core-only)
+        id: check-core
+        run: cargo check -p suzunari-error --no-default-features
         continue-on-error: true
 
-      - name: Build
-        id: build
-        run: cargo build --all-features
+      - name: Check (alloc)
+        id: check-alloc
+        run: cargo check -p suzunari-error --no-default-features --features alloc
         continue-on-error: true
 
-      - name: Run tests
-        id: test
-        run: cargo test --all-features
+      - name: Check (std)
+        id: check-std
+        run: cargo check -p suzunari-error --all-features
         continue-on-error: true
 
-      - name: Check for lint results
+      - name: Clippy (core-only)
+        id: clippy-core
+        run: cargo clippy -p suzunari-error --no-default-features -- -D warnings
+        continue-on-error: true
+
+      - name: Clippy (alloc)
+        id: clippy-alloc
+        run: cargo clippy -p suzunari-error --no-default-features --features alloc -- -D warnings
+        continue-on-error: true
+
+      - name: Clippy (std)
+        id: clippy-std
+        run: cargo clippy -p suzunari-error --all-features -- -D warnings
+        continue-on-error: true
+
+      - name: Test (std)
+        id: test-std
+        run: cargo test -p suzunari-error --all-features
+        continue-on-error: true
+
+      - name: Check macro-impl (no alloc)
+        id: check-macro-no-alloc
+        run: cargo check -p suzunari-error-macro-impl --no-default-features
+        continue-on-error: true
+
+      - name: Check macro-impl (alloc)
+        id: check-macro-alloc
+        run: cargo check -p suzunari-error-macro-impl --features alloc
+        continue-on-error: true
+
+      - name: Check feature tests (core-only)
+        id: check-feature-core
+        run: cargo check -p suzunari-error-feature-tests --no-default-features --features test-core-only
+        continue-on-error: true
+
+      - name: Check feature tests (alloc)
+        id: check-feature-alloc
+        run: cargo check -p suzunari-error-feature-tests --no-default-features --features test-alloc
+        continue-on-error: true
+
+      - name: Check feature tests (std)
+        id: check-feature-std
+        run: cargo check -p suzunari-error-feature-tests --features test-std
+        continue-on-error: true
+
+      - name: Test feature tests (core-only)
+        id: test-feature-core
+        run: cargo test -p suzunari-error-feature-tests --no-default-features --features test-core-only
+        continue-on-error: true
+
+      - name: Test feature tests (alloc)
+        id: test-feature-alloc
+        run: cargo test -p suzunari-error-feature-tests --no-default-features --features test-alloc
+        continue-on-error: true
+
+      - name: Test feature tests (std)
+        id: test-feature-std
+        run: cargo test -p suzunari-error-feature-tests --features test-std
+        continue-on-error: true
+
+      - name: Report results
+        if: always()
         shell: bash
+        env:
+          RESULTS: |
+            fmt=${{ steps.fmt.outcome }}
+            check-core=${{ steps.check-core.outcome }}
+            check-alloc=${{ steps.check-alloc.outcome }}
+            check-std=${{ steps.check-std.outcome }}
+            clippy-core=${{ steps.clippy-core.outcome }}
+            clippy-alloc=${{ steps.clippy-alloc.outcome }}
+            clippy-std=${{ steps.clippy-std.outcome }}
+            test-std=${{ steps.test-std.outcome }}
+            check-macro-no-alloc=${{ steps.check-macro-no-alloc.outcome }}
+            check-macro-alloc=${{ steps.check-macro-alloc.outcome }}
+            check-feature-core=${{ steps.check-feature-core.outcome }}
+            check-feature-alloc=${{ steps.check-feature-alloc.outcome }}
+            check-feature-std=${{ steps.check-feature-std.outcome }}
+            test-feature-core=${{ steps.test-feature-core.outcome }}
+            test-feature-alloc=${{ steps.test-feature-alloc.outcome }}
+            test-feature-std=${{ steps.test-feature-std.outcome }}
         run: |
-          echo "Checking outcomes of all steps..."
-          if [[ "${{ steps.fmt.outcome }}" == "failure" || \
-                "${{ steps.clippy.outcome }}" == "failure" || \
-                "${{ steps.build.outcome }}" == "failure" || \
-                "${{ steps.test.outcome }}" == "failure" ]]; then
-            echo "One or more lints failed."
+          failed=0
+          while IFS='=' read -r name outcome; do
+            [ -z "$name" ] && continue
+            if [ "$outcome" = "failure" ]; then
+              echo "::error::$name failed"
+              failed=1
+            fi
+          done <<< "$RESULTS"
+          if [ "$failed" -eq 1 ]; then
             exit 1
-          else
-            echo "All steps succeeded."
           fi
+          echo "All steps succeeded."

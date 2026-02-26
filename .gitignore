@@ -51,11 +51,15 @@ gen/
 
 # Rust
 out/
+Cargo.lock
 
 _[sS]cratch*.*
 
 
 .config/local/
+
+# Claude Code
+.claude/settings.local.json
 
 # Added by cargo
 

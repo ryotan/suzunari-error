@@ -10,12 +10,13 @@ authors.workspace = true
 [lib]
 proc-macro = true
 
+[features]
+alloc = []
+
 [dependencies]
 proc-macro-crate.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true
-snafu.workspace = true
 syn = { workspace = true, features = ["full"] }
-
 [dev-dependencies]
 suzunari-error.workspace = true
