@@ -238,21 +238,18 @@ mod tests {
 ### Error Handling Example
 
 ```rust
-use snafu::{Snafu, ResultExt};
-use suzunari::{StackError, suzunari_location};
+use snafu::ResultExt;
+use suzunari::suzunari_error;
 
-#[derive(Debug, Snafu, StackError)]
-#[suzunari_location]
+#[suzunari_error]
 enum ApiError {
-    #[snafu(display("Failed to fetch data: {}", source))]
+    #[snafu(display("data fetch failed"))]
     FetchFailed {
-        #[snafu(source)]
         source: reqwest::Error,
     },
 
-    #[snafu(display("Failed to parse response: {}", source))]
+    #[snafu(display("response parse failed"))]
     ParseFailed {
-        #[snafu(source)]
         source: serde_json::Error,
     },
 }

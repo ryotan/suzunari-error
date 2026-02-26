@@ -1,116 +1,95 @@
-# Development Guide
+# Contributing
 
-This document provides guidelines for contributors to this project. It includes important information you should know when participating in the project, such as how to write code, commit rules, how to create PRs, and more.
+Thank you for your interest in contributing to Suzunari Error!
 
-## Directory Structure
+## Prerequisites
 
-```
-<root>/
-├── .github/                  # GitHub-related files (workflows, templates, etc.)
-├── .junie/                   # Project guidelines and documentation
-│   ├── coding-practices.md   # General coding practices
-│   ├── guidelines-general.md # High-level development guidelines
-│   ├── guidelines-git.md     # Git and commit conventions
-│   ├── guidelines-rs.md      # Rust-specific guidelines
-│   └── guidelines.md         # Main guidelines document with references
-├── macro-impl/               # Macro implementation crate
-│   ├── src/                  # Source code for macros
-│   │   └── lib.rs            # Main library file for macros
-│   └── Cargo.toml            # Cargo configuration for macro-impl
-├── src/                      # Main library source code
-│   └── lib.rs                # Main library file
-├── target/                   # Build artifacts (generated)
-├── CONTRIBUTING.md           # Contribution guidelines
-├── Cargo.toml                # Cargo configuration for main crate
-├── Cargo.lock                # Locked dependencies
-├── README.md                 # Project overview and setup instructions
-└── rust-toolchain.toml       # Rust toolchain configuration
+- Rust toolchain: The required version and components (rustfmt, clippy, rust-analyzer) are defined in `rust-toolchain.toml`. Simply install [rustup](https://rustup.rs/) and it will handle the rest.
+
+## Development
+
+```bash
+# Build
+cargo build --all-features
+
+# Test (all features — same as CI)
+cargo test --all-features
+
+# Lint
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+
+# Feature-tier tests
+cargo test -p suzunari-error-feature-tests --features test-std
+cargo test -p suzunari-error-feature-tests --features test-alloc
+cargo test -p suzunari-error-feature-tests --no-default-features  # core-only
 ```
 
-## Development Environment Setup
+## Project Structure
 
-1. Install Rust (if not already installed):
-   - Visit [rustup.rs](https://rustup.rs/) and follow the instructions for your platform
-   - This project uses a specific Rust version defined in `rust-toolchain.toml`
-
-2. Clone the repository:
-   ```
-   git clone https://github.com/ryotan/suzunari-error.git
-   cd suzunari-error
-   ```
-
-3. Build the project:
-   ```
-   cargo build
-   ```
-
-4. Run tests:
-   ```
-   cargo test
-   ```
-
-5. Optional: Install development tools:
-   - Install [mise](https://mise.jdx.dev/) for running predefined project commands
-   - Install [rustfmt](https://github.com/rust-lang/rustfmt) for code formatting: `rustup component add rustfmt`
-   - Install [Clippy](https://github.com/rust-lang/rust-clippy) for linting: `rustup component add clippy`
-
+```
+├── src/                  # Main library
+│   ├── lib.rs            # Crate root
+│   ├── location.rs       # Location type
+│   ├── stack_error.rs    # StackError trait
+│   ├── boxed_stack_error.rs  # BoxedStackError (alloc)
+│   └── display_error.rs  # DisplayError adapter
+├── macro-impl/           # Proc-macro crate
+│   └── src/
+│       ├── lib.rs        # Macro entry points
+│       ├── attribute.rs  # #[suzunari_error], #[suzunari_location]
+│       ├── derive.rs     # #[derive(StackError)]
+│       └── helper.rs     # Shared utilities
+├── tests/                # Integration tests (std)
+├── tests-features/       # Feature-tier compile checks and integration tests
+├── docs/                 # Development guidelines
+└── .github/              # CI workflows
+```
 
 ## Coding Conventions
 
-See [Rust Style Guide](./.junie/guidelines-rs.md)
+See [docs/guidelines-rs.md](./docs/guidelines-rs.md) for Rust style guidelines and [docs/coding-practices.md](./docs/coding-practices.md) for general coding practices.
 
-## Commit Message Conventions
+## Git Conventions
 
-See [Commit Message Conventions](./.junie/guidelines-git.md)
+See [docs/guidelines-git.md](./docs/guidelines-git.md) for details.
 
-## Creating Pull Requests (PRs)
+### Branches
 
-1. Create a new branch (include feature name or bug fix name):
-   ```
-   git checkout -b feat/git-diff-viewer
-   ```
+[Conventional Branch](https://conventional-branch.github.io/) format:
 
-2. Implement changes and commit:
-   ```
-   git add .
-   git commit -m "feat: Add Git diff display feature"
-   ```
+```
+feature/add-display-error
+bugfix/fix-location-tracking
+chore/update-dependencies
+```
 
-3. Push to remote branch:
-   ```
-   git push -u origin feat/git-diff-viewer
-   ```
+### Commits
 
-4. Create a pull request on GitHub. Include the following in the PR description:
+GitMoji + Conventional Commits:
 
-   - Summary of changes
-   - Related issue number
+```
+✨: Add suzunari_error attribute macro
+🐛: Fix column tracking in nested calls
+♻️: Simplify StackError trait bounds
+```
+
+## Pull Requests
+
+1. Create a branch following the naming convention above
+2. Implement changes and commit
+3. Push and open a pull request on GitHub
+4. Include in the PR description:
+   - Purpose and context of the change
+   - Related issue number (if any)
    - How to test
-   - Screenshots (if there are UI changes)
-
-## Testing
-
-See "Testing" section in [Rust Style Guide](./.junie/guidelines-rs.md)
-
-- Run tests with `cargo test`
-- Use `cargo clippy` for code quality checks
-- Use `cargo fmt --check` to verify code formatting
-
-Note: While the project includes a `.mise.toml` file for potential command shortcuts, these commands are not currently configured. You can set up your own mise commands or use the standard cargo commands above.
 
 ## Release
 
-1. The `main` branch is always kept in a stable state.
-2. Releases are made by tagging: `v1.0.0`, `v1.0.1`, etc.
-3. Follow semantic versioning:
-   - Major: Incompatible changes
-   - Minor: Backward-compatible feature additions
-   - Patch: Backward-compatible bug fixes
+- The `main` branch should be kept in a stable state
+- Releases are tagged: `v1.0.0`, `v1.0.1`, etc.
+- Follow [Semantic Versioning](https://semver.org/)
 
-## Help
+## Questions?
 
-If you have questions or need assistance, create an Issue or contact the project administrator.
-
----
-
-Thank you for your cooperation!
+If you have questions or need help, feel free to [start a discussion](https://github.com/ryotan/suzunari-error/discussions).

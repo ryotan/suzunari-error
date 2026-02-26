@@ -1,0 +1,16 @@
+[package]
+name = "suzunari-error-feature-tests"
+publish = false
+version.workspace = true
+edition.workspace = true
+
+# Select suzunari-error tier via feature flags
+[features]
+default = []
+test-std = ["suzunari-error/std", "test-alloc"]
+test-alloc = ["suzunari-error/alloc"]
+test-core-only = []
+
+[dependencies]
+suzunari-error = { path = "..", default-features = false }
+snafu = { workspace = true, features = ["rust_1_81"] }

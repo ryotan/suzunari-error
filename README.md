@@ -1,74 +1,107 @@
 # Suzunari Error
 
-Suzunari Error is a crate that provides a highly traceable and noise-free error system by propagating error locations as
-error contexts and minimizing the information output to the log. It also provides utilities to simplify error definition
-and handling.
+A highly traceable and noise-free error handling library for Rust. Propagates error locations as error contexts and minimizes information output to logs.
 
-This crate is designed to help implement my philosophy of error design. It would be helpful for you to understand my
-policy on error design. If you want to know more about my approach to error design, check out the section titled "Error
-Design."
-
-Suzunari Error uses SNAFU as a foundation for easily constructing traceable errors. We were inspired by the ideas in the
-articles [Error Handling for Large Rust Projects - Best Practice in GreptimeDB](https://greptime.com/blogs/2024-05-07-error-rust),
-and [tamanegi-error - crates.io](https://crates.io/crates/tamanegi-error) when we came up with the features we provide
-in this crate.
+Built on [SNAFU](https://docs.rs/snafu), inspired by [Error Handling for Large Rust Projects - Best Practice in GreptimeDB](https://greptime.com/blogs/2024-05-07-error-rust) and [tamanegi-error](https://crates.io/crates/tamanegi-error).
 
 ## Features
 
-- `StackError`
-  - A trait for error location aware contextual chained error
-- `Location`
-  - Memory-efficient Location structure compatible with SNAFU's implicit context
-- `StackError` derive macro
-  - Implement StackError for struct and enum variants
-  - Implement Debug to log error location, stack depth and contextual message
-- `suzunari_location` attribute macro
-  - Add location field which SNAFU implicitly adds from context
-- `suzunari_error` attribute macro
-  - Add `suzunari_location` attribute macro and Snafu and StackError derive macros
+- **`#[suzunari_error]`** — The primary macro. Annotate your error type and get `Snafu` + `StackError` derives plus automatic `location` field injection. This is all you need in most cases.
+- **`StackError` trait** — Error location-aware contextual chained errors. `Debug` output includes stack depth, contextual message, and source location at each level.
+- **`Location`** — Memory-efficient location structure compatible with SNAFU's implicit context.
+- **`DisplayError<E>`** — Adapter to wrap external types that implement `Debug + Display` but not `Error`, making them usable as snafu `source` fields.
+- **`BoxedStackError`** — Type-erased `StackError` wrapper for uniform error handling across module boundaries (requires `alloc`).
+- **`#![no_std]` compatible** — Works in core-only, `alloc`, and `std` environments via feature flags.
 
 ## Usage
 
 ```rust
 use suzunari_error::*;
+use snafu::ResultExt;
 
 #[suzunari_error]
 enum SomeError {
-  #[snafu(display("after {}sec", timeout_sec))]
-  ReadTimeout {
-    timeout_sec: u32,
-    #[snafu(source)]
-    error: std::io::Error,
-  },
-  #[snafu(display("{} is an invalid value. Must be larger than 1", param))]
-  ValidationFailed { param: i32 },
+    #[snafu(display("after {}sec", timeout_sec))]
+    ReadTimeout {
+        timeout_sec: u32,
+        #[snafu(source)]
+        error: std::io::Error,
+    },
+    #[snafu(display("{} is an invalid value. Must be larger than 1", param))]
+    ValidationFailed { param: i32 },
 }
 
 #[suzunari_error]
 #[snafu(display("Failed to retrieve"))]
 struct RetrieveFailed {
-  source: SomeError,
+    source: SomeError,
 }
 
 fn retrieve_data() -> Result<(), RetrieveFailed> {
-  read_external().context(RetrieveFailedSnafu)?;
-  Ok(())
+    read_external().context(RetrieveFailedSnafu)?;
+    Ok(())
 }
 
 fn read_external() -> Result<(), SomeError> {
-  let err = std::io::Error::new(std::io::ErrorKind::TimedOut, "timeout");
-  Err(err).context(ReadTimeoutSnafu { timeout_sec: 3u32 })?;
-  Ok(())
-}
-
-fn validate() -> Result<(), BoxedStackError> {
-  let param = 0;
-  ensure!(false, ValidationFailedSnafu { param });
-  Ok(())
+    let err = std::io::Error::new(std::io::ErrorKind::TimedOut, "timeout");
+    Err(err).context(ReadTimeoutSnafu { timeout_sec: 3u32 })?;
+    Ok(())
 }
 ```
 
-### Known issues
+### `BoxedStackError` — Uniform error handling across module boundaries
 
-* If `suzunari_location` is not used and `suzunari_error` is used, IntelliJ IDEA will report a compile error. However,
-  `cargo test` or `cargo build` will succeed. To avoid this, it is recommended to use `suzunari_error::*`.
+```rust
+use suzunari_error::*;
+use snafu::ResultExt;
+
+#[suzunari_error]
+#[snafu(display("database query failed"))]
+struct DbError {
+    source: BoxedStackError,
+}
+
+fn run() -> Result<(), DbError> {
+    query_user()
+        .map_err(BoxedStackError::new)
+        .context(DbSnafu)?;
+    Ok(())
+}
+```
+
+### `DisplayError` — Wrapping non-`Error` types
+
+For third-party types that implement `Debug + Display` but not `Error`:
+
+```rust
+use suzunari_error::*;
+
+#[suzunari_error]
+#[snafu(display("hashing failed"))]
+struct HashError {
+    #[snafu(source(from(argon2::Error, DisplayError::new)))]
+    source: DisplayError<argon2::Error>,
+}
+```
+
+## Feature Flags
+
+| Feature | Default | Description |
+|---------|---------|-------------|
+| `std`   | Yes     | Enables `alloc` + `snafu/std` |
+| `alloc` | No      | Enables `BoxedStackError` and `From<T> for BoxedStackError` macro generation |
+
+For `no_std` usage, disable default features:
+
+```toml
+[dependencies]
+suzunari-error = { version = "0.1", default-features = false }
+```
+
+## Known Issues
+
+- When using `#[suzunari_error]` without a wildcard import, IntelliJ IDEA may report false compile errors. `cargo build` / `cargo test` will succeed. Workaround: `use suzunari_error::*;`
+
+## License
+
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT License](LICENSE-MIT) at your option.

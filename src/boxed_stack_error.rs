@@ -1,3 +1,5 @@
+use alloc::boxed::Box;
+
 use crate::{Location, StackError};
 use core::error::Error;
 use core::fmt::{Debug, Display, Formatter, Result};
@@ -26,7 +28,7 @@ impl Display for BoxedStackError {
 
 impl Debug for BoxedStackError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{:?}", self.inner)
+        self.fmt_stack(f)
     }
 }
 
@@ -56,14 +58,17 @@ impl From<BoxedStackError> for Box<dyn StackError + Send + Sync> {
 
 #[cfg(test)]
 mod tests {
+    // Tests use raw #[derive(Snafu)] + manual impl to test StackError trait
+    // independently from proc-macro layer. .build() is snafu's standard test pattern.
     use super::*;
     use crate::Location;
+    use alloc::format;
     use snafu::prelude::*;
 
     #[derive(Debug, Snafu)]
     #[snafu(display("Test error: {}", message))]
     struct TestError {
-        message: String,
+        message: alloc::string::String,
         #[snafu(implicit)]
         location: Location,
     }
@@ -84,7 +89,7 @@ mod tests {
 
         assert!(format!("{}", error).contains("Test error"));
         assert!(format!("{}", error).contains("Test message"));
-        assert!(format!("{:?}", error).contains("TestError"));
+        assert!(format!("{:?}", error).contains("Test error: Test message"));
         assert!(error.source().is_none());
 
         handle_stack_error(error);
