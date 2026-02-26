@@ -4,8 +4,7 @@
 extern crate alloc;
 
 // --- core-only tier: always-available API ---
-use suzunari_error::{DisplayError, Location, StackError};
-use suzunari_error::{write_error_log, write_stack_error_log};
+use suzunari_error::{DisplayError, StackError};
 
 // Derive macros work in core-only mode
 #[suzunari_error::suzunari_error]
@@ -17,12 +16,11 @@ fn _use_display_error() {
     let _: DisplayError<&str> = DisplayError::new("test");
 }
 
-// write_stack_error_log / write_error_log are available in core-only mode
-fn _use_write_functions(_loc: &Location, _err: &dyn StackError) {
-    // Type-level availability check (no need to call)
+// depth() and fmt_stack() are available as StackError default methods
+fn _use_trait_methods(err: &CoreOnlyError) {
+    let _: usize = err.depth();
     let _ =
-        write_stack_error_log as fn(&mut core::fmt::Formatter, &CoreOnlyError) -> core::fmt::Result;
-    let _ = write_error_log as fn(&mut core::fmt::Formatter, &CoreOnlyError) -> core::fmt::Result;
+        StackError::fmt_stack as fn(&CoreOnlyError, &mut core::fmt::Formatter) -> core::fmt::Result;
 }
 
 // --- alloc tier ---

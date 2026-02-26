@@ -1,9 +1,23 @@
 use crate::Location;
 use core::error::Error;
-use snafu::{AsErrorSource, ErrorCompat};
 
 pub trait StackError: Error {
     fn location(&self) -> &Location;
+
+    fn depth(&self) -> usize {
+        let mut count = 0;
+        let mut current = self.source();
+        while let Some(e) = current {
+            count += 1;
+            current = e.source();
+        }
+        count
+    }
+
+    fn fmt_stack(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        writeln!(f, "{}: {self}, at {:?}", self.depth(), self.location())?;
+        self.source().map_or(Ok(()), |s| write!(f, "{s:?}"))
+    }
 }
 
 #[cfg(feature = "alloc")]
@@ -50,40 +64,6 @@ mod alloc_impls {
     }
 }
 
-pub fn write_stack_error_log<T: StackError + ErrorCompat + AsErrorSource>(
-    f: &mut core::fmt::Formatter,
-    err: &T,
-) -> core::fmt::Result {
-    write_error_log_impl(f, err, Some(err.location()))
-}
-
-pub fn write_error_log<T: Error + ErrorCompat + AsErrorSource>(
-    f: &mut core::fmt::Formatter,
-    err: &T,
-) -> core::fmt::Result {
-    write_error_log_impl(f, err, None)
-}
-
-fn write_error_log_impl<T: Error + ErrorCompat + AsErrorSource>(
-    f: &mut core::fmt::Formatter,
-    err: &T,
-    location: Option<&Location>,
-) -> core::fmt::Result {
-    let depth = err.iter_chain().count() - 1;
-    match location {
-        Some(location) => {
-            writeln!(f, "{depth}: {err}, at {:?}", location)?;
-        }
-        None => {
-            writeln!(f, "{depth}: {err}")?;
-        }
-    }
-    if let Some(source) = err.source() {
-        write!(f, "{source:?}")?;
-    }
-    Ok(())
-}
-
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
     // Tests use raw #[derive(Snafu)] + manual impl to test StackError trait
@@ -104,7 +84,7 @@ mod tests {
     }
     impl core::fmt::Debug for SimpleError {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            write_stack_error_log(f, self)
+            self.fmt_stack(f)
         }
     }
     impl StackError for SimpleError {
@@ -123,7 +103,7 @@ mod tests {
     }
     impl core::fmt::Debug for WrapperError {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            write_stack_error_log(f, self)
+            self.fmt_stack(f)
         }
     }
     impl StackError for WrapperError {

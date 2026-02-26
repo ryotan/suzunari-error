@@ -26,12 +26,9 @@ impl Display for BoxedStackError {
     }
 }
 
-// Delegates to inner's Debug (which calls write_stack_error_log).
-// Cannot call write_stack_error_log directly because BoxedStackError
-// does not implement ErrorCompat.
 impl Debug for BoxedStackError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{:?}", self.inner)
+        self.fmt_stack(f)
     }
 }
 
@@ -92,7 +89,7 @@ mod tests {
 
         assert!(format!("{}", error).contains("Test error"));
         assert!(format!("{}", error).contains("Test message"));
-        assert!(format!("{:?}", error).contains("TestError"));
+        assert!(format!("{:?}", error).contains("Test error: Test message"));
         assert!(error.source().is_none());
 
         handle_stack_error(error);

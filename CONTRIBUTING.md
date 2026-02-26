@@ -31,7 +31,7 @@ cargo test -p suzunari-error-feature-tests --no-default-features  # core-only
 ├── src/                  # Main library
 │   ├── lib.rs            # Crate root
 │   ├── location.rs       # Location type
-│   ├── stack_error.rs    # StackError trait + log helpers
+│   ├── stack_error.rs    # StackError trait
 │   ├── boxed_stack_error.rs  # BoxedStackError (alloc)
 │   └── display_error.rs  # DisplayError adapter
 ├── macro-impl/           # Proc-macro crate

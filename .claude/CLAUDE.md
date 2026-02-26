@@ -58,7 +58,7 @@ A snafu-based error handling library with automatic location tracking. `#![no_st
 ### Core Concepts
 
 - **`Location`** — Wrapper around `core::panic::Location`. Uses `#[track_caller]` + snafu's `GenerateImplicitData` to automatically capture error origin
-- **`StackError` trait** — Extends `Error` with `location()`. Its `Debug` impl outputs error chains with stack depth via `write_stack_error_log`
+- **`StackError` trait** — Extends `Error` with `location()`, `depth()`, and `fmt_stack()`. `Debug` impl uses `fmt_stack()` to output error chains with stack depth and location
 - **`BoxedStackError`** — Wrapper around `Box<dyn StackError + Send + Sync>` for uniform handling of heterogeneous errors (requires alloc)
 - **`DisplayError<E>`** — Adapter that wraps `Debug + Display` types (without `Error` impl) into `core::error::Error`
 
@@ -68,7 +68,7 @@ Provides 3 proc-macros:
 
 - **`#[suzunari_error]`** — The main entry point. Combines `#[suzunari_location]` + `#[derive(Snafu, StackError)]`. Use this by default
 - **`#[suzunari_location]`** — Auto-adds `location: Location` field with `#[snafu(implicit)]` to structs and each enum variant
-- **`#[derive(StackError)]`** — Generates `StackError` impl, `Debug` impl (via `write_stack_error_log`), and `From<T> for BoxedStackError` (when alloc enabled)
+- **`#[derive(StackError)]`** — Generates `StackError` impl, `Debug` impl (via `fmt_stack()`), and `From<T> for BoxedStackError` (when alloc enabled)
 
 The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc")` controls whether `From<T> for BoxedStackError` impl is generated.
 

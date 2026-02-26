@@ -58,7 +58,7 @@ fn generate_struct_impl(name: &Ident, fields: &FieldsNamed, crate_path: &Ident) 
         }
         impl core::fmt::Debug for #name {
             fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-                #crate_path::write_stack_error_log(f, self)
+                #crate_path::StackError::fmt_stack(self, f)
             }
         }
         #boxed_impl
@@ -108,7 +108,7 @@ fn generate_enum_impl(
         }
         impl core::fmt::Debug for #name {
             fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-                #crate_path::write_stack_error_log(f, self)
+                #crate_path::StackError::fmt_stack(self, f)
             }
         }
         #boxed_impl
