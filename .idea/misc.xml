@@ -1,9 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="BiomeSettings">
-    <option name="applySafeFixesOnSave" value="true" />
-    <option name="formatOnSave" value="true" />
-  </component>
   <component name="CodeInsightWorkspaceSettings">
     <option name="optimizeImportsOnTheFly" value="true" />
   </component>
@@ -22,10 +18,6 @@
   </component>
   <component name="MarkdownSettings">
     <option name="splitLayout" value="SHOW_EDITOR" />
-  </component>
-  <component name="PrettierConfiguration">
-    <option name="myRunOnSave" value="true" />
-    <option name="myRunOnReformat" value="true" />
   </component>
   <component name="ProjectInspectionProfilesVisibleTreeState">
     <entry key="Project Default">

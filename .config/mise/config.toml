@@ -16,5 +16,3 @@ zizmor = "1.22.0"
 [env]
 _.file = ".config/local/.credentials.enc.yaml"
 SOPS_CONFIG = ".config/local/.sops.yaml"
-
-
