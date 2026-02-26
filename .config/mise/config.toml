@@ -10,7 +10,7 @@ gh = "2.86.0"
 ghalint = "1.5.5"
 pinact = "3.8.0"
 slsa-verifier = "2.7.1"
-sops = "3.11.0"
+sops = "3.12.1"
 zizmor = "1.22.0"
 
 [env]
