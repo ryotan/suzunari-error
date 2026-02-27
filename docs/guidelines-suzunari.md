@@ -35,10 +35,16 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 
 ### Macros
 
-- **`#[suzunari_error]`**: The main entry point for defining error types. Combines `#[suzunari_location]` + `#[derive(Debug, Snafu, StackError)]`
+- **`#[suzunari_error]`**: The main entry point for defining error types. Processes `#[suzu(...)]` attributes, injects `location: Location` fields, and appends `#[derive(Debug, Snafu, StackError)]`
 - `#[derive(StackError)]`: Implements the StackError trait for structs and enums. Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
-- `#[suzunari_location]`: Adds a location field to error types with SNAFU's implicit context
 - `#[suzunari_error::report]`: Transforms `fn main() -> Result<(), E>` to return `StackReport<E>`. Prints formatted error chain to stderr on failure (std only)
+
+### `#[suzu(...)]` Attribute
+
+`#[suzu(...)]` is a superset of `#[snafu(...)]`. All snafu keywords are passed through as-is. Additionally:
+
+- **`translate`** (field-level): Wraps the field type in `DisplayError<T>` and generates `#[snafu(source(from(T, DisplayError::new)))]`
+- **`location`** (field-level): Marks a field as the location field and adds `#[snafu(implicit)]`. Suppresses automatic location injection for that struct/variant
 
 ### Location Structure
 
@@ -76,22 +82,29 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 ```rust
 #[suzunari_error]
 pub enum DatabaseError {
-    #[snafu(display("connection to {connection_string} failed"))]
+    #[suzu(display("connection to {connection_string} failed"))]
     ConnectionFailed {
         connection_string: String,
         source: std::io::Error,
     },
 
-    #[snafu(display("query execution failed"))]
+    #[suzu(display("query execution failed"))]
     QueryFailed {
         query: String,
         source: sqlx::Error,
     },
 
-    #[snafu(display("record {id} not found in {table}"))]
+    #[suzu(display("record {id} not found in {table}"))]
     RecordNotFound {
         id: String,
         table: String,
+    },
+
+    // #[suzu(translate)] wraps non-Error types in DisplayError automatically
+    #[suzu(display("hashing failed"))]
+    HashFailed {
+        #[suzu(translate)]
+        source: argon2::Error,
     },
 }
 ```

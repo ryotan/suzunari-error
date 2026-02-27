@@ -3,7 +3,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::format_ident;
 use syn::ext::IdentExt;
 use syn::spanned::Spanned;
-use syn::{Error, Field, FieldsNamed, Meta};
+use syn::{Error, Field, FieldsNamed, Meta, PathArguments, Type};
 
 /// Helper function to get the crate name
 pub(crate) fn get_crate_name(original_name: &str, stream: &TokenStream) -> Result<Ident, Error> {
@@ -56,6 +56,30 @@ pub(crate) fn validate_location(fields: &FieldsNamed) -> Result<(), Error> {
                 ))
             }
         }
+    }
+}
+
+/// Extracts the inner type `T` from `DisplayError<T>`.
+///
+/// Returns `Some(&T)` if the type's last path segment is `DisplayError` with
+/// a single angle-bracket argument. Returns `None` otherwise.
+pub(crate) fn extract_display_error_inner(ty: &Type) -> Option<&Type> {
+    let Type::Path(type_path) = ty else {
+        return None;
+    };
+    let segment = type_path.path.segments.last()?;
+    if segment.ident != "DisplayError" {
+        return None;
+    }
+    let PathArguments::AngleBracketed(args) = &segment.arguments else {
+        return None;
+    };
+    if args.args.len() != 1 {
+        return None;
+    }
+    match &args.args[0] {
+        syn::GenericArgument::Type(inner) => Some(inner),
+        _ => None,
     }
 }
 

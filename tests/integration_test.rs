@@ -117,7 +117,7 @@ fn test_unit_variant_location() {
         Ok(())
     }
     let err = make_unit_error().unwrap_err();
-    // Unit variant should still have a location captured by suzunari_location
+    // Unit variant should still have a location captured by suzunari_error
     assert!(err.location().file().ends_with("integration_test.rs"));
     assert!(err.location().line() > 0);
     assert_eq!(err.type_name(), "ErrorEnum::Variant1Unit");

@@ -63,14 +63,20 @@ A snafu-based error handling library with automatic location tracking. `#![no_st
 
 ### Macro Crate (`macro-impl/`)
 
-Provides 4 proc-macros:
+Provides 3 proc-macros:
 
-- **`#[suzunari_error]`** — The main entry point. Combines `#[suzunari_location]` + `#[derive(Debug, Snafu, StackError)]`. Use this by default
-- **`#[suzunari_location]`** — Auto-adds `location: Location` field with `#[snafu(implicit)]` to structs and each enum variant
+- **`#[suzunari_error]`** — The main entry point. Processes `#[suzu(...)]` attributes, injects `location: Location` fields, and appends `#[derive(Debug, Snafu, StackError)]`. Use this by default
 - **`#[derive(StackError)]`** — Generates `StackError` impl and `From<T> for BoxedStackError` (when alloc enabled). Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
 - **`#[suzunari_error::report]`** — Transforms `fn main() -> Result<(), E>` into `fn main() -> StackReport<E>` for formatted error output on failure (std only)
 
 The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc")` controls whether `From<T> for BoxedStackError` impl is generated.
+
+### `#[suzu(...)]` Attribute
+
+`#[suzu(...)]` is a superset of `#[snafu(...)]` — all snafu keywords pass through as-is. Suzunari extensions:
+
+- **`translate`** (field-level) — Wraps field type in `DisplayError<T>` and generates `#[snafu(source(from(T, DisplayError::new)))]`
+- **`location`** (field-level) — Adds `#[snafu(implicit)]` and suppresses auto location injection for that struct/variant
 
 ### Feature Flags
 

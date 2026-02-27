@@ -1,0 +1,5 @@
+error: `location` can only be used on fields
+ --> tests/compile-fail/suzu_location_on_variant.rs:5:12
+  |
+5 |     #[suzu(location)]
+  |            ^^^^^^^^
