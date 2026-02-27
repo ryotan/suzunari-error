@@ -21,7 +21,7 @@ pub(crate) fn get_crate_name(original_name: &str, stream: &TokenStream) -> Resul
 
 /// Returns true if a field named "location" exists (regardless of type).
 ///
-/// Used by `suzunari_location` to decide whether to inject the field.
+/// Used by `suzunari_error` to decide whether to inject the location field.
 pub(crate) fn has_location_field(fields: &FieldsNamed) -> bool {
     fields.named.iter().any(|field| {
         field
