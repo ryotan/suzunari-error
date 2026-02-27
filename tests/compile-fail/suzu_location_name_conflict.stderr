@@ -1,0 +1,5 @@
+error: field 'location' exists but is not of type Location; rename it or change its type to Location
+ --> tests/compile-fail/suzu_location_name_conflict.rs:7:5
+  |
+7 |     location: String,
+  |     ^^^^^^^^

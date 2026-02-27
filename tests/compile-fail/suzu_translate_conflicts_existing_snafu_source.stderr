@@ -1,5 +1,0 @@
-error: `translate` conflicts with existing `#[snafu(source(...))]`
- --> tests/compile-fail/suzu_translate_conflicts_existing_snafu_source.rs:8:5
-  |
-8 |     source: String,
-  |     ^^^^^^

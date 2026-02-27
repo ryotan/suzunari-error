@@ -1,5 +1,5 @@
-error: field 'location' must be of type Location (from suzunari_error). If you intended a custom field, rename it to avoid conflict.
- --> tests/compile-fail/derive_struct_wrong_location_type.rs:8:15
+error: field 'location' exists but is not of type Location; use Location type or mark the correct field with #[stack(location)]
+ --> tests/compile-fail/derive_struct_wrong_location_type.rs:8:5
   |
 8 |     location: String,
-  |               ^^^^^^
+  |     ^^^^^^^^

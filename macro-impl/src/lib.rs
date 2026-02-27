@@ -3,10 +3,11 @@
 //! Provides 3 proc-macros:
 //!
 //! - [`#[suzunari_error]`](suzunari_error) — The main entry point. Processes
-//!   `#[suzu(...)]` attributes, injects `location: Location` fields, and appends
+//!   `#[suzu(...)]` attributes, resolves/injects location fields, and appends
 //!   `#[derive(Debug, Snafu, StackError)]`.
 //! - [`#[derive(StackError)]`](derive_stack_error) — Generates `StackError` impl
-//!   and `From<T> for BoxedStackError` (when `alloc` enabled).
+//!   and `From<T> for BoxedStackError` (when `alloc` enabled). Finds location field
+//!   via `#[stack(location)]` marker or `Location` type.
 //! - [`#[report]`](report) — Transforms `fn() -> Result<(), E>` into
 //!   `fn() -> StackReport<E>` for formatted error output on failure (`std` only).
 
@@ -23,10 +24,17 @@ use proc_macro::TokenStream;
 
 /// Derives the [`StackError`] trait for a struct or enum.
 ///
-/// Requires a `location: Location` field in every struct/variant (added
-/// automatically by `#[suzunari_error]`).
+/// Requires a `Location` field in every struct/variant (added automatically
+/// by `#[suzunari_error]`). The location field is resolved by:
+/// 1. `#[stack(location)]` marker — highest priority, supports any field name
+/// 2. Single field of type `Location` — automatic fallback
+/// 3. Error if neither is found
+///
+/// When using `#[suzunari_error]`, `#[suzu(location)]` on a field becomes
+/// `#[stack(location)]` + `#[snafu(implicit)]`.
+///
 /// Also generates `From<T> for BoxedStackError` when the `alloc` feature is enabled.
-#[proc_macro_derive(StackError)]
+#[proc_macro_derive(StackError, attributes(stack))]
 pub fn derive_stack_error(input: TokenStream) -> TokenStream {
     stack_error_impl(input.into())
         .unwrap_or_else(|err| err.to_compile_error())
@@ -36,7 +44,7 @@ pub fn derive_stack_error(input: TokenStream) -> TokenStream {
 /// The main entry point for defining error types.
 ///
 /// Processes `#[suzu(...)]` attributes (suzunari extensions + snafu passthrough),
-/// injects `location: Location` fields, and appends
+/// resolves/injects location fields, and appends
 /// `#[derive(Debug, Snafu, StackError)]`.
 ///
 /// # `#[suzu(...)]` attributes
@@ -44,11 +52,11 @@ pub fn derive_stack_error(input: TokenStream) -> TokenStream {
 /// `#[suzu(...)]` is a superset of `#[snafu(...)]`. All snafu keywords are
 /// passed through as-is. Additionally:
 ///
-/// - **`translate`** (field-level): Wraps the field type in `DisplayError<T>` and
+/// - **`from`** (field-level): Wraps the field type in `DisplayError<T>` and
 ///   generates `#[snafu(source(from(T, DisplayError::new)))]`.
-/// - **`location`** (field-level): Marks a field as the location field and adds
-///   `#[snafu(implicit)]`. Suppresses automatic location injection for that
-///   struct/variant.
+/// - **`location`** (field-level): Marks a field as the location field. Converts
+///   to `#[stack(location)]` + `#[snafu(implicit)]`. Allows custom field names
+///   instead of the default `location`. Requires `Location` type.
 #[proc_macro_attribute]
 pub fn suzunari_error(_attr: TokenStream, item: TokenStream) -> TokenStream {
     suzunari_error_impl(item.into())

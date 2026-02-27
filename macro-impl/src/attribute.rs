@@ -1,87 +1,43 @@
-use crate::helper::{get_crate_name, has_location_field};
-use crate::suzu_attr::{self, SuzuResult};
+use crate::helper::{get_crate_name, has_stack_location_attr, looks_like_location_type};
+use crate::suzu_attr;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Error, Fields};
+use syn::{Data, DeriveInput, Error, Fields, FieldsNamed, Meta};
 
 pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
     let mut input: DeriveInput = syn::parse2(stream.clone())?;
-
     let crate_path = get_crate_name("suzunari-error", &stream)?;
     let snafu_path = get_crate_name("snafu", &stream)?;
 
-    // 1. Process #[suzu(...)] attrs (translate, location, snafu passthrough)
-    let suzu_result = suzu_attr::process_suzu_attrs(&mut input, &crate_path)?;
+    // Step 1: Process #[suzu(...)] attrs (from, location, snafu passthrough)
+    // - #[suzu(location)] → #[stack(location)] + #[snafu(implicit)]
+    // - #[suzu(from)] → DisplayError wrapping + #[snafu(source(from(...)))]
+    // - other #[suzu(...)] tokens → #[snafu(...)] passthrough
+    suzu_attr::process_suzu_attrs(&mut input, &crate_path)?;
 
-    // 2. Inject location fields where not explicitly provided
-    inject_location_fields(&mut input, &crate_path, &suzu_result)?;
-
-    // 3. Generate derives (no more #[suzunari_location])
-    let derive_attribute = quote! { #[derive(Debug, #snafu_path::Snafu, #crate_path::StackError)] };
-
-    Ok(quote! {
-        #derive_attribute
-        #input
-    })
-}
-
-/// Injects `location: Location` fields with `#[snafu(implicit)]` where needed.
-///
-/// Skips injection for structs/variants that:
-/// - Already have a field named `location`
-/// - Have a field with `#[suzu(location)]` (indicated by `suzu_result`)
-fn inject_location_fields(
-    input: &mut DeriveInput,
-    crate_path: &Ident,
-    suzu_result: &SuzuResult,
-) -> Result<(), Error> {
+    // Step 2: Resolve and inject location fields
     match &mut input.data {
-        Data::Struct(data_struct) => {
-            let has_explicit = suzu_result
-                .has_explicit_location
-                .first()
-                .copied()
-                .unwrap_or(false);
-            match &mut data_struct.fields {
-                Fields::Named(fields) => {
-                    if !has_explicit && !has_location_field(fields) {
-                        fields.named.push(make_location_field(crate_path));
-                    }
-                }
-                Fields::Unit => {
-                    // Cannot happen — struct with unit fields can't have suzu(location)
-                    // and we need named fields for location injection
-                    return Err(Error::new(
-                        data_struct.fields.span(),
-                        "#[suzunari_error] requires structs with named fields (or unit enum variants)",
-                    ));
-                }
-                _ => {
-                    return Err(Error::new(
-                        data_struct.fields.span(),
-                        "#[suzunari_error] can only be used on structs with named fields",
-                    ));
-                }
+        Data::Struct(data_struct) => match &mut data_struct.fields {
+            Fields::Named(fields) => {
+                resolve_and_inject_location(fields, &crate_path)?;
             }
-        }
+            _ => {
+                return Err(Error::new(
+                    data_struct.fields.span(),
+                    "suzunari_error can only be used on structs with named fields",
+                ));
+            }
+        },
         Data::Enum(data_enum) => {
-            for (i, variant) in data_enum.variants.iter_mut().enumerate() {
-                let has_explicit = suzu_result
-                    .has_explicit_location
-                    .get(i)
-                    .copied()
-                    .unwrap_or(false);
+            for variant in &mut data_enum.variants {
                 match &mut variant.fields {
                     Fields::Named(fields) => {
-                        if !has_explicit && !has_location_field(fields) {
-                            fields.named.push(make_location_field(crate_path));
-                        }
+                        resolve_and_inject_location(fields, &crate_path)?;
                     }
                     Fields::Unit => {
-                        // Convert unit variant to named-fields variant with location
-                        let location_field = make_location_field(crate_path);
+                        let location_field = location_field_impl(&crate_path);
                         let mut fields = Punctuated::new();
                         fields.push(location_field);
                         variant.fields = Fields::Named(syn::FieldsNamed {
@@ -92,7 +48,7 @@ fn inject_location_fields(
                     _ => {
                         return Err(Error::new(
                             variant.span(),
-                            "#[suzunari_error] can only be used on enum variants with named fields",
+                            "suzunari_error can only be used on enum variants with named fields",
                         ));
                     }
                 }
@@ -101,16 +57,125 @@ fn inject_location_fields(
         Data::Union(_) => {
             return Err(Error::new(
                 input.span(),
-                "#[suzunari_error] cannot be used on unions",
+                "suzunari_error cannot be used on unions",
             ));
         }
     }
+
+    // Step 3: Emit derives (location injection is done above)
+    let derive_attribute = quote! { #[derive(Debug, #snafu_path::Snafu, #crate_path::StackError)] };
+
+    Ok(quote! {
+        #derive_attribute
+        #input
+    })
+}
+
+/// Location resolution flow for a single struct/variant.
+///
+/// 1. `#[stack(location)]` count → 1: OK, 2+: error
+/// 2. Location-typed field count → 1: add `#[stack(location)]`, 2+: error
+/// 3. "location" name conflict check → error if non-Location type
+/// 4. Auto-inject `location: Location` with `#[stack(location)]` + `#[snafu(implicit)]`
+fn resolve_and_inject_location(fields: &mut FieldsNamed, crate_path: &Ident) -> Result<(), Error> {
+    // 1. Check #[stack(location)] markers
+    let mut stack_marked = Vec::new();
+    for (i, field) in fields.named.iter().enumerate() {
+        if has_stack_location_attr(field)? {
+            stack_marked.push(i);
+        }
+    }
+
+    match stack_marked.len() {
+        1 => {
+            ensure_snafu_implicit(&mut fields.named[stack_marked[0]]);
+            return Ok(());
+        }
+        n if n > 1 => {
+            return Err(Error::new(
+                fields.named[stack_marked[1]].span(),
+                "multiple #[stack(location)] fields; only one is allowed per struct/variant",
+            ));
+        }
+        _ => {}
+    }
+
+    // 2. Check Location-typed fields
+    let location_typed: Vec<usize> = fields
+        .named
+        .iter()
+        .enumerate()
+        .filter(|(_, f)| looks_like_location_type(&f.ty))
+        .map(|(i, _)| i)
+        .collect();
+
+    match location_typed.len() {
+        1 => {
+            let field = &mut fields.named[location_typed[0]];
+            field.attrs.push(syn::parse_quote!(#[stack(location)]));
+            ensure_snafu_implicit(field);
+            return Ok(());
+        }
+        n if n > 1 => {
+            return Err(Error::new(
+                fields.named[location_typed[1]].span(),
+                "multiple Location fields found; use #[suzu(location)] to specify which one",
+            ));
+        }
+        _ => {}
+    }
+
+    // 3. Check for "location" name conflict
+    let name_conflict = fields
+        .named
+        .iter()
+        .find(|f| f.ident.as_ref().is_some_and(|i| i == "location"));
+    if let Some(field) = name_conflict {
+        return Err(Error::new(
+            field.span(),
+            "field 'location' exists but is not of type Location; \
+             rename it or change its type to Location",
+        ));
+    }
+
+    // 4. Auto-inject location field
+    fields.named.push(location_field_impl(crate_path));
     Ok(())
 }
 
-fn make_location_field(crate_path: &Ident) -> syn::Field {
+/// Ensures the field has `#[snafu(implicit)]`. Adds it if missing.
+fn ensure_snafu_implicit(field: &mut syn::Field) {
+    let has_implicit = field.attrs.iter().any(|attr| {
+        if !attr.path().is_ident("snafu") {
+            return false;
+        }
+        let Meta::List(meta_list) = &attr.meta else {
+            return false;
+        };
+        // Intentionally ignore parse errors: if snafu attribute syntax is
+        // malformed, snafu's own derive will report the error. We only need
+        // to check whether `implicit` is already present.
+        meta_list
+            .parse_args_with(syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated)
+            .ok()
+            .is_some_and(|nested| {
+                nested
+                    .iter()
+                    .any(|meta| matches!(meta, Meta::Path(p) if p.is_ident("implicit")))
+            })
+    });
+
+    if !has_implicit {
+        field.attrs.push(syn::parse_quote!(#[snafu(implicit)]));
+    }
+}
+
+fn location_field_impl(crate_path: &Ident) -> syn::Field {
     syn::Field {
-        attrs: vec![syn::parse_quote!(#[snafu(implicit)])],
+        attrs: vec![
+            syn::parse_quote!(#[snafu(implicit)]),
+            syn::parse_quote!(#[stack(location)]),
+        ],
         vis: syn::Visibility::Inherited,
         ident: Some(format_ident!("location")),
         colon_token: Some(syn::token::Colon::default()),

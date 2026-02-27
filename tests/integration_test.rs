@@ -159,6 +159,87 @@ fn test_validate() {
     );
 }
 
+// -- Custom-named location field tests --
+
+/// #[suzu(location)] allows naming the location field anything.
+#[suzunari_error]
+#[snafu(display("custom location struct"))]
+struct CustomLocStruct {
+    #[suzu(location)]
+    error_origin: Location,
+}
+
+/// Enum with custom-named location via #[suzu(location)].
+#[suzunari_error]
+enum CustomLocEnum {
+    #[snafu(display("variant A"))]
+    VariantA {
+        #[suzu(location)]
+        origin: Location,
+    },
+    #[snafu(display("variant B: {msg}"))]
+    VariantB {
+        msg: String,
+        #[suzu(location)]
+        pos: Location,
+    },
+}
+
+/// Struct with auto-detected Location field (no #[suzu(location)] needed).
+#[suzunari_error]
+#[snafu(display("auto detect"))]
+struct AutoDetectLoc {
+    #[snafu(implicit)]
+    my_loc: Location,
+}
+
+#[test]
+fn test_custom_location_struct() {
+    fn make_error() -> Result<(), CustomLocStruct> {
+        ensure!(false, CustomLocStructSnafu);
+        Ok(())
+    }
+    let err = make_error().unwrap_err();
+    let file = file!();
+    let line = err.location().line();
+    assert!(err.location().file().ends_with("integration_test.rs"));
+    assert!(line > 0);
+    assert_eq!(
+        format!("{:?}", StackReport::from_error(err)),
+        format!("Error: CustomLocStruct: custom location struct, at {file}:{line}:9\n")
+    );
+}
+
+#[test]
+fn test_custom_location_enum() {
+    fn make_a() -> Result<(), CustomLocEnum> {
+        ensure!(false, VariantASnafu);
+        Ok(())
+    }
+    fn make_b() -> Result<(), CustomLocEnum> {
+        ensure!(false, VariantBSnafu { msg: "hello" });
+        Ok(())
+    }
+    let err_a = make_a().unwrap_err();
+    assert!(err_a.location().file().ends_with("integration_test.rs"));
+    assert_eq!(err_a.type_name(), "CustomLocEnum::VariantA");
+
+    let err_b = make_b().unwrap_err();
+    assert!(err_b.location().file().ends_with("integration_test.rs"));
+    assert_eq!(err_b.type_name(), "CustomLocEnum::VariantB");
+}
+
+#[test]
+fn test_auto_detect_location_field() {
+    fn make_error() -> Result<(), AutoDetectLoc> {
+        ensure!(false, AutoDetectLocSnafu);
+        Ok(())
+    }
+    let err = make_error().unwrap_err();
+    assert!(err.location().file().ends_with("integration_test.rs"));
+    assert_eq!(err.type_name(), "AutoDetectLoc");
+}
+
 /// E-2: stack_source() and Error::source() must be consistent —
 /// when stack_source() returns Some, Error::source() must also return Some.
 #[test]

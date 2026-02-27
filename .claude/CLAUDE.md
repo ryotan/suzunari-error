@@ -65,7 +65,7 @@ A snafu-based error handling library with automatic location tracking. `#![no_st
 
 Provides 3 proc-macros:
 
-- **`#[suzunari_error]`** — The main entry point. Processes `#[suzu(...)]` attributes, injects `location: Location` fields, and appends `#[derive(Debug, Snafu, StackError)]`. Use this by default
+- **`#[suzunari_error]`** — The main entry point. Processes `#[suzu(...)]` attributes, resolves/injects location fields, and appends `#[derive(Debug, Snafu, StackError)]`. Use this by default
 - **`#[derive(StackError)]`** — Generates `StackError` impl and `From<T> for BoxedStackError` (when alloc enabled). Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
 - **`#[suzunari_error::report]`** — Transforms `fn main() -> Result<(), E>` into `fn main() -> StackReport<E>` for formatted error output on failure (std only)
 
@@ -75,8 +75,24 @@ The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc"
 
 `#[suzu(...)]` is a superset of `#[snafu(...)]` — all snafu keywords pass through as-is. Suzunari extensions:
 
-- **`translate`** (field-level) — Wraps field type in `DisplayError<T>` and generates `#[snafu(source(from(T, DisplayError::new)))]`
-- **`location`** (field-level) — Adds `#[snafu(implicit)]` and suppresses auto location injection for that struct/variant
+- **`from`** (field-level) — Wraps field type in `DisplayError<T>` and generates `#[snafu(source(from(T, DisplayError::new)))]`
+- **`location`** (field-level) — Marks a field as the location field. Converts to `#[stack(location)]` + `#[snafu(implicit)]`. Allows custom field names. Requires `Location` type
+
+### Field-Level Attributes
+
+Attribute ownership: each attribute is consumed by a specific macro.
+
+- **`#[suzu(location)]`** → consumed by `#[suzunari_error]`. Marks a field as the location field. Converted to `#[stack(location)]` + `#[snafu(implicit)]`. Requires `Location` type
+- **`#[stack(location)]`** → consumed by `derive(StackError)`. Tells the derive which field provides the location. Supports any field name
+- **`#[snafu(...)]`** → consumed by `derive(Snafu)`. Standard snafu attributes (`source`, `implicit`, `display`, etc.)
+
+### Location Resolution (by `#[suzunari_error]`)
+
+1. `#[suzu(location)]` → convert to `#[stack(location)]` + `#[snafu(implicit)]`; error if not `Location` type
+2. Count `#[stack(location)]` fields: 1 = OK, 2+ = error
+3. Count `Location`-typed fields: 1 = auto-mark with `#[stack(location)]`, 2+ = error
+4. Check for `location` name conflict (non-Location type) = error
+5. Otherwise: auto-inject `location: Location` with `#[stack(location)]` + `#[snafu(implicit)]`
 
 ### Feature Flags
 

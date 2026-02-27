@@ -6,7 +6,7 @@ Built on [SNAFU](https://docs.rs/snafu), inspired by [Error Handling for Large R
 
 ## Features
 
-- **`#[suzunari_error]`** — The primary macro. Annotate your error type and get `Snafu` + `StackError` derives plus automatic `location` field injection. Supports `#[suzu(...)]` attributes for snafu passthrough and suzunari extensions (`translate`, `location`).
+- **`#[suzunari_error]`** — The primary macro. Annotate your error type and get `Snafu` + `StackError` derives plus automatic `location` field injection. Supports `#[suzu(...)]` attributes for snafu passthrough and suzunari extensions (`from`, `location`).
 - **`StackError` trait** — Error location-aware contextual chained errors. Provides `location()`, `type_name()`, and `stack_source()` for traversing error chains with location info.
 - **`StackReport`** — Formats a `StackError` chain as a stack-trace-like report with type names and locations at each level. Use at error display boundaries.
 - **`Location`** — Memory-efficient location structure compatible with SNAFU's implicit context.
@@ -113,7 +113,7 @@ fn run() -> Result<(), DbError> {
 
 ### `DisplayError` — Wrapping non-`Error` types
 
-For third-party types that implement `Debug + Display` but not `Error`, use `#[suzu(translate)]` to automatically wrap the type in `DisplayError` and generate the `source(from(...))` annotation:
+For third-party types that implement `Debug + Display` but not `Error`, use `#[suzu(from)]` to automatically wrap the type in `DisplayError` and generate the `source(from(...))` annotation:
 
 ```rust
 use suzunari_error::*;
@@ -121,7 +121,7 @@ use suzunari_error::*;
 #[suzunari_error]
 #[suzu(display("hashing failed"))]
 struct HashError {
-    #[suzu(translate)]
+    #[suzu(from)]
     source: argon2::Error,
 }
 ```

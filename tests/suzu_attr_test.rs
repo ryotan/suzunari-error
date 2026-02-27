@@ -4,7 +4,7 @@
 use snafu::prelude::*;
 use suzunari_error::*;
 
-// --- translate: basic enum usage ---
+// --- from: basic enum usage ---
 
 // Simulates a third-party error without Error impl
 struct FakeLibError {
@@ -22,10 +22,10 @@ impl core::fmt::Debug for FakeLibError {
 }
 
 #[suzunari_error]
-enum TranslateEnumError {
+enum FromEnumError {
     #[suzu(display("hashing failed"))]
     HashFailed {
-        #[suzu(translate)]
+        #[suzu(from)]
         source: FakeLibError,
     },
     #[suzu(display("io error"))]
@@ -33,7 +33,7 @@ enum TranslateEnumError {
 }
 
 #[test]
-fn test_translate_enum_basic() {
+fn test_from_enum_basic() {
     fn fake_hash() -> Result<(), FakeLibError> {
         Err(FakeLibError { message: "boom" })
     }
@@ -44,7 +44,7 @@ fn test_translate_enum_basic() {
 }
 
 #[test]
-fn test_translate_enum_non_translate_variant() {
+fn test_from_enum_non_from_variant() {
     fn io_op() -> Result<(), std::io::Error> {
         Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
@@ -57,39 +57,39 @@ fn test_translate_enum_non_translate_variant() {
     assert!(report.contains("not found"));
 }
 
-// --- translate: struct usage ---
+// --- from: struct usage ---
 
 #[suzunari_error]
-#[suzu(display("struct translate error"))]
-struct TranslateStructError {
-    #[suzu(translate)]
+#[suzu(display("struct from error"))]
+struct FromStructError {
+    #[suzu(from)]
     source: FakeLibError,
 }
 
 #[test]
-fn test_translate_struct() {
+fn test_from_struct() {
     fn fake_op() -> Result<(), FakeLibError> {
         Err(FakeLibError {
             message: "struct boom",
         })
     }
-    let err = fake_op().context(TranslateStructSnafu).unwrap_err();
+    let err = fake_op().context(FromStructSnafu).unwrap_err();
     let report = format!("{:?}", StackReport::from_error(err));
-    assert!(report.contains("struct translate error"));
+    assert!(report.contains("struct from error"));
     assert!(report.contains("struct boom"));
 }
 
-// --- translate: already DisplayError<T> (no double-wrapping) ---
+// --- from: already DisplayError<T> (no double-wrapping) ---
 
 #[suzunari_error]
 #[suzu(display("already wrapped"))]
 struct AlreadyWrappedError {
-    #[suzu(translate)]
+    #[suzu(from)]
     source: DisplayError<FakeLibError>,
 }
 
 #[test]
-fn test_translate_already_display_error() {
+fn test_from_already_display_error() {
     fn fake_op() -> Result<(), FakeLibError> {
         Err(FakeLibError {
             message: "already wrapped",
@@ -162,14 +162,14 @@ fn test_passthrough_only() {
     assert!(report.contains("pass through"));
 }
 
-// --- mixed: suzu(display(...)) on variant + suzu(translate) on field ---
+// --- mixed: suzu(display(...)) on variant + suzu(from) on field ---
 
 #[suzunari_error]
 enum MixedSuzuError {
     #[suzu(display("mixed display: {context}"))]
     Mixed {
         context: String,
-        #[suzu(translate)]
+        #[suzu(from)]
         source: FakeLibError,
     },
 }
@@ -196,17 +196,17 @@ fn test_mixed_suzu_attrs() {
 #[suzunari_error]
 #[suzu(display("outer error"))]
 struct OuterError {
-    source: TranslateEnumError,
+    source: FromEnumError,
 }
 
 #[test]
-fn test_stack_report_with_translate_chain() {
+fn test_stack_report_with_from_chain() {
     fn fake_hash() -> Result<(), FakeLibError> {
         Err(FakeLibError {
             message: "hash fail",
         })
     }
-    fn inner() -> Result<(), TranslateEnumError> {
+    fn inner() -> Result<(), FromEnumError> {
         fake_hash().context(HashFailedSnafu)?;
         Ok(())
     }
@@ -216,7 +216,7 @@ fn test_stack_report_with_translate_chain() {
     }
 
     let err = outer().unwrap_err();
-    // Should have depth 2: OuterError -> TranslateEnumError::HashFailed -> DisplayError
+    // Should have depth 2: OuterError -> FromEnumError::HashFailed -> DisplayError
     assert_eq!(err.depth(), 2);
     let report = format!("{:?}", StackReport::from_error(err));
     assert!(report.contains("outer error"));

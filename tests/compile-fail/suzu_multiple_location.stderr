@@ -1,0 +1,7 @@
+error: multiple #[stack(location)] fields; only one is allowed per struct/variant
+ --> tests/compile-fail/suzu_multiple_location.rs:3:1
+  |
+3 | #[suzunari_error]
+  | ^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `suzunari_error` (in Nightly builds, run with -Z macro-backtrace for more info)
