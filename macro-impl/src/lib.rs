@@ -8,8 +8,8 @@
 //!   field with `#[snafu(implicit)]` to structs and each enum variant.
 //! - [`#[derive(StackError)]`](derive_stack_error) — Generates `StackError` impl
 //!   and `From<T> for BoxedStackError` (when `alloc` enabled).
-//! - [`#[report]`](report) — Transforms `fn main() -> Result<(), E>` into
-//!   `fn main() -> StackReport<E>` for formatted error output on failure (`std` only).
+//! - [`#[report]`](report) — Transforms `fn() -> Result<(), E>` into
+//!   `fn() -> StackReport<E>` for formatted error output on failure (`std` only).
 
 mod attribute;
 mod derive;
@@ -53,11 +53,13 @@ pub fn suzunari_error(_attr: TokenStream, item: TokenStream) -> TokenStream {
         .into()
 }
 
-/// Transforms `fn main() -> Result<(), E>` into `fn main() -> StackReport<E>`.
+/// Transforms `fn() -> Result<(), E>` into `fn() -> StackReport<E>`.
 ///
-/// Designed for `fn main()`. Does not support generics, `where` clauses,
-/// `async fn`, or type aliases (e.g., `type MyResult<E> = Result<(), E>`).
-/// For non-`main` functions, use `StackReport::from_error` or `.into()` directly.
+/// Primarily designed for `fn main()` where `StackReport`'s `Termination` impl
+/// formats error chains on failure. Can also be applied to other functions to
+/// convert `Result<(), E>` to `StackReport<E>` (e.g., for testing).
+///
+/// Does not support generics, `where` clauses, `async fn`, or type aliases.
 #[proc_macro_attribute]
 pub fn report(attr: TokenStream, item: TokenStream) -> TokenStream {
     report_impl(attr.into(), item.into())

@@ -1,8 +1,8 @@
 error: StackError requires a 'location' field of type Location
- --> tests/compile-fail/derive_struct_no_location.rs:6:16
+ --> tests/compile-fail/derive_struct_no_location.rs:7:16
   |
-6 |   struct MyError {
+7 |   struct MyError {
   |  ________________^
-7 | |     message: String,
-8 | | }
+8 | |     message: String,
+9 | | }
   | |_^

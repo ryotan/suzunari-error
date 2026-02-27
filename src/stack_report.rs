@@ -9,7 +9,8 @@ use core::fmt;
 /// Create via [`StackReport::from_error`] or `Result<(), E>::into()`.
 ///
 /// With the `std` feature, implements [`std::process::Termination`] for use as the
-/// return type of `main()`. See also [`#[suzunari_error::report]`](crate::report).
+/// return type of `main()`. The [`#[suzunari_error::report]`](crate::report) macro
+/// can transform `fn() -> Result<(), E>` into `fn() -> StackReport<E>` automatically.
 pub struct StackReport<E: StackError>(Result<(), E>);
 
 impl<E: StackError> StackReport<E> {
@@ -56,7 +57,7 @@ impl<E: StackError> std::process::Termination for StackReport<E> {
                 // panicking here would mask the original error.
                 let _ = std::io::Write::write_fmt(
                     &mut std::io::stderr(),
-                    format_args!("{}\n", StackReportFormatter(&e)),
+                    format_args!("{}", StackReportFormatter(&e)),
                 );
                 std::process::ExitCode::FAILURE
             }

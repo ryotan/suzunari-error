@@ -47,8 +47,10 @@ mod std_tests {
     use suzunari_error::StackReport;
 
     // StackReport implements Termination (std-only)
-    fn _report_is_termination() -> StackReport<super::CoreOnlyError> {
-        (|| -> Result<(), super::CoreOnlyError> { Ok(()) })().into()
+    fn _report_is_termination()
+    where
+        StackReport<super::CoreOnlyError>: std::process::Termination,
+    {
     }
 
     // #[suzunari_error::report] macro works

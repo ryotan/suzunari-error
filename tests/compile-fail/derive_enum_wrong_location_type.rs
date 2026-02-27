@@ -3,9 +3,8 @@
 use suzunari_error::*;
 
 #[derive(Debug, snafu::Snafu, StackError)]
-#[snafu(display("error"))]
-struct MyError {
-    location: String,
+enum MyError {
+    Variant1 { location: String },
 }
 
 fn main() {}
