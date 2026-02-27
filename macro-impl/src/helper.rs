@@ -92,15 +92,27 @@ pub(crate) fn find_location_field(fields: &FieldsNamed) -> Result<&Field, Error>
 pub(crate) fn has_stack_location_attr(field: &Field) -> Result<bool, Error> {
     for attr in field.attrs.iter().filter(|a| a.path().is_ident("stack")) {
         let Meta::List(meta_list) = &attr.meta else {
-            continue;
+            // Reject bare #[stack] or #[stack = ...] — this crate owns
+            // the stack attribute namespace, so malformed usage is always an error.
+            return Err(Error::new(
+                attr.span(),
+                "#[stack] requires arguments, e.g., #[stack(location)]",
+            ));
         };
         let nested = meta_list.parse_args_with(
             syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated,
         )?;
-        if nested
+        // Reject unknown tokens — only `location` is supported.
+        if let Some(unknown) = nested
             .iter()
-            .any(|meta| matches!(meta, Meta::Path(p) if p.is_ident("location")))
+            .find(|meta| !matches!(meta, Meta::Path(p) if p.is_ident("location")))
         {
+            return Err(Error::new(
+                unknown.span(),
+                "unknown #[stack(...)] argument; only `location` is supported",
+            ));
+        }
+        if !nested.is_empty() {
             return Ok(true);
         }
     }
