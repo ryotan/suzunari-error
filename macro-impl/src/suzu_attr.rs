@@ -1,77 +1,52 @@
 //! Processes `#[suzu(...)]` attributes on types, variants, and fields.
 //!
 //! `#[suzu(...)]` is a superset of `#[snafu(...)]`: suzunari-specific keywords
-//! (`translate`, `location`) are handled here, and everything else is passed
+//! (`from`, `location`) are handled here, and everything else is passed
 //! through as `#[snafu(...)]`.
 
-use crate::helper::extract_display_error_inner;
+use crate::helper::{extract_display_error_inner, looks_like_location_type};
 use proc_macro2::Ident;
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, Meta, Token};
 
-/// Tracks which fields have an explicit `#[suzu(location)]`.
-///
-/// The outer `Vec` index corresponds to:
-/// - For structs: a single-element vec (the struct itself)
-/// - For enums: one entry per variant, in declaration order
-///
-/// Each inner `bool` is `true` if the variant/struct has a field with
-/// `#[suzu(location)]`.
-pub(crate) struct SuzuResult {
-    pub has_explicit_location: Vec<bool>,
-}
-
 /// Processes all `#[suzu(...)]` attributes on `input`, consuming them.
 ///
-/// - `translate` and `location` are handled as suzunari extensions.
+/// - `from` and `location` are handled as suzunari extensions.
 /// - All other tokens are forwarded as `#[snafu(...)]`.
-/// - Returns [`SuzuResult`] so the caller can decide auto-location injection.
-pub(crate) fn process_suzu_attrs(
-    input: &mut DeriveInput,
-    crate_path: &Ident,
-) -> Result<SuzuResult, Error> {
+///
+/// After this call, `#[suzu(location)]` fields have `#[stack(location)]` +
+/// `#[snafu(implicit)]`, and `#[suzu(from)]` fields have their type wrapped in
+/// `DisplayError<T>` with `#[snafu(source(from(...)))]`.
+pub(crate) fn process_suzu_attrs(input: &mut DeriveInput, crate_path: &Ident) -> Result<(), Error> {
     match &mut input.data {
         Data::Struct(data_struct) => {
-            // Type-level attrs
             process_type_level_attrs(&mut input.attrs)?;
 
-            let has_explicit = match &mut data_struct.fields {
-                Fields::Named(fields) => process_fields(&mut fields.named, crate_path)?,
-                Fields::Unit => false,
-                _ => false,
-            };
-            Ok(SuzuResult {
-                has_explicit_location: vec![has_explicit],
-            })
+            if let Fields::Named(fields) = &mut data_struct.fields {
+                process_fields(&mut fields.named, crate_path)?;
+            }
+            Ok(())
         }
         Data::Enum(data_enum) => {
-            // Type-level attrs
             process_type_level_attrs(&mut input.attrs)?;
 
-            let mut has_explicit_location = Vec::with_capacity(data_enum.variants.len());
             for variant in &mut data_enum.variants {
-                // Variant-level attrs
                 process_variant_level_attrs(&mut variant.attrs)?;
 
-                let has_explicit = match &mut variant.fields {
-                    Fields::Named(fields) => process_fields(&mut fields.named, crate_path)?,
-                    Fields::Unit => false,
-                    _ => false,
-                };
-                has_explicit_location.push(has_explicit);
+                if let Fields::Named(fields) = &mut variant.fields {
+                    process_fields(&mut fields.named, crate_path)?;
+                }
             }
-            Ok(SuzuResult {
-                has_explicit_location,
-            })
+            Ok(())
         }
         Data::Union(_) => Err(Error::new(input.span(), "#[suzu] cannot be used on unions")),
     }
 }
 
 /// Processes `#[suzu(...)]` on type-level attributes.
-/// Only passthrough to `#[snafu(...)]` is allowed; `translate`/`location` are errors.
+/// Only passthrough to `#[snafu(...)]` is allowed; `from`/`location` are errors.
 fn process_type_level_attrs(attrs: &mut Vec<Attribute>) -> Result<(), Error> {
     let mut new_attrs = Vec::new();
     let mut errors = Vec::new();
@@ -96,7 +71,7 @@ fn process_type_level_attrs(attrs: &mut Vec<Attribute>) -> Result<(), Error> {
 }
 
 /// Processes `#[suzu(...)]` on variant-level attributes.
-/// Only passthrough to `#[snafu(...)]` is allowed; `translate`/`location` are errors.
+/// Only passthrough to `#[snafu(...)]` is allowed; `from`/`location` are errors.
 fn process_variant_level_attrs(attrs: &mut Vec<Attribute>) -> Result<(), Error> {
     let mut new_attrs = Vec::new();
     let mut errors = Vec::new();
@@ -121,19 +96,17 @@ fn process_variant_level_attrs(attrs: &mut Vec<Attribute>) -> Result<(), Error> 
 }
 
 /// Processes `#[suzu(...)]` attributes on fields within a single struct/variant.
-/// Returns `true` if any field has `#[suzu(location)]`.
 fn process_fields(
     fields: &mut Punctuated<Field, Token![,]>,
     crate_path: &Ident,
-) -> Result<bool, Error> {
-    let mut has_explicit_location = false;
+) -> Result<(), Error> {
     let mut errors = Vec::new();
 
     for field in fields.iter_mut() {
         // Take ownership of attrs to avoid borrow conflicts when mutating field.ty
         let old_attrs = std::mem::take(&mut field.attrs);
         let mut new_attrs = Vec::new();
-        let mut needs_translate = false;
+        let mut needs_from = false;
         let mut needs_location = false;
 
         for attr in old_attrs {
@@ -146,8 +119,8 @@ fn process_fields(
                     if let Some(snafu_attr) = result.snafu_passthrough {
                         new_attrs.push(snafu_attr);
                     }
-                    if result.has_translate {
-                        needs_translate = true;
+                    if result.has_from {
+                        needs_from = true;
                     }
                     if result.has_location {
                         needs_location = true;
@@ -157,23 +130,28 @@ fn process_fields(
             }
         }
 
-        // Apply translate/location after the attrs loop so field is freely borrowable
-        if needs_translate {
-            match apply_translate(field, &new_attrs, crate_path) {
+        // Apply from/location after the attrs loop so field is freely borrowable
+        if needs_from {
+            match apply_from(field, &new_attrs, crate_path) {
                 Ok(snafu_source_attr) => new_attrs.push(snafu_source_attr),
                 Err(e) => errors.push(e),
             }
         }
         if needs_location {
-            apply_location(&mut new_attrs);
-            has_explicit_location = true;
+            if !looks_like_location_type(&field.ty) {
+                errors.push(Error::new(
+                    field.ty.span(),
+                    "#[suzu(location)] requires the field type to be Location",
+                ));
+            } else {
+                apply_location(&mut new_attrs);
+            }
         }
 
         field.attrs = new_attrs;
     }
 
-    combine_errors(errors)?;
-    Ok(has_explicit_location)
+    combine_errors(errors)
 }
 
 #[derive(Clone, Copy)]
@@ -186,8 +164,8 @@ enum Level {
 struct SingleAttrResult {
     /// The passthrough `#[snafu(...)]` attribute, if any non-suzunari tokens exist.
     snafu_passthrough: Option<Attribute>,
-    /// Whether `translate` was found.
-    has_translate: bool,
+    /// Whether `from` was found.
+    has_from: bool,
     /// Whether `location` was found.
     has_location: bool,
 }
@@ -207,23 +185,20 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
         return Err(Error::new(attr.span(), "#[suzu] requires arguments"));
     }
 
-    let mut has_translate = false;
+    let mut has_from = false;
     let mut has_location = false;
     let mut passthrough_tokens: Vec<Meta> = Vec::new();
     let mut has_source_in_passthrough = false;
 
     for meta in &nested {
-        let is_translate = meta_is_ident(meta, "translate");
+        let is_from = meta_is_ident(meta, "from");
         let is_location = meta_is_ident(meta, "location");
 
-        if is_translate {
+        if is_from {
             match level {
-                Level::Field => has_translate = true,
+                Level::Field => has_from = true,
                 _ => {
-                    return Err(Error::new(
-                        meta.span(),
-                        "`translate` can only be used on fields",
-                    ));
+                    return Err(Error::new(meta.span(), "`from` can only be used on fields"));
                 }
             }
         } else if is_location {
@@ -245,11 +220,11 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
         }
     }
 
-    // Conflict: translate + source(...) in the same #[suzu(...)]
-    if has_translate && has_source_in_passthrough {
+    // Conflict: from + source(...) in the same #[suzu(...)]
+    if has_from && has_source_in_passthrough {
         return Err(Error::new(
             attr.span(),
-            "`translate` conflicts with `source(...)` — `translate` generates `source(from(...))` automatically",
+            "`from` conflicts with `source(...)` — `from` generates `source(from(...))` automatically",
         ));
     }
 
@@ -261,18 +236,18 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
 
     Ok(SingleAttrResult {
         snafu_passthrough,
-        has_translate,
+        has_from,
         has_location,
     })
 }
 
-/// Applies `translate` to a field: wraps type in `DisplayError<T>` and generates
+/// Applies `from` to a field: wraps type in `DisplayError<T>` and generates
 /// `#[snafu(source(from(T, DisplayError::new)))]`.
 ///
 /// `existing_attrs` contains all non-suzu attrs plus passthrough snafu attrs
 /// already collected for this field. `field.attrs` is empty at this point
 /// (taken via `std::mem::take` in the caller).
-fn apply_translate(
+fn apply_from(
     field: &mut Field,
     existing_attrs: &[Attribute],
     crate_path: &Ident,
@@ -281,7 +256,7 @@ fn apply_translate(
     if has_snafu_source(existing_attrs) {
         return Err(Error::new(
             field.span(),
-            "`translate` conflicts with existing `#[snafu(source(...))]`",
+            "`from` conflicts with existing `#[snafu(source(...))]`",
         ));
     }
 
@@ -301,7 +276,11 @@ fn apply_translate(
     ))
 }
 
-/// Applies `location` to a field: adds `#[snafu(implicit)]` if not already present.
+/// Applies `location` to a field: adds `#[snafu(implicit)]` + `#[stack(location)]`.
+///
+/// `#[stack(location)]` is consumed by `derive(StackError)` to identify the
+/// location field. `#[snafu(implicit)]` is consumed by `derive(Snafu)` for
+/// auto-filling via `GenerateImplicitData`.
 ///
 /// `attrs` contains all non-suzu attrs plus passthrough snafu attrs already
 /// collected for this field. `field.attrs` is empty at this point.
@@ -309,6 +288,7 @@ fn apply_location(attrs: &mut Vec<Attribute>) {
     if !has_snafu_implicit(attrs) {
         attrs.push(parse_quote!(#[snafu(implicit)]));
     }
+    attrs.push(parse_quote!(#[stack(location)]));
 }
 
 // --- Helpers ---

@@ -27,19 +27,19 @@ struct AutoConvertError {
     source: DisplayError<FakeLibError>,
 }
 
-// --- Pattern A2: automatic conversion via #[suzu(translate)] ---
+// --- Pattern A2: automatic conversion via #[suzu(from)] ---
 #[suzunari_error]
-#[suzu(display("translate op failed"))]
-struct TranslateConvertError {
-    #[suzu(translate)]
+#[suzu(display("from convert op failed"))]
+struct FromConvertError {
+    #[suzu(from)]
     source: FakeLibError,
 }
 
-// --- Pattern A3: #[suzu(translate)] with already-wrapped DisplayError ---
+// --- Pattern A3: #[suzu(from)] with already-wrapped DisplayError ---
 #[suzunari_error]
-#[suzu(display("translate already wrapped"))]
-struct TranslateAlreadyWrappedError {
-    #[suzu(translate)]
+#[suzu(display("from already wrapped"))]
+struct FromAlreadyWrappedError {
+    #[suzu(from)]
     source: DisplayError<FakeLibError>,
 }
 
@@ -82,30 +82,30 @@ fn test_map_err_manual_convert() {
 }
 
 #[test]
-fn test_translate_attr_auto_convert() {
+fn test_from_attr_auto_convert() {
     fn fake_op() -> Result<(), FakeLibError> {
         Err(FakeLibError {
-            message: "translate broke",
+            message: "from broke",
         })
     }
-    let err = fake_op().context(TranslateConvertSnafu).unwrap_err();
+    let err = fake_op().context(FromConvertSnafu).unwrap_err();
 
     let report = format!("{:?}", StackReport::from_error(err));
-    assert!(report.contains("translate op failed"));
-    assert!(report.contains("translate broke"));
+    assert!(report.contains("from convert op failed"));
+    assert!(report.contains("from broke"));
 }
 
 #[test]
-fn test_translate_attr_already_wrapped() {
+fn test_from_attr_already_wrapped() {
     fn fake_op() -> Result<(), FakeLibError> {
         Err(FakeLibError {
             message: "already wrapped",
         })
     }
-    let err = fake_op().context(TranslateAlreadyWrappedSnafu).unwrap_err();
+    let err = fake_op().context(FromAlreadyWrappedSnafu).unwrap_err();
 
     let report = format!("{:?}", StackReport::from_error(err));
-    assert!(report.contains("translate already wrapped"));
+    assert!(report.contains("from already wrapped"));
 }
 
 #[cfg(feature = "test-alloc")]

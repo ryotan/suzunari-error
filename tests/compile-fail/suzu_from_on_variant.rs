@@ -2,7 +2,7 @@ use suzunari_error::suzunari_error;
 
 #[suzunari_error]
 enum MyError {
-    #[suzu(translate)]
+    #[suzu(from)]
     Variant {},
 }
 

@@ -19,44 +19,92 @@ pub(crate) fn get_crate_name(original_name: &str, stream: &TokenStream) -> Resul
     }
 }
 
-/// Returns true if a field named "location" exists (regardless of type).
+/// Finds the location field in a struct/variant's named fields.
 ///
-/// Used by `suzunari_error` to decide whether to inject the location field.
-pub(crate) fn has_location_field(fields: &FieldsNamed) -> bool {
-    fields.named.iter().any(|field| {
-        field
-            .ident
-            .as_ref()
-            .is_some_and(|ident| ident == "location")
-    })
-}
-
-/// Validates that a `location: Location` field exists with the correct type.
+/// Resolution order (symmetric with `find_source_field`):
+/// 1. `#[stack(location)]` marker — highest priority, any field name
+/// 2. Single field of type `Location` — automatic fallback
+/// 3. Error if no location field found
 ///
-/// Used by `derive(StackError)` for clear error messages when the field
-/// is missing or has an unexpected type.
-pub(crate) fn validate_location(fields: &FieldsNamed) -> Result<(), Error> {
-    let location_field = fields
-        .named
-        .iter()
-        .find(|f| f.ident.as_ref().is_some_and(|i| i == "location"));
-    match location_field {
-        None => Err(Error::new(
-            fields.span(),
-            "StackError requires a 'location' field of type Location",
-        )),
-        Some(field) => {
-            if looks_like_location_type(&field.ty) {
-                Ok(())
-            } else {
-                Err(Error::new(
-                    field.ty.span(),
-                    "field 'location' must be of type Location (from suzunari_error). \
-                     If you intended a custom field, rename it to avoid conflict.",
-                ))
-            }
+/// Used by `derive(StackError)` to resolve the location field dynamically.
+pub(crate) fn find_location_field(fields: &FieldsNamed) -> Result<&Field, Error> {
+    // Priority 1: explicit #[stack(location)] marker
+    let mut marked = Vec::new();
+    for field in &fields.named {
+        if has_stack_location_attr(field)? {
+            marked.push(field);
         }
     }
+
+    match marked.len() {
+        1 => return Ok(marked[0]),
+        n if n > 1 => {
+            return Err(Error::new(
+                marked[1].span(),
+                "multiple #[stack(location)] fields; only one is allowed per struct/variant",
+            ));
+        }
+        _ => {}
+    }
+
+    // Priority 2: single field with Location type
+    let location_typed: Vec<_> = fields
+        .named
+        .iter()
+        .filter(|f| looks_like_location_type(&f.ty))
+        .collect();
+
+    match location_typed.len() {
+        1 => return Ok(location_typed[0]),
+        n if n > 1 => {
+            return Err(Error::new(
+                location_typed[1].span(),
+                "multiple Location fields found; use #[stack(location)] to specify which one",
+            ));
+        }
+        _ => {}
+    }
+
+    // Near-miss: field named "location" but wrong type
+    if let Some(field) = fields.named.iter().find(|f| {
+        f.ident.as_ref().is_some_and(|i| i == "location") && !looks_like_location_type(&f.ty)
+    }) {
+        return Err(Error::new(
+            field.span(),
+            "field 'location' exists but is not of type Location; \
+             use Location type or mark the correct field with #[stack(location)]",
+        ));
+    }
+
+    // No location field found
+    Err(Error::new(
+        fields.span(),
+        "StackError requires a Location field. Use #[suzunari_error] to auto-inject, \
+         or add a field of type Location manually.",
+    ))
+}
+
+/// Returns true if the field has `#[stack(location)]` attribute.
+///
+/// Unlike `is_source_field` (which defers parse errors to snafu), this function
+/// propagates parse errors because `#[stack(...)]` is consumed by our own
+/// `derive(StackError)` — no other macro will report the error.
+pub(crate) fn has_stack_location_attr(field: &Field) -> Result<bool, Error> {
+    for attr in field.attrs.iter().filter(|a| a.path().is_ident("stack")) {
+        let Meta::List(meta_list) = &attr.meta else {
+            continue;
+        };
+        let nested = meta_list.parse_args_with(
+            syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated,
+        )?;
+        if nested
+            .iter()
+            .any(|meta| matches!(meta, Meta::Path(p) if p.is_ident("location")))
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Extracts the inner type `T` from `DisplayError<T>`.
@@ -83,7 +131,7 @@ pub(crate) fn extract_display_error_inner(ty: &Type) -> Option<&Type> {
     }
 }
 
-fn looks_like_location_type(ty: &syn::Type) -> bool {
+pub(crate) fn looks_like_location_type(ty: &syn::Type) -> bool {
     match ty {
         syn::Type::Path(p) => p
             .path

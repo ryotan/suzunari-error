@@ -11,7 +11,7 @@ use suzunari_error::{DisplayError, StackError};
 #[snafu(display("core only error"))]
 pub struct CoreOnlyError {}
 
-// #[suzu(translate)] works in core-only mode
+// #[suzu(from)] works in core-only mode
 struct FakeNonError;
 impl core::fmt::Display for FakeNonError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -25,9 +25,9 @@ impl core::fmt::Debug for FakeNonError {
 }
 
 #[suzunari_error::suzunari_error]
-#[suzu(display("translate in core"))]
-pub struct TranslateInCore {
-    #[suzu(translate)]
+#[suzu(display("from in core"))]
+pub struct FromInCore {
+    #[suzu(from)]
     source: FakeNonError,
 }
 

@@ -1,5 +1,0 @@
-error: `translate` can only be used on fields
- --> tests/compile-fail/suzu_translate_on_variant.rs:5:12
-  |
-5 |     #[suzu(translate)]
-  |            ^^^^^^^^^

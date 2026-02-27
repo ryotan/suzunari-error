@@ -1,0 +1,5 @@
+error: multiple Location fields found; use #[suzu(location)] to specify which one
+ --> tests/compile-fail/suzu_multiple_location_types.rs:9:5
+  |
+9 |     #[snafu(implicit)]
+  |     ^

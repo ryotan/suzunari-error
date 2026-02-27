@@ -1,21 +1,20 @@
 #![cfg(feature = "std")]
 // Tests verify derive macros and attributes individually and in combination.
-// Uses #[suzunari_error] with #[suzu(location)] for explicit location fields,
-// raw #[derive(StackError)] with manual location field, and #[suzunari_error]
-// with auto-injection to test each layer independently.
+// Uses #[suzunari_error] for the all-in-one macro, raw #[derive(StackError)] with
+// manual location field, and manual enum construction to test each layer independently.
 // .build() is snafu's standard test pattern.
 
 use snafu::prelude::*;
 use suzunari_error::{Location, StackError, StackReport, suzunari_error};
 
-// Test struct with StackError derive macro and explicit location via #[suzu(location)]
+// Test struct with #[suzunari_error] (auto-injects location)
 #[suzunari_error]
 #[snafu(display("{}", message))]
 struct TestError {
     message: String,
 }
 
-// Test struct with manual location field
+// Test struct with manual location field (raw derive)
 #[derive(Debug, Snafu, StackError)]
 struct TestErrorWithLocation {
     message: String,
@@ -23,23 +22,19 @@ struct TestErrorWithLocation {
     location: Location,
 }
 
-// No need to implement Error manually, Snafu already does this
-
-// Test enum with StackError derive macro
+// Test enum with #[suzunari_error]
 #[suzunari_error]
 enum TestErrorEnum {
     Variant1 { message: String },
     Variant2 { context: String },
 }
 
-// Test enum with manual location field
+// Test enum with manual location field (raw derive)
 #[derive(Debug, Snafu, StackError)]
 enum TestErrorEnumWithLocation {
     Variant3 { message: String, location: Location },
     Variant4 { context: String, location: Location },
 }
-
-// No need to implement Error manually, Snafu already does this
 
 #[test]
 fn test_stack_error_derive() {
@@ -58,7 +53,7 @@ fn test_stack_error_derive() {
 }
 
 #[test]
-fn test_manual_location_field() {
+fn test_manual_location_struct() {
     let error = TestErrorWithLocationSnafu {
         message: "Test error".to_string(),
     }

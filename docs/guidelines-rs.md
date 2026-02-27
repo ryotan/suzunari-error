@@ -35,7 +35,7 @@ guidelines will ensure code consistency, readability, and maintainability across
 
 ### Suzunari Error Approach
 
-- Use `#[suzunari_error]` for defining error types (combines `#[suzunari_location]` + `#[derive(Snafu, StackError)]`)
+- Use `#[suzunari_error]` for defining error types (location injection + `#[derive(Debug, Snafu, StackError)]`)
 - Structure error types to capture relevant context:
   - Include fields that provide context about the error situation
   - Use the `source` field to chain errors

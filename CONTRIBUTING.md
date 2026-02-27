@@ -39,8 +39,7 @@ cargo test -p suzunari-error-feature-tests --no-default-features --features test
 ├── macro-impl/           # Proc-macro crate
 │   └── src/
 │       ├── lib.rs        # Macro entry points
-│       ├── attribute.rs  # #[suzunari_error] (main entry point)
-│       ├── suzu_attr.rs  # #[suzu(...)] attribute processing
+│       ├── attribute.rs  # #[suzunari_error]
 │       ├── derive.rs     # #[derive(StackError)]
 │       ├── report.rs     # #[suzunari_error::report]
 │       └── helper.rs     # Shared utilities

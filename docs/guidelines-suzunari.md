@@ -35,16 +35,21 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 
 ### Macros
 
-- **`#[suzunari_error]`**: The main entry point for defining error types. Processes `#[suzu(...)]` attributes, injects `location: Location` fields, and appends `#[derive(Debug, Snafu, StackError)]`
-- `#[derive(StackError)]`: Implements the StackError trait for structs and enums. Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
+- **`#[suzunari_error]`**: The main entry point for defining error types. Processes `#[suzu(...)]` attributes, resolves/injects location fields, and appends `#[derive(Debug, Snafu, StackError)]`
+- `#[derive(StackError)]`: Implements the StackError trait for structs and enums. Finds location field via `#[stack(location)]` or `Location` type. Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
 - `#[suzunari_error::report]`: Transforms `fn main() -> Result<(), E>` to return `StackReport<E>`. Prints formatted error chain to stderr on failure (std only)
 
 ### `#[suzu(...)]` Attribute
 
 `#[suzu(...)]` is a superset of `#[snafu(...)]`. All snafu keywords are passed through as-is. Additionally:
 
-- **`translate`** (field-level): Wraps the field type in `DisplayError<T>` and generates `#[snafu(source(from(T, DisplayError::new)))]`
-- **`location`** (field-level): Marks a field as the location field and adds `#[snafu(implicit)]`. Suppresses automatic location injection for that struct/variant
+- **`from`** (field-level): Wraps the field type in `DisplayError<T>` and generates `#[snafu(source(from(T, DisplayError::new)))]`
+- **`location`** (field-level): Marks a field as the location field. Converts to `#[stack(location)]` + `#[snafu(implicit)]`. Allows custom field names. Requires `Location` type
+
+### Field Attributes
+
+- `#[suzu(location)]`: Marks a field as the location field (consumed by `#[suzunari_error]`). Allows custom field names instead of the default `location`
+- `#[stack(location)]`: Internal marker consumed by `derive(StackError)` to identify the location field
 
 ### Location Structure
 
@@ -100,10 +105,10 @@ pub enum DatabaseError {
         table: String,
     },
 
-    // #[suzu(translate)] wraps non-Error types in DisplayError automatically
+    // #[suzu(from)] wraps non-Error types in DisplayError automatically
     #[suzu(display("hashing failed"))]
     HashFailed {
-        #[suzu(translate)]
+        #[suzu(from)]
         source: argon2::Error,
     },
 }
@@ -133,10 +138,10 @@ fn get_user(id: &str, conn: &Connection) -> Result<User, DatabaseError> {
 fn process_user_data(id: &str) -> Result<ProcessedData, ApplicationError> {
     let conn = establish_connection()
         .context(DatabaseConnectionSnafu)?;
-        
+
     let user = get_user(id, &conn)
         .context(UserRetrievalSnafu { user_id: id.to_string() })?;
-        
+
     // Process user data
     Ok(ProcessedData::from_user(user))
 }
@@ -153,7 +158,7 @@ fn process_user_data(id: &str) -> Result<ProcessedData, ApplicationError> {
 #[test]
 fn test_error_propagation() {
     let result = get_user("non_existent", &mock_connection());
-    
+
     match result {
         Err(DatabaseError::RecordNotFound { id, table }) => {
             assert_eq!(id, "non_existent");

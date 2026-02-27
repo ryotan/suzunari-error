@@ -1,4 +1,4 @@
-error: StackError requires a 'location' field of type Location
+error: StackError requires a Location field. Use #[suzunari_error] to auto-inject, or add a field of type Location manually.
  --> tests/compile-fail/derive_enum_no_location.rs:7:14
   |
 7 |     Variant1 { message: String },

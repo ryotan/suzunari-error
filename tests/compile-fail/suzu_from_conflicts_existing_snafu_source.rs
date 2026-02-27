@@ -3,7 +3,8 @@ use suzunari_error::suzunari_error;
 #[suzunari_error]
 #[snafu(display("error"))]
 struct MyError {
-    #[suzu(translate, source(from(String, suzunari_error::DisplayError::new)))]
+    #[snafu(source(from(String, suzunari_error::DisplayError::new)))]
+    #[suzu(from)]
     source: String,
 }
 

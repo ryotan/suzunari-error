@@ -1,0 +1,5 @@
+error: #[suzu(location)] requires the field type to be Location
+ --> tests/compile-fail/suzu_location_wrong_type.rs:8:11
+  |
+8 |     name: String,
+  |           ^^^^^^
