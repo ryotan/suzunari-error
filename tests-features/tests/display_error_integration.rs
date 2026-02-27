@@ -27,6 +27,22 @@ struct AutoConvertError {
     source: DisplayError<FakeLibError>,
 }
 
+// --- Pattern A2: automatic conversion via #[suzu(translate)] ---
+#[suzunari_error]
+#[suzu(display("translate op failed"))]
+struct TranslateConvertError {
+    #[suzu(translate)]
+    source: FakeLibError,
+}
+
+// --- Pattern A3: #[suzu(translate)] with already-wrapped DisplayError ---
+#[suzunari_error]
+#[suzu(display("translate already wrapped"))]
+struct TranslateAlreadyWrappedError {
+    #[suzu(translate)]
+    source: DisplayError<FakeLibError>,
+}
+
 // --- Pattern B: manual conversion via map_err ---
 #[suzunari_error]
 #[snafu(display("manual convert failed"))]
@@ -63,6 +79,33 @@ fn test_map_err_manual_convert() {
     let report = format!("{:?}", StackReport::from_error(err));
     assert!(report.contains("manual convert failed"));
     assert!(report.contains("manual"));
+}
+
+#[test]
+fn test_translate_attr_auto_convert() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "translate broke",
+        })
+    }
+    let err = fake_op().context(TranslateConvertSnafu).unwrap_err();
+
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains("translate op failed"));
+    assert!(report.contains("translate broke"));
+}
+
+#[test]
+fn test_translate_attr_already_wrapped() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "already wrapped",
+        })
+    }
+    let err = fake_op().context(TranslateAlreadyWrappedSnafu).unwrap_err();
+
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains("translate already wrapped"));
 }
 
 #[cfg(feature = "test-alloc")]

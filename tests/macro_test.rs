@@ -1,15 +1,15 @@
 #![cfg(feature = "std")]
 // Tests verify derive macros and attributes individually and in combination.
-// Uses #[suzunari_location] + #[derive(StackError)], raw #[derive(StackError)] with
-// manual location field, and #[suzunari_error] to test each layer independently.
+// Uses #[suzunari_error] with #[suzu(location)] for explicit location fields,
+// raw #[derive(StackError)] with manual location field, and #[suzunari_error]
+// with auto-injection to test each layer independently.
 // .build() is snafu's standard test pattern.
 
 use snafu::prelude::*;
-use suzunari_error::{Location, StackError, StackReport, suzunari_error, suzunari_location};
+use suzunari_error::{Location, StackError, StackReport, suzunari_error};
 
-// Test struct with StackError derive macro
-#[suzunari_location]
-#[derive(Debug, Snafu, StackError)]
+// Test struct with StackError derive macro and explicit location via #[suzu(location)]
+#[suzunari_error]
 #[snafu(display("{}", message))]
 struct TestError {
     message: String,
@@ -58,7 +58,7 @@ fn test_stack_error_derive() {
 }
 
 #[test]
-fn test_suzunari_location_attribute() {
+fn test_manual_location_field() {
     let error = TestErrorWithLocationSnafu {
         message: "Test error".to_string(),
     }
@@ -103,7 +103,7 @@ fn test_stack_error_enum_derive() {
 }
 
 #[test]
-fn test_suzunari_location_enum_attribute() {
+fn test_manual_location_enum() {
     let error = TestErrorEnumWithLocation::Variant3 {
         message: "Test error".to_string(),
         location: Location::current(),

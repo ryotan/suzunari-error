@@ -1,56 +1,87 @@
 use crate::helper::{get_crate_name, has_location_field};
+use crate::suzu_attr::{self, SuzuResult};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Fields};
 
-pub(crate) fn suzunari_location_impl(stream: TokenStream) -> Result<TokenStream, Error> {
+pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
     let mut input: DeriveInput = syn::parse2(stream.clone())?;
 
-    // Try to find the suzunari_error crate
     let crate_path = get_crate_name("suzunari-error", &stream)?;
+    let snafu_path = get_crate_name("snafu", &stream)?;
 
-    // Add the location field based on whether it's a struct or enum
+    // 1. Process #[suzu(...)] attrs (translate, location, snafu passthrough)
+    let suzu_result = suzu_attr::process_suzu_attrs(&mut input, &crate_path)?;
+
+    // 2. Inject location fields where not explicitly provided
+    inject_location_fields(&mut input, &crate_path, &suzu_result)?;
+
+    // 3. Generate derives (no more #[suzunari_location])
+    let derive_attribute = quote! { #[derive(Debug, #snafu_path::Snafu, #crate_path::StackError)] };
+
+    Ok(quote! {
+        #derive_attribute
+        #input
+    })
+}
+
+/// Injects `location: Location` fields with `#[snafu(implicit)]` where needed.
+///
+/// Skips injection for structs/variants that:
+/// - Already have a field named `location`
+/// - Have a field with `#[suzu(location)]` (indicated by `suzu_result`)
+fn inject_location_fields(
+    input: &mut DeriveInput,
+    crate_path: &Ident,
+    suzu_result: &SuzuResult,
+) -> Result<(), Error> {
     match &mut input.data {
         Data::Struct(data_struct) => {
+            let has_explicit = suzu_result
+                .has_explicit_location
+                .first()
+                .copied()
+                .unwrap_or(false);
             match &mut data_struct.fields {
                 Fields::Named(fields) => {
-                    // If it doesn't have a location field, add one
-                    if !has_location_field(fields) {
-                        // Create a new field with the #[snafu(implicit)] attribute
-                        let location_field = location_field_impl(&crate_path);
-
-                        // Add the field to the struct
-                        fields.named.push(location_field);
+                    if !has_explicit && !has_location_field(fields) {
+                        fields.named.push(make_location_field(crate_path));
                     }
                 }
-                _ => {
-                    // Return an error for non-named fields
+                Fields::Unit => {
+                    // Cannot happen — struct with unit fields can't have suzu(location)
+                    // and we need named fields for location injection
                     return Err(Error::new(
                         data_struct.fields.span(),
-                        "suzunari_location can only be used on structs with named fields",
+                        "#[suzunari_error] requires structs with named fields (or unit enum variants)",
+                    ));
+                }
+                _ => {
+                    return Err(Error::new(
+                        data_struct.fields.span(),
+                        "#[suzunari_error] can only be used on structs with named fields",
                     ));
                 }
             }
         }
         Data::Enum(data_enum) => {
-            // Check if all variants have named fields
-            for variant in &mut data_enum.variants {
+            for (i, variant) in data_enum.variants.iter_mut().enumerate() {
+                let has_explicit = suzu_result
+                    .has_explicit_location
+                    .get(i)
+                    .copied()
+                    .unwrap_or(false);
                 match &mut variant.fields {
                     Fields::Named(fields) => {
-                        // If it doesn't have a location field, add one
-                        if !has_location_field(fields) {
-                            // Create a new field with the #[snafu(implicit)] attribute
-                            let location_field = location_field_impl(&crate_path);
-
-                            // Add the field to the variant
-                            fields.named.push(location_field);
+                        if !has_explicit && !has_location_field(fields) {
+                            fields.named.push(make_location_field(crate_path));
                         }
                     }
                     Fields::Unit => {
-                        // Create a new field with the #[snafu(implicit)] attribute
-                        let location_field = location_field_impl(&crate_path);
+                        // Convert unit variant to named-fields variant with location
+                        let location_field = make_location_field(crate_path);
                         let mut fields = Punctuated::new();
                         fields.push(location_field);
                         variant.fields = Fields::Named(syn::FieldsNamed {
@@ -59,52 +90,25 @@ pub(crate) fn suzunari_location_impl(stream: TokenStream) -> Result<TokenStream,
                         });
                     }
                     _ => {
-                        // Return an error for non-named fields
                         return Err(Error::new(
                             variant.span(),
-                            "suzunari_location can only be used on enum variants with named fields",
+                            "#[suzunari_error] can only be used on enum variants with named fields",
                         ));
                     }
                 }
             }
         }
         Data::Union(_) => {
-            // Return an error for unions
             return Err(Error::new(
                 input.span(),
-                "suzunari_location cannot be used on unions",
+                "#[suzunari_error] cannot be used on unions",
             ));
         }
     }
-
-    // Return the modified input
-    Ok(quote! {
-        #input
-    })
+    Ok(())
 }
 
-pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse2(stream.clone())?;
-
-    // Append Snafu and StackError derives
-    let crate_path = get_crate_name("suzunari-error", &stream)?;
-    let snafu_path = get_crate_name("snafu", &stream)?;
-
-    // Generate #[suzunari_location] attribute
-    let location_attribute = quote! { #[#crate_path::suzunari_location] };
-
-    // Generate #[derive(Debug, Snafu, StackError)] attribute
-    let derive_attribute = quote! { #[derive(Debug, #snafu_path::Snafu, #crate_path::StackError)] };
-
-    // Combine attributes with the original struct/enum definition
-    Ok(quote! {
-        #location_attribute
-        #derive_attribute
-        #input
-    })
-}
-
-fn location_field_impl(crate_path: &Ident) -> syn::Field {
+fn make_location_field(crate_path: &Ident) -> syn::Field {
     syn::Field {
         attrs: vec![syn::parse_quote!(#[snafu(implicit)])],
         vis: syn::Visibility::Inherited,
