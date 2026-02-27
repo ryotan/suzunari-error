@@ -165,7 +165,7 @@ fn process_fields(
             }
         }
         if needs_location {
-            apply_location(&mut new_attrs, field);
+            apply_location(&mut new_attrs);
             has_explicit_location = true;
         }
 
@@ -268,13 +268,17 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
 
 /// Applies `translate` to a field: wraps type in `DisplayError<T>` and generates
 /// `#[snafu(source(from(T, DisplayError::new)))]`.
+///
+/// `existing_attrs` contains all non-suzu attrs plus passthrough snafu attrs
+/// already collected for this field. `field.attrs` is empty at this point
+/// (taken via `std::mem::take` in the caller).
 fn apply_translate(
     field: &mut Field,
     existing_attrs: &[Attribute],
     crate_path: &Ident,
 ) -> Result<Attribute, Error> {
     // Check for conflict with existing #[snafu(source(...))]
-    if has_snafu_source(existing_attrs) || has_snafu_source(&field.attrs) {
+    if has_snafu_source(existing_attrs) {
         return Err(Error::new(
             field.span(),
             "`translate` conflicts with existing `#[snafu(source(...))]`",
@@ -298,9 +302,11 @@ fn apply_translate(
 }
 
 /// Applies `location` to a field: adds `#[snafu(implicit)]` if not already present.
-fn apply_location(attrs: &mut Vec<Attribute>, field: &Field) {
-    let already_implicit = has_snafu_implicit(attrs) || has_snafu_implicit(&field.attrs);
-    if !already_implicit {
+///
+/// `attrs` contains all non-suzu attrs plus passthrough snafu attrs already
+/// collected for this field. `field.attrs` is empty at this point.
+fn apply_location(attrs: &mut Vec<Attribute>) {
+    if !has_snafu_implicit(attrs) {
         attrs.push(parse_quote!(#[snafu(implicit)]));
     }
 }
