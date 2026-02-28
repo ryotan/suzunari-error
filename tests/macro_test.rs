@@ -126,6 +126,42 @@ fn test_manual_location_enum() {
     );
 }
 
+// Generic struct with #[suzunari_error]
+#[suzunari_error]
+#[suzu(display("generic: {value}"))]
+struct GenericError<T: core::fmt::Display + core::fmt::Debug> {
+    value: T,
+}
+
+#[test]
+fn test_generic_struct() {
+    let error: GenericError<i32> = GenericSnafu { value: 42 }.build();
+    assert!(error.location().file().ends_with("macro_test.rs"));
+    assert_eq!(format!("{error}"), "generic: 42");
+}
+
+// Generic enum with #[suzunari_error]
+#[suzunari_error]
+enum GenericEnumError<T: core::fmt::Display + core::fmt::Debug> {
+    #[suzu(display("a: {value}"))]
+    VariantA { value: T },
+    #[suzu(display("b: {msg}"))]
+    VariantB { msg: String },
+}
+
+#[test]
+fn test_generic_enum() {
+    let error: GenericEnumError<i32> = VariantASnafu { value: 99 }.build();
+    assert!(error.location().file().ends_with("macro_test.rs"));
+    assert_eq!(format!("{error}"), "a: 99");
+
+    let error: GenericEnumError<i32> = VariantBSnafu {
+        msg: "hello".to_string(),
+    }
+    .build();
+    assert_eq!(format!("{error}"), "b: hello");
+}
+
 #[test]
 fn test_chain_context() {
     let error = TestError {
