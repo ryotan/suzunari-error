@@ -90,6 +90,32 @@ fn test_chain_context() {
     assert!(normalized_path.ends_with("stack_error_test.rs"));
 }
 
+// Test StackSourceResolver autoref specialization directly.
+// When T: StackError, inherent resolve() returns Some(&dyn StackError).
+// When T does not implement StackError, Deref fallback returns None.
+#[test]
+fn test_stack_source_resolver_specialization() {
+    use suzunari_error::__private::StackSourceResolver;
+
+    // NestedError implements StackError → inherent resolve() wins
+    let nested: NestedError = std::fs::read("nonexistent")
+        .context(NestedSnafu)
+        .unwrap_err();
+    let resolver = StackSourceResolver(&nested);
+    assert!(
+        resolver.resolve().is_some(),
+        "StackError type should resolve to Some"
+    );
+
+    // std::io::Error does NOT implement StackError → Deref fallback wins
+    let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+    let resolver = StackSourceResolver(&io_err);
+    assert!(
+        resolver.resolve().is_none(),
+        "non-StackError type should resolve to None"
+    );
+}
+
 // Test error propagation through multiple functions
 fn function_c() -> Result<Vec<u8>, NestedError> {
     std::fs::read("not exist").context(NestedSnafu)

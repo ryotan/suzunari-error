@@ -1,0 +1,7 @@
+error: suzunari_error can only be used on enum variants with named fields
+ --> tests/compile-fail/suzunari_error_tuple_variant.rs:4:1
+  |
+4 | #[suzunari_error]
+  | ^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `suzunari_error` (in Nightly builds, run with -Z macro-backtrace for more info)

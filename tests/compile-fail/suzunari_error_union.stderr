@@ -1,0 +1,5 @@
+error: #[suzu] cannot be used on unions
+ --> tests/compile-fail/suzunari_error_union.rs:5:1
+  |
+5 | pub union MyError {
+  | ^^^
