@@ -1,4 +1,6 @@
-use crate::helper::{get_crate_name, has_stack_location_attr, looks_like_location_type};
+use crate::helper::{
+    get_crate_name, has_stack_location_attr, looks_like_location_type, snafu_tokens_contain_keyword,
+};
 use crate::suzu_attr;
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
@@ -6,6 +8,12 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Fields, FieldsNamed, Meta};
 
+/// Implementation of `#[suzunari_error]`.
+///
+/// Three-step pipeline:
+/// 1. `process_suzu_attrs` — rewrites `#[suzu(...)]` to `#[snafu(...)]` + `#[stack(...)]`
+/// 2. `resolve_and_inject_location` — ensures every struct/variant has exactly one location field
+/// 3. Emit `#[derive(Debug, Snafu, StackError)]` wrapping the rewritten input
 pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
     let mut input: DeriveInput = syn::parse2(stream.clone())?;
     let crate_path = get_crate_name("suzunari-error", &stream)?;
@@ -152,17 +160,7 @@ fn ensure_snafu_implicit(field: &mut syn::Field) {
         let Meta::List(meta_list) = &attr.meta else {
             return false;
         };
-        // Intentionally ignore parse errors: if snafu attribute syntax is
-        // malformed, snafu's own derive will report the error. We only need
-        // to check whether `implicit` is already present.
-        meta_list
-            .parse_args_with(syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated)
-            .ok()
-            .is_some_and(|nested| {
-                nested
-                    .iter()
-                    .any(|meta| matches!(meta, Meta::Path(p) if p.is_ident("implicit")))
-            })
+        snafu_tokens_contain_keyword(&meta_list.tokens, "implicit")
     });
 
     if !has_implicit {
@@ -170,6 +168,8 @@ fn ensure_snafu_implicit(field: &mut syn::Field) {
     }
 }
 
+/// Constructs a synthetic `location: Location` field with
+/// `#[snafu(implicit)]` + `#[stack(location)]`.
 fn location_field_impl(crate_path: &Ident) -> syn::Field {
     syn::Field {
         attrs: vec![

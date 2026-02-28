@@ -4,7 +4,9 @@
 //! (`from`, `location`) are handled here, and everything else is passed
 //! through as `#[snafu(...)]`.
 
-use crate::helper::{extract_display_error_inner, looks_like_location_type};
+use crate::helper::{
+    extract_display_error_inner, looks_like_location_type, snafu_tokens_contain_keyword,
+};
 use proc_macro2::Ident;
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
@@ -22,7 +24,7 @@ use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, Meta, Token};
 pub(crate) fn process_suzu_attrs(input: &mut DeriveInput, crate_path: &Ident) -> Result<(), Error> {
     match &mut input.data {
         Data::Struct(data_struct) => {
-            process_type_level_attrs(&mut input.attrs)?;
+            process_non_field_attrs(&mut input.attrs, Level::NonField)?;
 
             if let Fields::Named(fields) = &mut data_struct.fields {
                 process_fields(&mut fields.named, crate_path)?;
@@ -30,10 +32,10 @@ pub(crate) fn process_suzu_attrs(input: &mut DeriveInput, crate_path: &Ident) ->
             Ok(())
         }
         Data::Enum(data_enum) => {
-            process_type_level_attrs(&mut input.attrs)?;
+            process_non_field_attrs(&mut input.attrs, Level::NonField)?;
 
             for variant in &mut data_enum.variants {
-                process_variant_level_attrs(&mut variant.attrs)?;
+                process_non_field_attrs(&mut variant.attrs, Level::NonField)?;
 
                 if let Fields::Named(fields) = &mut variant.fields {
                     process_fields(&mut fields.named, crate_path)?;
@@ -45,9 +47,9 @@ pub(crate) fn process_suzu_attrs(input: &mut DeriveInput, crate_path: &Ident) ->
     }
 }
 
-/// Processes `#[suzu(...)]` on type-level attributes.
+/// Processes `#[suzu(...)]` on type/variant-level attributes.
 /// Only passthrough to `#[snafu(...)]` is allowed; `from`/`location` are errors.
-fn process_type_level_attrs(attrs: &mut Vec<Attribute>) -> Result<(), Error> {
+fn process_non_field_attrs(attrs: &mut Vec<Attribute>, level: Level) -> Result<(), Error> {
     let mut new_attrs = Vec::new();
     let mut errors = Vec::new();
 
@@ -56,32 +58,7 @@ fn process_type_level_attrs(attrs: &mut Vec<Attribute>) -> Result<(), Error> {
             new_attrs.push(attr);
             continue;
         }
-        match process_single_suzu_attr(&attr, Level::Type) {
-            Ok(result) => {
-                if let Some(snafu_attr) = result.snafu_passthrough {
-                    new_attrs.push(snafu_attr);
-                }
-            }
-            Err(e) => errors.push(e),
-        }
-    }
-
-    *attrs = new_attrs;
-    combine_errors(errors)
-}
-
-/// Processes `#[suzu(...)]` on variant-level attributes.
-/// Only passthrough to `#[snafu(...)]` is allowed; `from`/`location` are errors.
-fn process_variant_level_attrs(attrs: &mut Vec<Attribute>) -> Result<(), Error> {
-    let mut new_attrs = Vec::new();
-    let mut errors = Vec::new();
-
-    for attr in attrs.drain(..) {
-        if !attr.path().is_ident("suzu") {
-            new_attrs.push(attr);
-            continue;
-        }
-        match process_single_suzu_attr(&attr, Level::Variant) {
+        match process_single_suzu_attr(&attr, level) {
             Ok(result) => {
                 if let Some(snafu_attr) = result.snafu_passthrough {
                     new_attrs.push(snafu_attr);
@@ -101,6 +78,9 @@ fn process_fields(
     crate_path: &Ident,
 ) -> Result<(), Error> {
     let mut errors = Vec::new();
+    // Track the first #[suzu(location)] span to detect duplicates with
+    // accurate span on the second occurrence (before it becomes #[stack(location)]).
+    let mut first_location_span: Option<proc_macro2::Span> = None;
 
     for field in fields.iter_mut() {
         // Take ownership of attrs to avoid borrow conflicts when mutating field.ty
@@ -123,7 +103,18 @@ fn process_fields(
                         needs_from = true;
                     }
                     if result.has_location {
-                        needs_location = true;
+                        // Detect duplicate #[suzu(location)] early so error points
+                        // at the original #[suzu(location)] attr, not the generated
+                        // #[stack(location)] (which has a call_site span).
+                        if first_location_span.is_some() {
+                            errors.push(Error::new(
+                                attr.span(),
+                                "multiple #[suzu(location)] fields; only one is allowed per struct/variant",
+                            ));
+                        } else {
+                            first_location_span = Some(attr.span());
+                            needs_location = true;
+                        }
                     }
                 }
                 Err(e) => errors.push(e),
@@ -156,8 +147,9 @@ fn process_fields(
 
 #[derive(Clone, Copy)]
 enum Level {
-    Type,
-    Variant,
+    /// Type-level or variant-level — only passthrough allowed.
+    NonField,
+    /// Field-level — `from` and `location` are valid.
     Field,
 }
 
@@ -228,6 +220,14 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
         ));
     }
 
+    // Conflict: from + location on the same field
+    if has_from && has_location {
+        return Err(Error::new(
+            attr.span(),
+            "`from` and `location` cannot be used on the same field",
+        ));
+    }
+
     let snafu_passthrough = if passthrough_tokens.is_empty() {
         None
     } else {
@@ -253,7 +253,7 @@ fn apply_from(
     crate_path: &Ident,
 ) -> Result<Attribute, Error> {
     // Check for conflict with existing #[snafu(source(...))]
-    if has_snafu_source(existing_attrs) {
+    if has_snafu_keyword(existing_attrs, "source") {
         return Err(Error::new(
             field.span(),
             "`from` conflicts with existing `#[snafu(source(...))]`",
@@ -285,7 +285,7 @@ fn apply_from(
 /// `attrs` contains all non-suzu attrs plus passthrough snafu attrs already
 /// collected for this field. `field.attrs` is empty at this point.
 fn apply_location(attrs: &mut Vec<Attribute>) {
-    if !has_snafu_implicit(attrs) {
+    if !has_snafu_keyword(attrs, "implicit") {
         attrs.push(parse_quote!(#[snafu(implicit)]));
     }
     attrs.push(parse_quote!(#[stack(location)]));
@@ -305,7 +305,13 @@ fn meta_is_ident_prefix(meta: &Meta, name: &str) -> bool {
     }
 }
 
-fn has_snafu_source(attrs: &[Attribute]) -> bool {
+/// Checks if any `#[snafu(...)]` attribute contains `keyword` as a top-level
+/// keyword (e.g., `source`, `implicit`).
+///
+/// Uses token-level scanning instead of `Punctuated<Meta>` parsing, because
+/// snafu's `source(from(T, |e| closure(e)))` syntax contains closures that
+/// cannot be parsed as `Meta`. Token scanning handles all snafu syntaxes.
+fn has_snafu_keyword(attrs: &[Attribute], keyword: &str) -> bool {
     attrs.iter().any(|attr| {
         if !attr.path().is_ident("snafu") {
             return false;
@@ -313,27 +319,7 @@ fn has_snafu_source(attrs: &[Attribute]) -> bool {
         let Meta::List(meta_list) = &attr.meta else {
             return false;
         };
-        let Ok(nested) = meta_list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-        else {
-            return false;
-        };
-        nested.iter().any(|m| meta_is_ident_prefix(m, "source"))
-    })
-}
-
-fn has_snafu_implicit(attrs: &[Attribute]) -> bool {
-    attrs.iter().any(|attr| {
-        if !attr.path().is_ident("snafu") {
-            return false;
-        }
-        let Meta::List(meta_list) = &attr.meta else {
-            return false;
-        };
-        let Ok(nested) = meta_list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)
-        else {
-            return false;
-        };
-        nested.iter().any(|m| meta_is_ident(m, "implicit"))
+        snafu_tokens_contain_keyword(&meta_list.tokens, keyword)
     })
 }
 

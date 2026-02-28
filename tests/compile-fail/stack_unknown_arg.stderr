@@ -1,0 +1,5 @@
+error: unknown #[stack(...)] argument; only `location` is supported
+ --> tests/compile-fail/stack_unknown_arg.rs:7:13
+  |
+7 |     #[stack(loc)]
+  |             ^^^

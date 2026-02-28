@@ -1,10 +1,8 @@
 error: #[report] requires the function to return Result<(), E>
- --> tests/compile-fail/report_no_return_type.rs:4:1
+ --> tests/compile-fail/report_no_return_type.rs:5:1
   |
-4 | #[suzunari_error::report]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^
-  |
-  = note: this error originates in the attribute macro `suzunari_error::report` (in Nightly builds, run with -Z macro-backtrace for more info)
+5 | fn main() {
+  | ^^
 
 warning: unused import: `suzunari_error::*`
  --> tests/compile-fail/report_no_return_type.rs:2:5
