@@ -44,9 +44,9 @@ fn test_source_from_auto_convert() {
     }
     let err = fake_op().context(AutoConvertSnafu).unwrap_err();
 
-    let debug = format!("{err:?}");
-    assert!(debug.contains("operation failed"));
-    assert!(debug.contains("fake lib broke"));
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains("operation failed"));
+    assert!(report.contains("fake lib broke"));
 }
 
 #[test]
@@ -60,9 +60,9 @@ fn test_map_err_manual_convert() {
         .context(ManualConvertSnafu)
         .unwrap_err();
 
-    let debug = format!("{err:?}");
-    assert!(debug.contains("manual convert failed"));
-    assert!(debug.contains("manual"));
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains("manual convert failed"));
+    assert!(report.contains("manual"));
 }
 
 #[cfg(feature = "test-alloc")]
@@ -73,5 +73,6 @@ fn test_display_error_with_boxed_stack_error() {
     }
     let err = fake_op().context(AutoConvertSnafu).unwrap_err();
     let boxed: BoxedStackError = err.into();
-    assert!(format!("{boxed:?}").contains("operation failed"));
+    let report = format!("{:?}", StackReport::from_error(boxed));
+    assert!(report.contains("operation failed"));
 }

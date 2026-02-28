@@ -22,7 +22,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 # Feature-tier tests
 cargo test -p suzunari-error-feature-tests --features test-std
 cargo test -p suzunari-error-feature-tests --features test-alloc
-cargo test -p suzunari-error-feature-tests --no-default-features  # core-only
+cargo test -p suzunari-error-feature-tests --no-default-features --features test-core-only  # core-only
 ```
 
 ## Project Structure
@@ -32,13 +32,16 @@ cargo test -p suzunari-error-feature-tests --no-default-features  # core-only
 │   ├── lib.rs            # Crate root
 │   ├── location.rs       # Location type
 │   ├── stack_error.rs    # StackError trait
+│   ├── stack_report.rs   # StackReport formatter
 │   ├── boxed_stack_error.rs  # BoxedStackError (alloc)
-│   └── display_error.rs  # DisplayError adapter
+│   ├── display_error.rs  # DisplayError adapter
+│   └── __private.rs      # Internal helpers for derive macro codegen
 ├── macro-impl/           # Proc-macro crate
 │   └── src/
 │       ├── lib.rs        # Macro entry points
 │       ├── attribute.rs  # #[suzunari_error], #[suzunari_location]
 │       ├── derive.rs     # #[derive(StackError)]
+│       ├── report.rs     # #[suzunari_error::report]
 │       └── helper.rs     # Shared utilities
 ├── tests/                # Integration tests (std)
 ├── tests-features/       # Feature-tier compile checks and integration tests

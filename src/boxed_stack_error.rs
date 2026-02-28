@@ -4,17 +4,23 @@ use crate::{Location, StackError};
 use core::error::Error;
 use core::fmt::{Debug, Display, Formatter, Result};
 
+/// Type-erased wrapper around `Box<dyn StackError + Send + Sync>`.
+///
+/// Provides uniform handling of heterogeneous `StackError` types while
+/// preserving location tracking through the error chain.
 pub struct BoxedStackError {
     inner: Box<dyn StackError + Send + Sync>,
 }
 
 impl BoxedStackError {
+    /// Wraps a concrete `StackError` in a type-erased box.
     pub fn new<T: StackError + Send + Sync + 'static>(inner: T) -> Self {
         Self {
             inner: Box::new(inner),
         }
     }
 
+    /// Unwraps into the inner trait object.
     pub fn into_inner(self) -> Box<dyn StackError + Send + Sync> {
         self.inner
     }
@@ -28,7 +34,7 @@ impl Display for BoxedStackError {
 
 impl Debug for BoxedStackError {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        self.fmt_stack(f)
+        write!(f, "{:?}", self.inner)
     }
 }
 
@@ -41,6 +47,12 @@ impl Error for BoxedStackError {
 impl StackError for BoxedStackError {
     fn location(&self) -> &Location {
         self.inner.location()
+    }
+    fn type_name(&self) -> &'static str {
+        self.inner.type_name()
+    }
+    fn stack_source(&self) -> Option<&dyn StackError> {
+        self.inner.stack_source()
     }
 }
 
@@ -77,6 +89,9 @@ mod tests {
         fn location(&self) -> &Location {
             &self.location
         }
+        fn type_name(&self) -> &'static str {
+            "TestError"
+        }
     }
 
     #[test]
@@ -89,7 +104,8 @@ mod tests {
 
         assert!(format!("{}", error).contains("Test error"));
         assert!(format!("{}", error).contains("Test message"));
-        assert!(format!("{:?}", error).contains("Test error: Test message"));
+        // Debug delegates to inner's derive(Debug), not stack trace
+        assert!(format!("{:?}", error).contains("Test message"));
         assert!(error.source().is_none());
 
         handle_stack_error(error);

@@ -1,0 +1,11 @@
+error: #[report] does not accept arguments
+ --> tests/compile-fail/report_with_args.rs:8:26
+  |
+8 | #[suzunari_error::report(something)]
+  |                          ^^^^^^^^^
+
+error[E0601]: `main` function not found in crate `$CRATE`
+  --> tests/compile-fail/report_with_args.rs:11:2
+   |
+11 | }
+   |  ^ consider adding a `main` function to `$DIR/tests/compile-fail/report_with_args.rs`

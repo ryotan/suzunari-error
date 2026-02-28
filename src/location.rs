@@ -1,6 +1,14 @@
+/// Source code location captured via `#[track_caller]`.
+///
+/// A newtype wrapper around `core::panic::Location` that integrates with
+/// snafu's `GenerateImplicitData` for automatic capture at error construction sites.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Location(&'static core::panic::Location<'static>);
 
 impl Location {
+    /// Returns the location of the immediate caller.
+    ///
+    /// Captures file, line, and column of the call site via `#[track_caller]`.
     #[track_caller]
     pub fn current() -> Self {
         Self(core::panic::Location::caller())
@@ -11,6 +19,12 @@ impl core::ops::Deref for Location {
     type Target = core::panic::Location<'static>;
     fn deref(&self) -> &Self::Target {
         self.0
+    }
+}
+
+impl core::fmt::Display for Location {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{}:{}:{}", self.file(), self.line(), self.column())
     }
 }
 

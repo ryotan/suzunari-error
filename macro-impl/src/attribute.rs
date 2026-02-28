@@ -1,4 +1,4 @@
-use crate::helper::{get_crate_name, has_location};
+use crate::helper::{get_crate_name, has_location_field};
 use proc_macro2::{Ident, TokenStream};
 use quote::{format_ident, quote};
 use syn::punctuated::Punctuated;
@@ -17,7 +17,7 @@ pub(crate) fn suzunari_location_impl(stream: TokenStream) -> Result<TokenStream,
             match &mut data_struct.fields {
                 Fields::Named(fields) => {
                     // If it doesn't have a location field, add one
-                    if !has_location(fields) {
+                    if !has_location_field(fields) {
                         // Create a new field with the #[snafu(implicit)] attribute
                         let location_field = location_field_impl(&crate_path);
 
@@ -40,7 +40,7 @@ pub(crate) fn suzunari_location_impl(stream: TokenStream) -> Result<TokenStream,
                 match &mut variant.fields {
                     Fields::Named(fields) => {
                         // If it doesn't have a location field, add one
-                        if !has_location(fields) {
+                        if !has_location_field(fields) {
                             // Create a new field with the #[snafu(implicit)] attribute
                             let location_field = location_field_impl(&crate_path);
 
@@ -93,8 +93,8 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
     // Generate #[suzunari_location] attribute
     let location_attribute = quote! { #[#crate_path::suzunari_location] };
 
-    // Generate #[derive(Snafu, StackError)] attribute
-    let derive_attribute = quote! { #[derive(#snafu_path::Snafu, #crate_path::StackError)] };
+    // Generate #[derive(Debug, Snafu, StackError)] attribute
+    let derive_attribute = quote! { #[derive(Debug, #snafu_path::Snafu, #crate_path::StackError)] };
 
     // Combine attributes with the original struct/enum definition
     Ok(quote! {

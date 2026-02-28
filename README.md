@@ -7,7 +7,8 @@ Built on [SNAFU](https://docs.rs/snafu), inspired by [Error Handling for Large R
 ## Features
 
 - **`#[suzunari_error]`** — The primary macro. Annotate your error type and get `Snafu` + `StackError` derives plus automatic `location` field injection. This is all you need in most cases.
-- **`StackError` trait** — Error location-aware contextual chained errors. `Debug` output includes stack depth, contextual message, and source location at each level.
+- **`StackError` trait** — Error location-aware contextual chained errors. Provides `location()`, `type_name()`, and `stack_source()` for traversing error chains with location info.
+- **`StackReport`** — Formats a `StackError` chain as a stack-trace-like report with type names and locations at each level. Use at error display boundaries.
 - **`Location`** — Memory-efficient location structure compatible with SNAFU's implicit context.
 - **`DisplayError<E>`** — Adapter to wrap external types that implement `Debug + Display` but not `Error`, making them usable as snafu `source` fields.
 - **`BoxedStackError`** — Type-erased `StackError` wrapper for uniform error handling across module boundaries (requires `alloc`).
@@ -49,6 +50,47 @@ fn read_external() -> Result<(), SomeError> {
 }
 ```
 
+### `StackReport` — Formatted error chain output
+
+Use `StackReport` at error display boundaries to produce stack-trace-like output:
+
+```rust
+use suzunari_error::*;
+
+fn run() -> Result<(), RetrieveFailed> {
+    retrieve_data()?;
+    Ok(())
+}
+
+fn main() {
+    if let Err(e) = run() {
+        eprintln!("{}", StackReport::from_error(e));
+        // Output:
+        // Error: RetrieveFailed: Failed to retrieve, at src/main.rs:4:5
+        // Caused by the following errors (recent errors listed first):
+        //   1| SomeError::ReadTimeout: after 3sec, at src/lib.rs:12:5
+        //   2| timeout
+    }
+}
+```
+
+### `#[suzunari_error::report]` — Simplified main with error reporting
+
+Use `#[suzunari_error::report]` on `main()` to automatically convert the return type to `StackReport<E>`, which prints a formatted error chain to stderr and exits with a non-zero code on failure:
+
+```rust
+use suzunari_error::*;
+use snafu::ResultExt;
+
+#[suzunari_error::report]
+fn main() -> Result<(), RetrieveFailed> {
+    retrieve_data()?;
+    Ok(())
+}
+```
+
+This is equivalent to `snafu::report` but uses `StackReport` for location-aware output.
+
 ### `BoxedStackError` — Uniform error handling across module boundaries
 
 ```rust
@@ -88,7 +130,7 @@ struct HashError {
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `std`   | Yes     | Enables `alloc` + `snafu/std` |
+| `std`   | Yes     | Enables `alloc` + `snafu/std` + `StackReport` `Termination` impl + `#[report]` macro |
 | `alloc` | No      | Enables `BoxedStackError` and `From<T> for BoxedStackError` macro generation |
 
 For `no_std` usage, disable default features:

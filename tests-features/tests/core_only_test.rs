@@ -1,4 +1,4 @@
-#![cfg(not(feature = "test-alloc"))]
+#![cfg(feature = "test-core-only")]
 
 use suzunari_error::*;
 

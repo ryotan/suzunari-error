@@ -1,15 +1,3 @@
-## !!! IMPORTANT !!!
-
-The user is better at programming than Junie, but we ask Junie to code for us to save time.
-
-If a test fails two or more times in a row, we'll figure out the current situation and work together to find a solution.
-
-Junie's got a ton of know-how from GitHub, and her use of individual algorithms and libraries is gonna be faster than my
-implementation. Junie'll write the test code and check the operation, while explaining the code to the user.
-
-On the other hand, Junie is not so great at processing according to the current context. When the context is unclear, I
-check with the user.
-
 ## Project Guidelines
 
 This document provides references to the coding guidelines and conventions used in this project. Instead of

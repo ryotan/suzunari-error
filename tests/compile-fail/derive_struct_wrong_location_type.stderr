@@ -1,0 +1,5 @@
+error: field 'location' must be of type Location (from suzunari_error). If you intended a custom field, rename it to avoid conflict.
+ --> tests/compile-fail/derive_struct_wrong_location_type.rs:8:15
+  |
+8 |     location: String,
+  |               ^^^^^^

@@ -1,0 +1,11 @@
+error: #[report] requires the Ok type to be (), only Result<(), E> is supported
+ --> tests/compile-fail/report_non_unit_ok.rs:9:21
+  |
+9 | fn main() -> Result<i32, MyError> {
+  |                     ^^^
+
+error[E0601]: `main` function not found in crate `$CRATE`
+  --> tests/compile-fail/report_non_unit_ok.rs:11:2
+   |
+11 | }
+   |  ^ consider adding a `main` function to `$DIR/tests/compile-fail/report_non_unit_ok.rs`

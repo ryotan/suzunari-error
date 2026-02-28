@@ -1,0 +1,31 @@
+//! Internal helpers for derive macro code generation.
+//! Not public API — may change without notice.
+
+use crate::StackError;
+
+/// Wraps a reference and resolves to the inherent `resolve()` method
+/// when `T: StackError`, or falls back via `Deref` → `NotStackErrorFallback`
+/// when `T` does not implement `StackError`.
+pub struct StackSourceResolver<'a, T: ?Sized>(pub &'a T);
+
+impl<'a, T: StackError> StackSourceResolver<'a, T> {
+    pub fn resolve(&self) -> Option<&'a dyn StackError> {
+        Some(self.0)
+    }
+}
+
+/// Fallback target via Deref. Always returns `None`.
+pub struct NotStackErrorFallback;
+
+impl NotStackErrorFallback {
+    pub fn resolve(&self) -> Option<&'static dyn StackError> {
+        None
+    }
+}
+
+impl<T: ?Sized> core::ops::Deref for StackSourceResolver<'_, T> {
+    type Target = NotStackErrorFallback;
+    fn deref(&self) -> &NotStackErrorFallback {
+        &NotStackErrorFallback
+    }
+}

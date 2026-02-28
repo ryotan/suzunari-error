@@ -1,0 +1,21 @@
+error: #[report] requires the function to return Result<(), E>
+ --> tests/compile-fail/report_no_return_type.rs:4:1
+  |
+4 | #[suzunari_error::report]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `suzunari_error::report` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: unused import: `suzunari_error::*`
+ --> tests/compile-fail/report_no_return_type.rs:2:5
+  |
+2 | use suzunari_error::*;
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+error[E0601]: `main` function not found in crate `$CRATE`
+ --> tests/compile-fail/report_no_return_type.rs:7:2
+  |
+7 | }
+  |  ^ consider adding a `main` function to `$DIR/tests/compile-fail/report_no_return_type.rs`

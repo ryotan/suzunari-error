@@ -47,7 +47,7 @@ cargo clippy --all-targets --all-features -- -D warnings
 # Feature-tier tests (tests-features crate)
 cargo test -p suzunari-error-feature-tests --features test-std
 cargo test -p suzunari-error-feature-tests --features test-alloc
-cargo test -p suzunari-error-feature-tests --no-default-features  # core-only
+cargo test -p suzunari-error-feature-tests --no-default-features --features test-core-only  # core-only
 ```
 
 ## Architecture
@@ -57,23 +57,24 @@ A snafu-based error handling library with automatic location tracking. `#![no_st
 ### Core Concepts
 
 - **`Location`** — Wrapper around `core::panic::Location`. Uses `#[track_caller]` + snafu's `GenerateImplicitData` to automatically capture error origin
-- **`StackError` trait** — Extends `Error` with `location()`, `depth()`, and `fmt_stack()`. `Debug` impl uses `fmt_stack()` to output error chains with stack depth and location
+- **`StackError` trait** — Extends `Error` with `location()`, `type_name()`, `stack_source()`, and `depth()`. Use `StackReport` to format error chains with location info
 - **`BoxedStackError`** — Wrapper around `Box<dyn StackError + Send + Sync>` for uniform handling of heterogeneous errors (requires alloc)
 - **`DisplayError<E>`** — Adapter that wraps `Debug + Display` types (without `Error` impl) into `core::error::Error`
 
 ### Macro Crate (`macro-impl/`)
 
-Provides 3 proc-macros:
+Provides 4 proc-macros:
 
-- **`#[suzunari_error]`** — The main entry point. Combines `#[suzunari_location]` + `#[derive(Snafu, StackError)]`. Use this by default
+- **`#[suzunari_error]`** — The main entry point. Combines `#[suzunari_location]` + `#[derive(Debug, Snafu, StackError)]`. Use this by default
 - **`#[suzunari_location]`** — Auto-adds `location: Location` field with `#[snafu(implicit)]` to structs and each enum variant
-- **`#[derive(StackError)]`** — Generates `StackError` impl, `Debug` impl (via `fmt_stack()`), and `From<T> for BoxedStackError` (when alloc enabled)
+- **`#[derive(StackError)]`** — Generates `StackError` impl and `From<T> for BoxedStackError` (when alloc enabled). Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
+- **`#[suzunari_error::report]`** — Transforms `fn main() -> Result<(), E>` into `fn main() -> StackReport<E>` for formatted error output on failure (std only)
 
 The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc")` controls whether `From<T> for BoxedStackError` impl is generated.
 
 ### Feature Flags
 
-- `std` (default) → `alloc` + `snafu/std`
+- `std` (default) → `alloc` + `snafu/std` + `StackReport` `Termination` impl + `#[report]` macro. Note: `StackReport` itself uses only `core::fmt` and is available in all tiers; only `Termination` impl and `#[report]` require `std`
 - `alloc` → `snafu/alloc` + `BoxedStackError` + macro generates `From<T> for BoxedStackError`
 
 ### Test Structure
@@ -93,6 +94,7 @@ The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc"
 - **Always use `#[suzunari_error]`** for defining error types. Do NOT define errors with raw `#[derive(Snafu)]` alone or hand-written `impl Error`.
 - **Always propagate errors with `?` and `.context()`** (`snafu::ResultExt`). Use `ensure!()` for validation checks. Do NOT use `unwrap()`, `expect()`, `.build()`, or `.fail()` in production code.
 - **Test code**: `unwrap()` is acceptable. But prefer `.context()` propagation even in tests when it improves clarity.
+- **Exception for trait-level unit tests**: Tests that verify `StackError` trait behavior independently from the proc-macro layer may use raw `#[derive(Snafu)]` + manual `impl StackError` + `.build()`. These tests must include a comment explaining the reason (e.g., testing the trait without macro coupling).
 
 ## Error Design Principles
 

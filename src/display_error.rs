@@ -33,10 +33,14 @@ use core::fmt::{Debug, Display, Formatter};
 pub struct DisplayError<E>(E);
 
 impl<E: Debug + Display> DisplayError<E> {
+    /// Wraps `error` in a `DisplayError`, making it usable as a `source` field.
     pub fn new(error: E) -> Self {
         Self(error)
     }
+}
 
+impl<E> DisplayError<E> {
+    /// Unwraps and returns the inner value.
     pub fn into_inner(self) -> E {
         self.0
     }

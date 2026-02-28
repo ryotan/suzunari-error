@@ -1,10 +1,42 @@
 use crate::Location;
 use core::error::Error;
 
+/// Error trait extension that adds source code location tracking.
+///
+/// Types implementing this trait carry a `Location` at each level of the
+/// error chain, enabling `StackReport` to produce stack-trace-like output.
 pub trait StackError: Error {
+    /// Returns the location where this error was constructed.
     fn location(&self) -> &Location;
 
+    /// Returns the error type name for display in stack traces.
+    ///
+    /// The derive macro generates this as a `&'static str` literal from the type name.
+    fn type_name(&self) -> &'static str;
+
+    /// Returns the source error as a StackError, if available.
+    ///
+    /// This enables StackReport to traverse the error chain with
+    /// location info. The derive macro generates this automatically
+    /// using Deref-based specialization.
+    ///
+    /// # Contract
+    /// If `stack_source()` returns `Some(s)`, then `Error::source()`
+    /// must also return `Some` pointing to the same error. The derive
+    /// macro upholds this automatically; manual impls must ensure
+    /// consistency.
+    fn stack_source(&self) -> Option<&dyn StackError> {
+        None
+    }
+
+    /// Returns the number of errors in the `Error::source()` chain (excluding self).
+    ///
+    /// Counts the full chain via `Error::source()`, including both
+    /// `StackError` and non-`StackError` causes.
     fn depth(&self) -> usize {
+        // successors() can't be used here due to trait object lifetime constraints:
+        // source() returns Option<&dyn Error> with a lifetime tied to &self,
+        // but successors requires the closure output lifetime to match its input.
         let mut count = 0;
         let mut current = self.source();
         while let Some(e) = current {
@@ -12,11 +44,6 @@ pub trait StackError: Error {
             current = e.source();
         }
         count
-    }
-
-    fn fmt_stack(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-        writeln!(f, "{}: {self}, at {:?}", self.depth(), self.location())?;
-        self.source().map_or(Ok(()), |s| write!(f, "{s:?}"))
     }
 }
 
@@ -34,10 +61,22 @@ mod alloc_impls {
         fn location(&self) -> &Location {
             self.as_ref().location()
         }
+        fn type_name(&self) -> &'static str {
+            self.as_ref().type_name()
+        }
+        fn stack_source(&self) -> Option<&dyn StackError> {
+            self.as_ref().stack_source()
+        }
     }
     impl<T: ?Sized + StackError> StackError for Arc<T> {
         fn location(&self) -> &Location {
             self.as_ref().location()
+        }
+        fn type_name(&self) -> &'static str {
+            self.as_ref().type_name()
+        }
+        fn stack_source(&self) -> Option<&dyn StackError> {
+            self.as_ref().stack_source()
         }
     }
 
@@ -50,6 +89,12 @@ mod alloc_impls {
         fn location(&self) -> &Location {
             self.as_ref().location()
         }
+        fn type_name(&self) -> &'static str {
+            self.as_ref().type_name()
+        }
+        fn stack_source(&self) -> Option<&dyn StackError> {
+            self.as_ref().stack_source()
+        }
     }
 
     impl Error for Box<dyn StackError + Send + Sync> {
@@ -61,6 +106,12 @@ mod alloc_impls {
         fn location(&self) -> &Location {
             self.as_ref().location()
         }
+        fn type_name(&self) -> &'static str {
+            self.as_ref().type_name()
+        }
+        fn stack_source(&self) -> Option<&dyn StackError> {
+            self.as_ref().stack_source()
+        }
     }
 }
 
@@ -69,31 +120,30 @@ mod tests {
     // Tests use raw #[derive(Snafu)] + manual impl to test StackError trait
     // independently from proc-macro layer. .build() is snafu's standard test pattern.
     use super::*;
+    use crate::StackReport;
     use alloc::boxed::Box;
     use alloc::format;
     use alloc::string::String;
     use alloc::sync::Arc;
     use snafu::prelude::*;
 
-    #[derive(Snafu)]
+    #[derive(Debug, Snafu)]
     #[snafu(display("Simple test error: {}", message))]
     struct SimpleError {
         message: String,
         #[snafu(implicit)]
         location: Location,
     }
-    impl core::fmt::Debug for SimpleError {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            self.fmt_stack(f)
-        }
-    }
     impl StackError for SimpleError {
         fn location(&self) -> &Location {
             &self.location
         }
+        fn type_name(&self) -> &'static str {
+            "SimpleError"
+        }
     }
 
-    #[derive(Snafu)]
+    #[derive(Debug, Snafu)]
     #[snafu(display("Wrapper error: {}", message))]
     struct WrapperError {
         message: String,
@@ -101,14 +151,16 @@ mod tests {
         #[snafu(implicit)]
         location: Location,
     }
-    impl core::fmt::Debug for WrapperError {
-        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-            self.fmt_stack(f)
-        }
-    }
     impl StackError for WrapperError {
         fn location(&self) -> &Location {
             &self.location
+        }
+        fn type_name(&self) -> &'static str {
+            "WrapperError"
+        }
+        fn stack_source(&self) -> Option<&dyn StackError> {
+            // Box<dyn StackError + Send + Sync> implements StackError
+            Some(self.source.as_ref())
         }
     }
 
@@ -163,18 +215,12 @@ mod tests {
         assert!(wrapper_error.location().file().ends_with("stack_error.rs"));
         assert_ne!(wrapper_error.location().line(), root_location);
 
-        assert!(format!("{wrapper_error:?}").contains(file!()));
-        assert!(format!("{wrapper_error:?}").contains("Wrapper error: "));
-        assert!(format!("{wrapper_error:?}").contains("Something failed"));
-        assert!(format!("{wrapper_error:?}").contains("Simple test error: "));
-        assert!(format!("{wrapper_error:?}").contains("Root cause"));
-
+        let report = format!("{:?}", StackReport::from_error(wrapper_error));
         let file = file!();
-        let debug = format!("{wrapper_error:?}");
-        assert!(debug.contains(&format!("1: Wrapper error: Something failed, at {file}:")));
-        assert!(debug.contains(&format!("0: Simple test error: Root cause, at {file}:")));
-
-        handle_stack_error(wrapper_error);
+        assert!(report.contains("Error: WrapperError: Wrapper error: Something failed"));
+        assert!(report.contains(&format!(", at {file}:")));
+        assert!(report.contains("Caused by"));
+        assert!(report.contains("1| SimpleError: Simple test error: Root cause"));
     }
 
     #[test]
@@ -238,7 +284,7 @@ mod tests {
         assert!(format!("{}", err).contains("Processing failed"));
 
         let source = err.source().unwrap();
-        assert!(format!("{source:?}").contains("Simple test error: "));
+        // Debug now uses standard derive(Debug), not stack trace format
         assert!(format!("{source:?}").contains("Input must be non-negative"));
 
         handle_stack_error(err);

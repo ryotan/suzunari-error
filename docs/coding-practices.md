@@ -239,7 +239,7 @@ mod tests {
 
 ```rust
 use snafu::ResultExt;
-use suzunari::suzunari_error;
+use suzunari_error::*;
 
 #[suzunari_error]
 enum ApiError {
