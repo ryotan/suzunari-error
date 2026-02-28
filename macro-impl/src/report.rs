@@ -15,11 +15,29 @@ pub(crate) fn report_impl(attr: TokenStream, stream: TokenStream) -> Result<Toke
 
     let input: ItemFn = syn::parse2(stream.clone())?;
 
-    // async fn is not supported — the closure wrap would break .await
+    // Reject function qualifiers that the closure wrap cannot preserve.
     if input.sig.asyncness.is_some() {
         return Err(Error::new(
             input.sig.asyncness.span(),
             "#[report] does not support async functions. Place #[report] below #[tokio::main] or similar runtime attributes so that async is resolved first.",
+        ));
+    }
+    if input.sig.unsafety.is_some() {
+        return Err(Error::new(
+            input.sig.unsafety.span(),
+            "#[report] does not support unsafe functions",
+        ));
+    }
+    if input.sig.abi.is_some() {
+        return Err(Error::new(
+            input.sig.abi.span(),
+            "#[report] does not support extern functions",
+        ));
+    }
+    if input.sig.constness.is_some() {
+        return Err(Error::new(
+            input.sig.constness.span(),
+            "#[report] does not support const functions",
         ));
     }
 
@@ -40,7 +58,7 @@ pub(crate) fn report_impl(attr: TokenStream, stream: TokenStream) -> Result<Toke
     // Extract the return type — must be Result<(), E>
     let ReturnType::Type(_, ref return_type) = input.sig.output else {
         return Err(Error::new(
-            input.sig.output.span(),
+            input.sig.fn_token.span(),
             "#[report] requires the function to return Result<(), E>",
         ));
     };

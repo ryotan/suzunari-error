@@ -58,7 +58,17 @@ pub fn derive_stack_error(input: TokenStream) -> TokenStream {
 ///   to `#[stack(location)]` + `#[snafu(implicit)]`. Allows custom field names
 ///   instead of the default `location`. Requires `Location` type.
 #[proc_macro_attribute]
-pub fn suzunari_error(_attr: TokenStream, item: TokenStream) -> TokenStream {
+pub fn suzunari_error(attr: TokenStream, item: TokenStream) -> TokenStream {
+    let attr2: proc_macro2::TokenStream = attr.into();
+    if !attr2.is_empty() {
+        use syn::spanned::Spanned;
+        return syn::Error::new(
+            attr2.span(),
+            "#[suzunari_error] does not accept arguments; use #[suzu(...)] on fields instead",
+        )
+        .to_compile_error()
+        .into();
+    }
     suzunari_error_impl(item.into())
         .unwrap_or_else(|err| err.to_compile_error())
         .into()

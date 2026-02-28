@@ -1,0 +1,5 @@
+error: `from` and `location` cannot be used on the same field
+ --> tests/compile-fail/suzu_from_location_conflict.rs:7:5
+  |
+7 |     #[suzu(from, location)]
+  |     ^

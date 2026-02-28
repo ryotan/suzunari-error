@@ -1,0 +1,11 @@
+error: #[report] does not support const functions
+ --> tests/compile-fail/report_const_fn.rs:9:1
+  |
+9 | const fn main() -> Result<(), MyError> {
+  | ^^^^^
+
+error[E0601]: `main` function not found in crate `$CRATE`
+  --> tests/compile-fail/report_const_fn.rs:11:2
+   |
+11 | }
+   |  ^ consider adding a `main` function to `$DIR/tests/compile-fail/report_const_fn.rs`

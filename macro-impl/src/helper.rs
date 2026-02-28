@@ -90,6 +90,7 @@ pub(crate) fn find_location_field(fields: &FieldsNamed) -> Result<&Field, Error>
 /// propagates parse errors because `#[stack(...)]` is consumed by our own
 /// `derive(StackError)` — no other macro will report the error.
 pub(crate) fn has_stack_location_attr(field: &Field) -> Result<bool, Error> {
+    let mut found = false;
     for attr in field.attrs.iter().filter(|a| a.path().is_ident("stack")) {
         let Meta::List(meta_list) = &attr.meta else {
             // Reject bare #[stack] or #[stack = ...] — this crate owns
@@ -102,6 +103,12 @@ pub(crate) fn has_stack_location_attr(field: &Field) -> Result<bool, Error> {
         let nested = meta_list.parse_args_with(
             syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated,
         )?;
+        if nested.is_empty() {
+            return Err(Error::new(
+                attr.span(),
+                "#[stack()] requires arguments, e.g., #[stack(location)]",
+            ));
+        }
         // Reject unknown tokens — only `location` is supported.
         if let Some(unknown) = nested
             .iter()
@@ -112,11 +119,9 @@ pub(crate) fn has_stack_location_attr(field: &Field) -> Result<bool, Error> {
                 "unknown #[stack(...)] argument; only `location` is supported",
             ));
         }
-        if !nested.is_empty() {
-            return Ok(true);
-        }
+        found = true;
     }
-    Ok(false)
+    Ok(found)
 }
 
 /// Extracts the inner type `T` from `DisplayError<T>`.
@@ -174,34 +179,59 @@ fn is_source_field(field: &Field) -> bool {
             let Meta::List(meta_list) = &attr.meta else {
                 return None;
             };
-            // Intentionally ignore parse errors: if the snafu attribute
-            // has syntax we don't understand, fall back to name-based
-            // detection. snafu itself will report the syntax error.
-            let nested = meta_list
-                .parse_args_with(
-                    syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated,
-                )
-                .ok()?;
-            // Use filter_map + last to be consistent with the outer .last():
-            // both within a single #[snafu(...)] and across multiple #[snafu]
-            // attributes, the last `source` directive wins.
-            nested
-                .iter()
-                .filter_map(|meta| match meta {
-                    Meta::Path(path) if path.is_ident("source") => Some(true),
-                    Meta::List(list) if list.path.is_ident("source") => {
-                        // `source(false)` explicitly disables source detection.
-                        // Use token-based parsing instead of string comparison.
-                        let is_disabled = list
-                            .parse_args_with(Ident::parse_any)
-                            .is_ok_and(|ident| ident == "false");
-                        Some(!is_disabled)
-                    }
-                    _ => None,
-                })
-                .last()
+            // Try structured parsing first (handles simple cases).
+            if let Ok(nested) = meta_list.parse_args_with(
+                syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated,
+            ) {
+                // Use filter_map + last to be consistent with the outer .last():
+                // both within a single #[snafu(...)] and across multiple #[snafu]
+                // attributes, the last `source` directive wins.
+                return nested
+                    .iter()
+                    .filter_map(|meta| match meta {
+                        Meta::Path(path) if path.is_ident("source") => Some(true),
+                        Meta::List(list) if list.path.is_ident("source") => {
+                            // `source(false)` explicitly disables source detection.
+                            let is_disabled = list
+                                .parse_args_with(Ident::parse_any)
+                                .is_ok_and(|ident| ident == "false");
+                            Some(!is_disabled)
+                        }
+                        _ => None,
+                    })
+                    .last();
+            }
+            // Fallback: token-level scan for closure syntax like
+            // source(from(T, |e| transform(e))) which fails Meta parsing.
+            // snafu itself will validate the syntax; we only need to detect
+            // that `source` is present for StackError's stack_source() generation.
+            if snafu_tokens_contain_keyword(&meta_list.tokens, "source") {
+                return Some(true);
+            }
+            None
         })
         .last();
 
     snafu_source.unwrap_or(is_named_source)
+}
+
+/// Scans a token stream for `keyword` as a leading ident in any
+/// comma-separated segment. Does not descend into groups (parentheses,
+/// brackets, braces), so `display("source")` won't match `source`.
+///
+/// Used as fallback when `Punctuated<Meta>` parsing fails (e.g., snafu's
+/// closure syntax in `source(from(T, |e| transform(e)))`).
+pub(crate) fn snafu_tokens_contain_keyword(
+    tokens: &proc_macro2::TokenStream,
+    keyword: &str,
+) -> bool {
+    let mut at_start = true;
+    for tt in tokens.clone() {
+        match &tt {
+            proc_macro2::TokenTree::Ident(ident) if at_start && *ident == keyword => return true,
+            proc_macro2::TokenTree::Punct(p) if p.as_char() == ',' => at_start = true,
+            _ => at_start = false,
+        }
+    }
+    false
 }
