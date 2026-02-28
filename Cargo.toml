@@ -12,7 +12,6 @@ members = ["macro-impl", "tests-features"]
 [workspace.dependencies]
 snafu = { version = "0.8.6", default-features = false }
 proc-macro2 = "1.0"
-proc-macro-crate = "3.3"
 quote = "1.0"
 syn = "2.0"
 # Workspace local crates

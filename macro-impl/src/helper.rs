@@ -1,22 +1,17 @@
-use proc_macro_crate::{FoundCrate, crate_name};
 use proc_macro2::{Ident, TokenStream};
-use quote::format_ident;
+use quote::{format_ident, quote};
 use syn::ext::IdentExt;
 use syn::spanned::Spanned;
 use syn::{Error, Field, FieldsNamed, Meta, PathArguments, Type};
 
-/// Helper function to get the crate name
-pub(crate) fn get_crate_name(original_name: &str, stream: &TokenStream) -> Result<Ident, Error> {
-    match crate_name(original_name) {
-        Ok(FoundCrate::Itself) => Ok(format_ident!("crate")),
-        Ok(FoundCrate::Name(name)) => Ok(format_ident!("{name}")),
-        Err(_) => Err(Error::new(
-            stream.span(),
-            format!(
-                "Failed to find the crate '{original_name}'. Ensure it is added as a dependency."
-            ),
-        )),
-    }
+/// Returns a token stream for the absolute crate path (e.g., `::suzunari_error`).
+///
+/// Hardcoded like snafu/thiserror instead of using proc-macro-crate, because
+/// proc-macro-crate cannot distinguish doc tests from crate-internal code
+/// (both return `FoundCrate::Itself`), causing doc tests to fail.
+pub(crate) fn get_crate_path(original_name: &str) -> TokenStream {
+    let ident = format_ident!("{}", original_name.replace('-', "_"));
+    quote! { ::#ident }
 }
 
 /// Finds the location field in a struct/variant's named fields.

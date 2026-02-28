@@ -7,7 +7,7 @@
 use crate::helper::{
     extract_display_error_inner, looks_like_location_type, snafu_tokens_contain_keyword,
 };
-use proc_macro2::Ident;
+use proc_macro2::TokenStream;
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -21,7 +21,10 @@ use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, Meta, Token};
 /// After this call, `#[suzu(location)]` fields have `#[stack(location)]` +
 /// `#[snafu(implicit)]`, and `#[suzu(from)]` fields have their type wrapped in
 /// `DisplayError<T>` with `#[snafu(source(from(...)))]`.
-pub(crate) fn process_suzu_attrs(input: &mut DeriveInput, crate_path: &Ident) -> Result<(), Error> {
+pub(crate) fn process_suzu_attrs(
+    input: &mut DeriveInput,
+    crate_path: &TokenStream,
+) -> Result<(), Error> {
     match &mut input.data {
         Data::Struct(data_struct) => {
             process_non_field_attrs(&mut input.attrs, Level::NonField)?;
@@ -75,7 +78,7 @@ fn process_non_field_attrs(attrs: &mut Vec<Attribute>, level: Level) -> Result<(
 /// Processes `#[suzu(...)]` attributes on fields within a single struct/variant.
 fn process_fields(
     fields: &mut Punctuated<Field, Token![,]>,
-    crate_path: &Ident,
+    crate_path: &TokenStream,
 ) -> Result<(), Error> {
     let mut errors = Vec::new();
     // Track the first #[suzu(location)] span to detect duplicates with
@@ -250,7 +253,7 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
 fn apply_from(
     field: &mut Field,
     existing_attrs: &[Attribute],
-    crate_path: &Ident,
+    crate_path: &TokenStream,
 ) -> Result<Attribute, Error> {
     // Check for conflict with existing #[snafu(source(...))]
     if has_snafu_keyword(existing_attrs, "source") {

@@ -1,4 +1,4 @@
-use crate::helper::get_crate_name;
+use crate::helper::get_crate_path;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
@@ -63,7 +63,7 @@ pub(crate) fn report_impl(attr: TokenStream, stream: TokenStream) -> Result<Toke
         ));
     };
 
-    let crate_path = get_crate_name("suzunari-error", &stream)?;
+    let crate_path = get_crate_path("suzunari-error");
     let error_type = extract_result_error_type(return_type)?;
 
     let vis = &input.vis;

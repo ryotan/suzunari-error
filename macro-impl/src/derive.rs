@@ -1,15 +1,15 @@
-use crate::helper::{find_location_field, find_source_field, get_crate_name};
+use crate::helper::{find_location_field, find_source_field, get_crate_path};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::spanned::Spanned;
 use syn::{Data, DeriveInput, Error, Fields, FieldsNamed, Generics, Variant};
 
 pub(crate) fn stack_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
-    let input: DeriveInput = syn::parse2(stream.clone())?;
+    let input: DeriveInput = syn::parse2(stream)?;
     let name = &input.ident;
     let generics = &input.generics;
 
-    let crate_path = get_crate_name("suzunari-error", &stream)?;
+    let crate_path = get_crate_path("suzunari-error");
 
     match &input.data {
         Data::Struct(data_struct) => match &data_struct.fields {
@@ -23,7 +23,7 @@ pub(crate) fn stack_error_impl(stream: TokenStream) -> Result<TokenStream, Error
             generate_enum_impl(name, &data_enum.variants, &crate_path, generics)
         }
         Data::Union(_) => Err(Error::new(
-            stream.span(),
+            input.ident.span(),
             "StackError cannot be derived for unions",
         )),
     }
@@ -33,7 +33,7 @@ pub(crate) fn stack_error_impl(stream: TokenStream) -> Result<TokenStream, Error
 fn generate_struct_impl(
     name: &Ident,
     fields: &FieldsNamed,
-    crate_path: &Ident,
+    crate_path: &TokenStream,
     generics: &Generics,
 ) -> Result<TokenStream, Error> {
     let loc_field = find_location_field(fields)?;
@@ -84,7 +84,7 @@ fn generate_struct_impl(
 fn generate_enum_impl(
     name: &Ident,
     variants: &syn::punctuated::Punctuated<Variant, syn::token::Comma>,
-    crate_path: &Ident,
+    crate_path: &TokenStream,
     generics: &Generics,
 ) -> Result<TokenStream, Error> {
     // Check all variants have named fields
@@ -198,7 +198,11 @@ fn generate_enum_impl(
 /// - Adding `#[cfg(feature = "alloc")]` to generated code would check the
 ///   downstream crate's features, which is incorrect — downstream crates
 ///   do not declare their own `alloc` feature
-fn boxed_stack_error_impl(name: &Ident, crate_path: &Ident, generics: &Generics) -> TokenStream {
+fn boxed_stack_error_impl(
+    name: &Ident,
+    crate_path: &TokenStream,
+    generics: &Generics,
+) -> TokenStream {
     if !cfg!(feature = "alloc") {
         return quote! {};
     }
