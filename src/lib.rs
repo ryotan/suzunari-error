@@ -9,8 +9,7 @@
 //! Use [`#[suzunari_error]`](macro@suzunari_error) to define error types — it combines
 //! location injection, `Snafu` derive, and `StackError` derive in one attribute:
 //!
-//! ```rust,ignore
-//! // NOTE: ignore due to proc-macro-crate limitation in doc-test context
+//! ```
 //! use suzunari_error::*;
 //!
 //! #[suzunari_error]

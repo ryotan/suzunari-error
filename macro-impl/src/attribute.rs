@@ -1,8 +1,8 @@
 use crate::helper::{
-    get_crate_name, has_stack_location_attr, looks_like_location_type, snafu_tokens_contain_keyword,
+    get_crate_path, has_stack_location_attr, looks_like_location_type, snafu_tokens_contain_keyword,
 };
 use crate::suzu_attr;
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -15,9 +15,9 @@ use syn::{Data, DeriveInput, Error, Fields, FieldsNamed, Meta};
 /// 2. `resolve_and_inject_location` — ensures every struct/variant has exactly one location field
 /// 3. Emit `#[derive(Debug, Snafu, StackError)]` wrapping the rewritten input
 pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
-    let mut input: DeriveInput = syn::parse2(stream.clone())?;
-    let crate_path = get_crate_name("suzunari-error", &stream)?;
-    let snafu_path = get_crate_name("snafu", &stream)?;
+    let mut input: DeriveInput = syn::parse2(stream)?;
+    let crate_path = get_crate_path("suzunari-error");
+    let snafu_path = get_crate_path("snafu");
 
     // Step 1: Process #[suzu(...)] attrs (from, location, snafu passthrough)
     // - #[suzu(location)] → #[stack(location)] + #[snafu(implicit)]
@@ -85,7 +85,10 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
 /// 2. Location-typed field count → 1: add `#[stack(location)]`, 2+: error
 /// 3. "location" name conflict check → error if non-Location type
 /// 4. Auto-inject `location: Location` with `#[stack(location)]` + `#[snafu(implicit)]`
-fn resolve_and_inject_location(fields: &mut FieldsNamed, crate_path: &Ident) -> Result<(), Error> {
+fn resolve_and_inject_location(
+    fields: &mut FieldsNamed,
+    crate_path: &TokenStream,
+) -> Result<(), Error> {
     // 1. Check #[stack(location)] markers
     let mut stack_marked = Vec::new();
     for (i, field) in fields.named.iter().enumerate() {
@@ -170,7 +173,7 @@ fn ensure_snafu_implicit(field: &mut syn::Field) {
 
 /// Constructs a synthetic `location: Location` field with
 /// `#[snafu(implicit)]` + `#[stack(location)]`.
-fn location_field_impl(crate_path: &Ident) -> syn::Field {
+fn location_field_impl(crate_path: &TokenStream) -> syn::Field {
     syn::Field {
         attrs: vec![
             syn::parse_quote!(#[snafu(implicit)]),
