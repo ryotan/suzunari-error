@@ -9,20 +9,34 @@ use core::fmt::{Debug, Display, Formatter};
 ///
 /// # Usage
 ///
-/// ## Pattern A: Automatic conversion via `source(from(...))`  (recommended)
+/// ## Pattern A: `#[suzu(from)]` — auto-wraps type and generates `source(from(...))` (recommended)
 ///
-/// ```ignore
+/// ```rust,ignore
+/// // ignore: uses external crate type for illustration
 /// #[suzunari_error]
-/// #[snafu(display("hashing failed"))]
+/// #[suzu(display("hashing failed"))]
 /// struct HashError {
-///     #[snafu(source(from(argon2::Error, DisplayError::new)))]
+///     #[suzu(from)]
+///     source: argon2::Error,  // becomes DisplayError<argon2::Error>
+/// }
+/// ```
+///
+/// ## Pattern B: Manual `source(from(...))` — explicit control
+///
+/// ```rust,ignore
+/// // ignore: uses external crate type for illustration
+/// #[suzunari_error]
+/// #[suzu(display("hashing failed"))]
+/// struct HashError {
+///     #[suzu(source(from(argon2::Error, DisplayError::new)))]
 ///     source: DisplayError<argon2::Error>,
 /// }
 /// ```
 ///
-/// ## Pattern B: Manual conversion via `map_err`
+/// ## Pattern C: `map_err` — for ad-hoc conversions
 ///
-/// ```ignore
+/// ```rust,ignore
+/// // ignore: uses external crate type for illustration
 /// fn hash(input: &[u8]) -> Result<Vec<u8>, HashError> {
 ///     do_hash(input)
 ///         .map_err(DisplayError::new)
