@@ -5,6 +5,13 @@ use core::error::Error;
 ///
 /// Types implementing this trait carry a `Location` at each level of the
 /// error chain, enabling `StackReport` to produce stack-trace-like output.
+///
+/// # Deriving
+///
+/// Use `#[suzunari_error]` (recommended) or `#[derive(StackError)]` directly.
+/// Both resolve the location field via `#[stack(location)]` or by detecting a
+/// `Location`-typed field. Manual impl is only needed for wrapper types like
+/// `BoxedStackError`.
 pub trait StackError: Error {
     /// Returns the location where this error was constructed.
     fn location(&self) -> &Location;
@@ -54,8 +61,8 @@ mod alloc_impls {
     use alloc::sync::Arc;
 
     // Box<T> requires T: Sized here because Box<dyn StackError> needs explicit
-    // Error + StackError impls (std's blanket impl<T: Error> Error for Box<T>
-    // requires T: Sized). Arc doesn't need this because std provides
+    // Error + StackError impls (core's blanket impl<T: Error> Error for Box<T>
+    // requires T: Sized). Arc doesn't need this because core provides
     // impl<T: Error + ?Sized> Error for Arc<T>.
     impl<T: StackError> StackError for Box<T> {
         fn location(&self) -> &Location {

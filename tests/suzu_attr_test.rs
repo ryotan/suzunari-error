@@ -1,5 +1,7 @@
 #![cfg(feature = "std")]
 //! Integration tests for the `#[suzu(...)]` attribute.
+//! Tests verify `from`, `location`, and snafu passthrough behavior.
+//! .build() is snafu's standard test pattern for constructing errors in tests.
 
 use snafu::prelude::*;
 use suzunari_error::*;

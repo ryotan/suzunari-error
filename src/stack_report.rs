@@ -8,6 +8,19 @@ use core::fmt;
 ///
 /// Create via [`StackReport::from_error`] or `Result<(), E>::into()`.
 ///
+/// # Output Format
+///
+/// ```text
+/// Error: AppError::IoFailed: io failed, at src/main.rs:42:5
+/// Caused by the following errors (recent errors listed first):
+///   1| InfraError::Read: read failed, at src/infra.rs:10:9
+///   2| No such file or directory (os error 2)
+/// ```
+///
+/// The first line shows the top-level error with type name and location.
+/// StackError sources (with location) are numbered in phase 1, then
+/// plain `Error::source()` chain entries (without location) follow.
+///
 /// With the `std` feature, implements [`std::process::Termination`] for use as the
 /// return type of `main()`. The [`#[suzunari_error::report]`](crate::report) macro
 /// can transform `fn() -> Result<(), E>` into `fn() -> StackReport<E>` automatically.
@@ -15,6 +28,7 @@ pub struct StackReport<E: StackError>(Result<(), E>);
 
 impl<E: StackError> StackReport<E> {
     /// Creates a report from an error value.
+    #[must_use]
     pub fn from_error(error: E) -> Self {
         Self(Err(error))
     }

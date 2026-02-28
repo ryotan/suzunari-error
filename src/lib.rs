@@ -10,11 +10,11 @@
 //! location injection, `Snafu` derive, and `StackError` derive in one attribute:
 //!
 //! ```rust,ignore
+//! // NOTE: ignore due to proc-macro-crate limitation in doc-test context
 //! use suzunari_error::*;
-//! use snafu::ResultExt;
 //!
 //! #[suzunari_error]
-//! #[snafu(display("operation failed"))]
+//! #[suzu(display("operation failed"))]
 //! struct AppError {
 //!     source: std::io::Error,
 //! }

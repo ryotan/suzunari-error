@@ -73,7 +73,7 @@ fn test_manual_location_in_error() {
 
     // Verify the location in the error
     let expected_file = file!();
-    let expected_line = line!() - 8; // 5 lines above is where Location::current() was called
+    let expected_line = line!() - 8; // 8 lines above is where Location::current() was called
 
     assert_eq!(error.location.file(), expected_file);
     assert_eq!(error.location.line(), expected_line);
