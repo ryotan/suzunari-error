@@ -20,7 +20,7 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 - Provides error location awareness for contextual chained errors
 - `location()` — returns the `Location` where this error was constructed
 - `type_name()` — returns the error type name for display in stack traces
-- `stack_source()` — returns the source error as a `StackError` if it implements the trait (uses Deref-based specialization in generated code)
+- `stack_source()` — returns the source error as a `StackError` if it implements the trait (uses autoref specialization in generated code)
 - `depth()` — counts the full `Error::source()` chain length
 
 ### StackReport
@@ -165,7 +165,7 @@ fn test_error_propagation() {
     let result = get_user("non_existent", &mock_connection());
 
     match result {
-        Err(DatabaseError::RecordNotFound { id, table }) => {
+        Err(DatabaseError::RecordNotFound { id, table, .. }) => {
             assert_eq!(id, "non_existent");
             assert_eq!(table, "users");
         },
