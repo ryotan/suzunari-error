@@ -116,9 +116,7 @@ struct RenamedSourceError {
 #[test]
 fn test_from_non_source_named_field() {
     fn fake_op() -> Result<(), FakeLibError> {
-        Err(FakeLibError {
-            message: "renamed",
-        })
+        Err(FakeLibError { message: "renamed" })
     }
     let err = fake_op().context(RenamedSourceSnafu).unwrap_err();
     let report = format!("{:?}", StackReport::from_error(err));
@@ -138,9 +136,7 @@ struct GenericFromError<E: core::fmt::Debug + core::fmt::Display + 'static> {
 #[test]
 fn test_from_with_generic_type() {
     fn fake_op() -> Result<(), FakeLibError> {
-        Err(FakeLibError {
-            message: "generic",
-        })
+        Err(FakeLibError { message: "generic" })
     }
     // snafu erases generic params in context selectors
     let err = fake_op().context(GenericFromSnafu).unwrap_err();

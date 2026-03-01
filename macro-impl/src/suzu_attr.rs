@@ -4,9 +4,7 @@
 //! (`from`, `location`) are handled here, and everything else is passed
 //! through as `#[snafu(...)]`.
 
-use crate::helper::{
-    extract_display_error_inner, has_snafu_keyword, looks_like_location_type,
-};
+use crate::helper::{extract_display_error_inner, has_snafu_keyword, looks_like_location_type};
 use proc_macro2::{Span, TokenStream};
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
