@@ -89,17 +89,6 @@ fn generate_enum_impl(
     crate_path: &TokenStream,
     generics: &Generics,
 ) -> Result<TokenStream, Error> {
-    // Check all variants have named fields
-    if let Some(variant) = variants
-        .iter()
-        .find(|v| !matches!(&v.fields, Fields::Named(_)))
-    {
-        return Err(Error::new(
-            variant.span(),
-            "StackError can only be derived for enums with named fields in all variants",
-        ));
-    }
-
     // Analyze each variant: resolve location and source field names
     struct VariantInfo<'a> {
         ident: &'a Ident,

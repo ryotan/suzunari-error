@@ -5,7 +5,7 @@
 //! through as `#[snafu(...)]`.
 
 use crate::helper::{
-    extract_display_error_inner, looks_like_location_type, snafu_tokens_contain_keyword,
+    extract_display_error_inner, has_snafu_keyword, looks_like_location_type,
 };
 use proc_macro2::{Span, TokenStream};
 use syn::parse_quote;
@@ -216,6 +216,20 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
         let is_from = meta_is_ident(meta, "from");
         let is_location = meta_is_ident(meta, "location");
 
+        // Reject from(...) and location(...) list forms with clear error
+        if matches!(meta, Meta::List(l) if l.path.is_ident("from")) {
+            return Err(Error::new(
+                meta.span(),
+                "`from` does not accept arguments; use `#[suzu(from)]` as a bare keyword",
+            ));
+        }
+        if matches!(meta, Meta::List(l) if l.path.is_ident("location")) {
+            return Err(Error::new(
+                meta.span(),
+                "`location` does not accept arguments; use `#[suzu(location)]` as a bare keyword",
+            ));
+        }
+
         if is_from {
             match level {
                 Level::Field => has_from = true,
@@ -333,24 +347,6 @@ fn meta_is_ident_prefix(meta: &Meta, name: &str) -> bool {
         Meta::List(l) => l.path.is_ident(name),
         Meta::NameValue(nv) => nv.path.is_ident(name),
     }
-}
-
-/// Checks if any `#[snafu(...)]` attribute contains `keyword` as a top-level
-/// keyword (e.g., `source`, `implicit`).
-///
-/// Uses token-level scanning instead of `Punctuated<Meta>` parsing, because
-/// snafu's `source(from(T, |e| closure(e)))` syntax contains closures that
-/// cannot be parsed as `Meta`. Token scanning handles all snafu syntaxes.
-fn has_snafu_keyword(attrs: &[Attribute], keyword: &str) -> bool {
-    attrs.iter().any(|attr| {
-        if !attr.path().is_ident("snafu") {
-            return false;
-        }
-        let Meta::List(meta_list) = &attr.meta else {
-            return false;
-        };
-        snafu_tokens_contain_keyword(&meta_list.tokens, keyword)
-    })
 }
 
 fn combine_errors(errors: Vec<Error>) -> Result<(), Error> {

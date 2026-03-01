@@ -68,7 +68,7 @@ enum ApiError {
     },
 }
 
-fn fetch_data(url: &str) -> Result<Data, ApiError> {
+async fn fetch_data(url: &str) -> Result<Data, ApiError> {
     let response = reqwest::get(url)
         .await
         .context(FetchFailedSnafu)?;

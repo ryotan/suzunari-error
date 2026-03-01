@@ -256,19 +256,25 @@ fn is_source_field(field: &Field) -> bool {
     snafu_source.unwrap_or(is_named_source)
 }
 
-/// Ensures the field has `#[snafu(implicit)]`. Adds it if missing.
-pub(crate) fn ensure_snafu_implicit(field: &mut Field) {
-    let has_implicit = field.attrs.iter().any(|attr| {
+/// Checks if any `#[snafu(...)]` attribute contains `keyword` as a top-level
+/// keyword (e.g., `source`, `implicit`).
+///
+/// Uses token-level scanning via [`snafu_tokens_contain_keyword`].
+pub(crate) fn has_snafu_keyword(attrs: &[syn::Attribute], keyword: &str) -> bool {
+    attrs.iter().any(|attr| {
         if !attr.path().is_ident("snafu") {
             return false;
         }
         let Meta::List(meta_list) = &attr.meta else {
             return false;
         };
-        snafu_tokens_contain_keyword(&meta_list.tokens, "implicit")
-    });
+        snafu_tokens_contain_keyword(&meta_list.tokens, keyword)
+    })
+}
 
-    if !has_implicit {
+/// Ensures the field has `#[snafu(implicit)]`. Adds it if missing.
+pub(crate) fn ensure_snafu_implicit(field: &mut Field) {
+    if !has_snafu_keyword(&field.attrs, "implicit") {
         field.attrs.push(syn::parse_quote!(#[snafu(implicit)]));
     }
 }

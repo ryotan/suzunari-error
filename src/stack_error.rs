@@ -56,7 +56,7 @@ pub trait StackError: Error {
     ///
     /// This enables StackReport to traverse the error chain with
     /// location info. The derive macro generates this automatically
-    /// using Deref-based specialization.
+    /// using autoref specialization (see the `__private` module).
     ///
     /// # Contract
     /// If `stack_source()` returns `Some(s)`, then `Error::source()`
