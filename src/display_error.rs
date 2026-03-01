@@ -87,11 +87,13 @@ impl<E: Debug + Display> DisplayError<E> {
 
 impl<E> DisplayError<E> {
     /// Returns a reference to the wrapped value.
+    #[must_use]
     pub fn inner(&self) -> &E {
         &self.0
     }
 
     /// Unwraps and returns the inner value.
+    #[must_use]
     pub fn into_inner(self) -> E {
         self.0
     }
@@ -142,6 +144,14 @@ mod tests {
         let wrapped = DisplayError::new(original);
         let inner = wrapped.into_inner();
         assert_eq!(inner.message, "oops");
+    }
+
+    #[test]
+    fn test_inner_ref() {
+        let wrapped = DisplayError::new(FakeLibError {
+            message: "ref access",
+        });
+        assert_eq!(wrapped.inner().message, "ref access");
     }
 
     #[test]

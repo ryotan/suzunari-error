@@ -229,6 +229,49 @@ fn test_custom_location_enum() {
     assert_eq!(err_b.type_name(), "CustomLocEnum::VariantB");
 }
 
+// StackReport output with different location field names per variant.
+// Verifies that the derive correctly destructures each variant's location field.
+#[suzunari_error]
+#[suzu(display("custom loc chain"))]
+struct CustomLocChain {
+    source: CustomLocEnum,
+}
+
+#[test]
+fn test_stack_report_with_mixed_location_names() {
+    fn make_a() -> Result<(), CustomLocEnum> {
+        ensure!(false, VariantASnafu);
+        Ok(())
+    }
+    fn outer_a() -> Result<(), CustomLocChain> {
+        make_a().context(CustomLocChainSnafu)?;
+        Ok(())
+    }
+    let err = outer_a().unwrap_err();
+    let file = file!();
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains(&format!(
+        "Error: CustomLocChain: custom loc chain, at {file}:"
+    )));
+    assert!(report.contains(&format!(
+        "1| CustomLocEnum::VariantA: variant A, at {file}:"
+    )));
+
+    fn make_b() -> Result<(), CustomLocEnum> {
+        ensure!(false, VariantBSnafu { msg: "hi" });
+        Ok(())
+    }
+    fn outer_b() -> Result<(), CustomLocChain> {
+        make_b().context(CustomLocChainSnafu)?;
+        Ok(())
+    }
+    let err = outer_b().unwrap_err();
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains(&format!(
+        "1| CustomLocEnum::VariantB: variant B: hi, at {file}:"
+    )));
+}
+
 #[test]
 fn test_auto_detect_location_field() {
     fn make_error() -> Result<(), AutoDetectLoc> {
