@@ -1,5 +1,8 @@
 //! Internal helpers for derive macro code generation.
-//! Not public API — may change without notice.
+//!
+//! **Not public API. Do not use.** This module is `#[doc(hidden)]` and not
+//! covered by semver guarantees. It exists solely for generated code emitted
+//! by `#[derive(StackError)]`.
 //!
 //! Uses the **autoref specialization** technique to conditionally resolve
 //! `stack_source()` at compile time. When the source type implements

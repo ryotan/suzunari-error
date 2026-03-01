@@ -59,6 +59,8 @@
 //!   used by snafu and thiserror.
 
 #![no_std]
+#![forbid(unsafe_code)]
+#![warn(missing_docs)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;

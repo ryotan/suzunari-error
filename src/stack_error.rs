@@ -8,11 +8,17 @@ use core::error::Error;
 ///
 /// # Design note: no `Send + Sync` supertrait
 ///
-/// Unlike anyhow/eyre which require `Send + Sync + 'static`, this trait
-/// only requires `Error`. This allows non-Send error types to implement
-/// `StackError`. `BoxedStackError` (requires `alloc` feature) adds `Send + Sync`
-/// bounds for the common thread-safe case. Adding a supertrait later is a
-/// breaking change, so this must be decided before v1.0.
+/// This trait requires only `Error`, not `Send + Sync + 'static` (unlike
+/// anyhow/eyre). This aligns with snafu, which does not impose `Send + Sync`
+/// on error types. `BoxedStackError` adds `Send + Sync` bounds for the
+/// thread-safe trait object case.
+///
+/// # Design note: unsealed trait
+///
+/// This trait is intentionally unsealed — external crates may implement it
+/// for custom wrapper types (e.g., similar to `BoxedStackError`). Future
+/// method additions must provide default implementations to avoid breaking
+/// downstream impls.
 ///
 /// # Deriving
 ///
