@@ -1,4 +1,4 @@
-error: field 'location' exists but is not of type Location; use Location type or mark the correct field with #[stack(location)]
+error: field 'location' exists but is not of type Location; rename it or use #[stack(location)] on the correct field
  --> tests/compile-fail/derive_enum_wrong_location_type.rs:7:16
   |
 7 |     Variant1 { location: String },

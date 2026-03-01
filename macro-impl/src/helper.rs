@@ -15,69 +15,115 @@ pub(crate) fn get_crate_path(original_name: &str) -> TokenStream {
     quote! { ::#ident }
 }
 
-/// Finds the location field in a struct/variant's named fields.
+/// Result of the location field resolution algorithm (steps 1-3).
+pub(crate) enum LocationLookup {
+    /// Found a location field at the given index.
+    /// `needs_stack_attr`: true if found via type heuristic (caller should add
+    /// `#[stack(location)]`), false if already has `#[stack(location)]` marker.
+    Found {
+        index: usize,
+        needs_stack_attr: bool,
+    },
+    /// No location field found (no markers, no Location types, no name conflicts).
+    NotFound,
+}
+
+/// Resolves the location field in a struct/variant's named fields.
 ///
-/// Resolution order (symmetric with `find_source_field`):
+/// Resolution order:
 /// 1. `#[stack(location)]` marker — highest priority, any field name
 /// 2. Single field of type `Location` — automatic fallback
-/// 3. Error if no location field found
+/// 3. Name conflict check (field named "location" with wrong type)
 ///
-/// Used by `derive(StackError)` to resolve the location field dynamically.
-pub(crate) fn find_location_field(fields: &FieldsNamed) -> Result<&Field, Error> {
-    // Priority 1: explicit #[stack(location)] marker
+/// `location_attr_hint` is used in ambiguity/conflict error messages to suggest
+/// the context-appropriate attribute (e.g., `"#[suzu(location)]"` for
+/// `#[suzunari_error]`, `"#[stack(location)]"` for `derive(StackError)`).
+pub(crate) fn lookup_location_field(
+    fields: &FieldsNamed,
+    location_attr_hint: &str,
+) -> Result<LocationLookup, Error> {
+    // 1. Check #[stack(location)] markers
     let mut marked = Vec::new();
-    for field in &fields.named {
+    for (i, field) in fields.named.iter().enumerate() {
         if has_stack_location_attr(field)? {
-            marked.push(field);
+            marked.push(i);
         }
     }
-
     match marked.len() {
-        1 => return Ok(marked[0]),
+        1 => {
+            return Ok(LocationLookup::Found {
+                index: marked[0],
+                needs_stack_attr: false,
+            });
+        }
         2.. => {
             return Err(Error::new(
-                marked[1].span(),
+                fields.named[marked[1]].span(),
                 "multiple #[stack(location)] fields; only one is allowed per struct/variant",
             ));
         }
         0 => {}
     }
 
-    // Priority 2: single field with Location type
-    let location_typed: Vec<_> = fields
+    // 2. Check Location-typed fields
+    let location_typed: Vec<usize> = fields
         .named
         .iter()
-        .filter(|f| looks_like_location_type(&f.ty))
+        .enumerate()
+        .filter(|(_, f)| looks_like_location_type(&f.ty))
+        .map(|(i, _)| i)
         .collect();
-
     match location_typed.len() {
-        1 => return Ok(location_typed[0]),
+        1 => {
+            return Ok(LocationLookup::Found {
+                index: location_typed[0],
+                needs_stack_attr: true,
+            });
+        }
         2.. => {
             return Err(Error::new(
-                location_typed[1].span(),
-                "multiple Location fields found; use #[stack(location)] to specify which one",
+                fields.named[location_typed[1]].span(),
+                format!(
+                    "multiple Location fields found; use {location_attr_hint} to specify which one"
+                ),
             ));
         }
         0 => {}
     }
 
-    // Near-miss: field named "location" but wrong type
-    if let Some(field) = fields.named.iter().find(|f| {
-        f.ident.as_ref().is_some_and(|i| i == "location") && !looks_like_location_type(&f.ty)
-    }) {
+    // 3. Name conflict: field named "location" with wrong type
+    if let Some(field) = fields
+        .named
+        .iter()
+        .find(|f| f.ident.as_ref().is_some_and(|i| i == "location"))
+    {
         return Err(Error::new(
             field.span(),
-            "field 'location' exists but is not of type Location; \
-             use Location type or mark the correct field with #[stack(location)]",
+            format!(
+                "field 'location' exists but is not of type Location; \
+                 rename it or use {location_attr_hint} on the correct field"
+            ),
         ));
     }
 
-    // No location field found
-    Err(Error::new(
-        fields.span(),
-        "StackError requires a Location field. Use #[suzunari_error] to auto-inject, \
-         or add a field of type Location manually.",
-    ))
+    Ok(LocationLookup::NotFound)
+}
+
+/// Finds the location field in a struct/variant's named fields.
+///
+/// Delegates to [`lookup_location_field`] for resolution, then returns the
+/// field reference or an error if not found.
+///
+/// Used by `derive(StackError)` to resolve the location field dynamically.
+pub(crate) fn find_location_field(fields: &FieldsNamed) -> Result<&Field, Error> {
+    match lookup_location_field(fields, "#[stack(location)]")? {
+        LocationLookup::Found { index, .. } => Ok(&fields.named[index]),
+        LocationLookup::NotFound => Err(Error::new(
+            fields.span(),
+            "StackError requires a Location field. Use #[suzunari_error] to auto-inject, \
+             or add a field of type Location manually.",
+        )),
+    }
 }
 
 /// Returns true if the field has `#[stack(location)]` attribute.

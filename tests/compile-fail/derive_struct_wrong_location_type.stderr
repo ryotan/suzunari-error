@@ -1,4 +1,4 @@
-error: field 'location' exists but is not of type Location; use Location type or mark the correct field with #[stack(location)]
+error: field 'location' exists but is not of type Location; rename it or use #[stack(location)] on the correct field
  --> tests/compile-fail/derive_struct_wrong_location_type.rs:8:5
   |
 8 |     location: String,

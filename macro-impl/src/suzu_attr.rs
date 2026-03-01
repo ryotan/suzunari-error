@@ -21,6 +21,11 @@ use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, Meta, Token};
 /// After this call, `#[suzu(location)]` fields have `#[stack(location)]` +
 /// `#[snafu(implicit)]`, and `#[suzu(from)]` fields have their type wrapped in
 /// `DisplayError<T>` with `#[snafu(source(from(...)))]`.
+///
+/// # Precondition
+///
+/// Callers must reject tuple structs/variants before calling this function.
+/// `#[suzu(...)]` on non-Named fields is silently skipped (not validated here).
 pub(crate) fn process_suzu_attrs(
     input: &mut DeriveInput,
     crate_path: &TokenStream,

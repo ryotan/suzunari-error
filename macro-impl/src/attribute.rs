@@ -1,6 +1,4 @@
-use crate::helper::{
-    ensure_snafu_implicit, get_crate_path, has_stack_location_attr, looks_like_location_type,
-};
+use crate::helper::{LocationLookup, ensure_snafu_implicit, get_crate_path, lookup_location_field};
 use crate::suzu_attr;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -86,76 +84,29 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
 
 /// Location resolution flow for a single struct/variant.
 ///
-/// 1. `#[stack(location)]` count → 1: OK, 2+: error
-/// 2. Location-typed field count → 1: add `#[stack(location)]`, 2+: error
-/// 3. "location" name conflict check → error if non-Location type
-/// 4. Auto-inject `location: Location` with `#[stack(location)]` + `#[snafu(implicit)]`
+/// Delegates steps 1–3 (marker check, type heuristic, name conflict) to
+/// [`lookup_location_field`], then applies the result:
+/// - `Found` → ensure `#[stack(location)]` + `#[snafu(implicit)]` on the field
+/// - `NotFound` → auto-inject a synthetic `location: Location` field
 fn resolve_and_inject_location(
     fields: &mut FieldsNamed,
     crate_path: &TokenStream,
 ) -> Result<(), Error> {
-    // 1. Check #[stack(location)] markers
-    let mut stack_marked = Vec::new();
-    for (i, field) in fields.named.iter().enumerate() {
-        if has_stack_location_attr(field)? {
-            stack_marked.push(i);
-        }
-    }
-
-    match stack_marked.len() {
-        1 => {
-            ensure_snafu_implicit(&mut fields.named[stack_marked[0]]);
-            return Ok(());
-        }
-        2.. => {
-            return Err(Error::new(
-                fields.named[stack_marked[1]].span(),
-                "multiple #[stack(location)] fields; only one is allowed per struct/variant",
-            ));
-        }
-        0 => {}
-    }
-
-    // 2. Check Location-typed fields
-    let location_typed: Vec<usize> = fields
-        .named
-        .iter()
-        .enumerate()
-        .filter(|(_, f)| looks_like_location_type(&f.ty))
-        .map(|(i, _)| i)
-        .collect();
-
-    match location_typed.len() {
-        1 => {
-            let field = &mut fields.named[location_typed[0]];
-            field.attrs.push(syn::parse_quote!(#[stack(location)]));
+    match lookup_location_field(fields, "#[suzu(location)]")? {
+        LocationLookup::Found {
+            index,
+            needs_stack_attr,
+        } => {
+            let field = &mut fields.named[index];
+            if needs_stack_attr {
+                field.attrs.push(syn::parse_quote!(#[stack(location)]));
+            }
             ensure_snafu_implicit(field);
-            return Ok(());
         }
-        2.. => {
-            return Err(Error::new(
-                fields.named[location_typed[1]].span(),
-                "multiple Location fields found; use #[suzu(location)] to specify which one",
-            ));
+        LocationLookup::NotFound => {
+            fields.named.push(location_field_impl(crate_path));
         }
-        0 => {}
     }
-
-    // 3. Check for "location" name conflict
-    let name_conflict = fields
-        .named
-        .iter()
-        .find(|f| f.ident.as_ref().is_some_and(|i| i == "location"));
-    if let Some(field) = name_conflict {
-        return Err(Error::new(
-            field.span(),
-            "field 'location' exists but is not of type Location; \
-             rename it or use #[suzu(location)] on the correct field",
-        ));
-    }
-
-    // 4. Auto-inject location field
-    fields.named.push(location_field_impl(crate_path));
     Ok(())
 }
 
