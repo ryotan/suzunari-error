@@ -322,9 +322,7 @@ mod tests {
             Err(Box::new(root))
         }
         let wrapper = gen_root()
-            .context(WrapperSnafu {
-                message: "wrapper",
-            })
+            .context(WrapperSnafu { message: "wrapper" })
             .unwrap_err();
         // WrapperError has one source (SimpleError), so depth == 1
         assert_eq!(wrapper.depth(), 1);
@@ -333,7 +331,10 @@ mod tests {
     #[test]
     fn test_box_concrete_stack_error() {
         // Box<T: Sized + StackError> blanket impl
-        let concrete = SimpleSnafu { message: "boxed concrete" }.build();
+        let concrete = SimpleSnafu {
+            message: "boxed concrete",
+        }
+        .build();
         let original_line = concrete.location().line();
         let boxed: Box<SimpleError> = Box::new(concrete);
 

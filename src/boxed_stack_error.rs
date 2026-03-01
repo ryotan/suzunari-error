@@ -123,8 +123,8 @@ mod tests {
     use super::*;
     use crate::Location;
     use alloc::format;
-    use snafu::prelude::*;
     use snafu::IntoError;
+    use snafu::prelude::*;
 
     #[derive(Debug, Snafu)]
     #[snafu(display("Test error: {}", message))]
@@ -215,8 +215,7 @@ mod tests {
         // BoxedStackError wrapping an error with a source should delegate source()
         let inner = TestSnafu { message: "root" }.build();
         let boxed = BoxedStackError::new(inner);
-        let wrapper = WrapperTestSnafu { message: "wrap" }
-            .into_error(boxed);
+        let wrapper = WrapperTestSnafu { message: "wrap" }.into_error(boxed);
         let outer = BoxedStackError::new(wrapper);
 
         // Error::source() should return Some (delegates to WrapperTestError's source)
@@ -233,8 +232,7 @@ mod tests {
 
         // Wrapped error: depth == 1 (the BoxedStackError source counts as 1)
         let inner = BoxedStackError::new(TestSnafu { message: "inner" }.build());
-        let wrapper = WrapperTestSnafu { message: "outer" }
-            .into_error(inner);
+        let wrapper = WrapperTestSnafu { message: "outer" }.into_error(inner);
         let outer = BoxedStackError::new(wrapper);
         assert_eq!(outer.depth(), 1);
     }

@@ -135,10 +135,7 @@ impl Display for StackReportFormatter<'_> {
             return writeln!(f);
         }
 
-        writeln!(
-            f,
-            "\nCaused by (recent first):"
-        )?;
+        writeln!(f, "\nCaused by (recent first):")?;
 
         let mut index = 1;
 

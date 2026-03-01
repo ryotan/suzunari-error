@@ -194,12 +194,10 @@ fn process_fields(
                 err.combine(Error::new(loc_span, "`location` defined here"));
                 errors.push(err);
             }
-            (Some(from_span), None) => {
-                match apply_from(field, &new_attrs, crate_path, from_span) {
-                    Ok(snafu_source_attr) => new_attrs.push(snafu_source_attr),
-                    Err(e) => errors.push(e),
-                }
-            }
+            (Some(from_span), None) => match apply_from(field, &new_attrs, crate_path, from_span) {
+                Ok(snafu_source_attr) => new_attrs.push(snafu_source_attr),
+                Err(e) => errors.push(e),
+            },
             (None, Some(_)) => {
                 if !looks_like_location_type(&field.ty) {
                     errors.push(Error::new(
