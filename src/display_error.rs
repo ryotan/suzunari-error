@@ -163,6 +163,28 @@ mod tests {
     }
 
     #[test]
+    fn test_clone() {
+        #[derive(Clone)]
+        struct ClonableError {
+            message: &'static str,
+        }
+        impl Display for ClonableError {
+            fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+                write!(f, "{}", self.message)
+            }
+        }
+        impl Debug for ClonableError {
+            fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+                write!(f, "ClonableError({})", self.message)
+            }
+        }
+
+        let original = DisplayError::new(ClonableError { message: "test" });
+        let cloned = original.clone();
+        assert_eq!(cloned.inner().message, "test");
+    }
+
+    #[test]
     fn test_error_source_is_none() {
         let wrapped = DisplayError::new(FakeLibError {
             message: "no source",

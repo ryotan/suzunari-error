@@ -309,6 +309,34 @@ mod tests {
         handle_stack_error(boxed_error);
     }
 
+    #[test]
+    fn test_depth_one() {
+        fn gen_root() -> Result<(), Box<dyn StackError + Send + Sync + 'static>> {
+            let root = SimpleSnafu { message: "root" }.build();
+            Err(Box::new(root))
+        }
+        let wrapper = gen_root()
+            .context(WrapperSnafu {
+                message: "wrapper",
+            })
+            .unwrap_err();
+        // WrapperError has one source (SimpleError), so depth == 1
+        assert_eq!(wrapper.depth(), 1);
+    }
+
+    #[test]
+    fn test_box_concrete_stack_error() {
+        // Box<T: Sized + StackError> blanket impl
+        let concrete = SimpleSnafu { message: "boxed concrete" }.build();
+        let original_line = concrete.location().line();
+        let boxed: Box<SimpleError> = Box::new(concrete);
+
+        assert_eq!(boxed.location().line(), original_line);
+        assert_eq!(boxed.type_name(), "SimpleError");
+        assert!(boxed.stack_source().is_none());
+        handle_stack_error(boxed);
+    }
+
     fn handle_stack_error<T: StackError>(_: T) {}
 
     // --- GAP-08: Box<dyn StackError> (non-Send-Sync) Error and StackError impls ---

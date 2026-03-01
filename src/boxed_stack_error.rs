@@ -124,6 +124,7 @@ mod tests {
     use crate::Location;
     use alloc::format;
     use snafu::prelude::*;
+    use snafu::IntoError;
 
     #[derive(Debug, Snafu)]
     #[snafu(display("Test error: {}", message))]
@@ -185,6 +186,57 @@ mod tests {
         let back_to_box: Box<dyn StackError + Send + Sync> = generic.into();
 
         assert!(format!("{:?}", back_to_box).contains("Convert test"));
+    }
+
+    // --- source chain delegation and depth ---
+
+    #[derive(Debug, Snafu)]
+    #[snafu(display("Wrapper: {}", message))]
+    struct WrapperTestError {
+        message: alloc::string::String,
+        source: BoxedStackError,
+        #[snafu(implicit)]
+        location: Location,
+    }
+    impl StackError for WrapperTestError {
+        fn location(&self) -> &Location {
+            &self.location
+        }
+        fn type_name(&self) -> &'static str {
+            "WrapperTestError"
+        }
+        fn stack_source(&self) -> Option<&dyn StackError> {
+            Some(&self.source)
+        }
+    }
+
+    #[test]
+    fn test_source_chain_delegation() {
+        // BoxedStackError wrapping an error with a source should delegate source()
+        let inner = TestSnafu { message: "root" }.build();
+        let boxed = BoxedStackError::new(inner);
+        let wrapper = WrapperTestSnafu { message: "wrap" }
+            .into_error(boxed);
+        let outer = BoxedStackError::new(wrapper);
+
+        // Error::source() should return Some (delegates to WrapperTestError's source)
+        assert!(outer.source().is_some());
+        // stack_source() should return Some (WrapperTestError has a stack_source)
+        assert!(outer.stack_source().is_some());
+    }
+
+    #[test]
+    fn test_depth() {
+        // Leaf error: depth == 0
+        let leaf = BoxedStackError::new(TestSnafu { message: "leaf" }.build());
+        assert_eq!(leaf.depth(), 0);
+
+        // Wrapped error: depth == 1 (the BoxedStackError source counts as 1)
+        let inner = BoxedStackError::new(TestSnafu { message: "inner" }.build());
+        let wrapper = WrapperTestSnafu { message: "outer" }
+            .into_error(inner);
+        let outer = BoxedStackError::new(wrapper);
+        assert_eq!(outer.depth(), 1);
     }
 
     fn handle_stack_error<T: StackError>(_: T) {}

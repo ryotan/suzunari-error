@@ -470,3 +470,52 @@ fn test_deep_stack_chain_numbering() {
     // 3| No such file or directory (os error 2)
     assert!(report.contains("3| "));
 }
+
+// --- source(false) on enum variant ---
+
+#[suzunari_error]
+enum SourceFalseError {
+    #[suzu(display("suppressed source"))]
+    Suppressed {
+        #[suzu(source(false))]
+        source: std::io::Error,
+    },
+}
+
+#[test]
+fn test_source_false_on_enum_variant() {
+    let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+    // source(false) makes `source` a regular field, so it must be passed explicitly.
+    let err = SuppressedSnafu { source: io_err }.build();
+    // source(false) suppresses source detection:
+    // - Error::source() should return None
+    // - stack_source() should return None
+    assert!(err.source().is_none());
+    assert!(err.stack_source().is_none());
+    assert_eq!(err.depth(), 0);
+}
+
+// --- #[report] on function with parameters ---
+
+#[suzunari_error]
+#[suzu(display("report error"))]
+struct ReportTestError {}
+
+#[suzunari_error::report]
+fn report_with_params(x: i32) -> Result<(), ReportTestError> {
+    if x < 0 {
+        ensure!(false, ReportTestSnafu);
+    }
+    Ok(())
+}
+
+#[test]
+fn test_report_with_params() {
+    let result = report_with_params(1);
+    // Success case: StackReport for Ok should display empty
+    assert_eq!(format!("{result}"), "");
+
+    let result = report_with_params(-1);
+    let output = format!("{result}");
+    assert!(output.contains("ReportTestError"));
+}
