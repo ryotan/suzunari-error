@@ -1,3 +1,6 @@
+use core::fmt::{Debug, Display, Formatter, Result};
+use core::ops::Deref;
+
 /// Source code location captured via `#[track_caller]`.
 ///
 /// A newtype wrapper around `core::panic::Location` that integrates with
@@ -15,22 +18,22 @@ impl Location {
     }
 }
 
-impl core::ops::Deref for Location {
+impl Deref for Location {
     type Target = core::panic::Location<'static>;
     fn deref(&self) -> &Self::Target {
         self.0
     }
 }
 
-impl core::fmt::Display for Location {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Display for Location {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}:{}:{}", self.file(), self.line(), self.column())
     }
 }
 
-impl core::fmt::Debug for Location {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}:{}:{}", self.file(), self.line(), self.column())
+impl Debug for Location {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        Display::fmt(self, f)
     }
 }
 

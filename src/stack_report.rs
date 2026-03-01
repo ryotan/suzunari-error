@@ -1,5 +1,7 @@
 use crate::StackError;
-use core::fmt;
+use core::fmt::{Debug, Display, Formatter};
+use std::io::{Write, stderr};
+use std::process::{ExitCode, Termination};
 
 /// Formats a [`StackError`] chain as a stack-trace-like report with type names and locations.
 ///
@@ -21,7 +23,7 @@ use core::fmt;
 /// StackError sources (with location) are numbered in phase 1, then
 /// plain `Error::source()` chain entries (without location) follow.
 ///
-/// With the `std` feature, implements [`std::process::Termination`] for use as the
+/// With the `std` feature, implements [`Termination`] for use as the
 /// return type of `main()`. The [`#[suzunari_error::report]`](crate::report) macro
 /// can transform `fn() -> Result<(), E>` into `fn() -> StackReport<E>` automatically.
 pub struct StackReport<E: StackError>(Result<(), E>);
@@ -46,34 +48,32 @@ impl<E: StackError> From<E> for StackReport<E> {
     }
 }
 
-impl<E: StackError> fmt::Debug for StackReport<E> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self, f)
+impl<E: StackError> Debug for StackReport<E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
-impl<E: StackError> fmt::Display for StackReport<E> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<E: StackError> Display for StackReport<E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match &self.0 {
             Ok(()) => Ok(()),
-            Err(e) => fmt::Display::fmt(&StackReportFormatter(e), f),
+            Err(e) => Display::fmt(&StackReportFormatter(e), f),
         }
     }
 }
 
 #[cfg(feature = "std")]
-impl<E: StackError> std::process::Termination for StackReport<E> {
-    fn report(self) -> std::process::ExitCode {
+impl<E: StackError> Termination for StackReport<E> {
+    fn report(self) -> ExitCode {
         match self.0 {
-            Ok(()) => std::process::ExitCode::SUCCESS,
+            Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
                 // Ignore write errors — stderr may be closed, and
                 // panicking here would mask the original error.
-                let _ = std::io::Write::write_fmt(
-                    &mut std::io::stderr(),
-                    format_args!("{}", StackReportFormatter(&e)),
-                );
-                std::process::ExitCode::FAILURE
+                let _ =
+                    Write::write_fmt(&mut stderr(), format_args!("{}", StackReportFormatter(&e)));
+                ExitCode::FAILURE
             }
         }
     }
@@ -82,14 +82,14 @@ impl<E: StackError> std::process::Termination for StackReport<E> {
 /// Internal formatter that formats a StackError chain.
 pub(crate) struct StackReportFormatter<'a>(pub(crate) &'a dyn StackError);
 
-impl fmt::Debug for StackReportFormatter<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self, f)
+impl Debug for StackReportFormatter<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
-impl fmt::Display for StackReportFormatter<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for StackReportFormatter<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let error = self.0;
 
         // Top-level error with type name and location (no index)

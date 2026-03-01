@@ -6,7 +6,10 @@ use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Error, Fields, FieldsNamed, Meta};
+use syn::token::Colon;
+use syn::{
+    Data, DeriveInput, Error, Field, FieldMutability, Fields, FieldsNamed, Meta, Visibility,
+};
 
 /// Implementation of `#[suzunari_error]`.
 ///
@@ -48,7 +51,7 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
                         let location_field = location_field_impl(&crate_path);
                         let mut fields = Punctuated::new();
                         fields.push(location_field);
-                        variant.fields = Fields::Named(syn::FieldsNamed {
+                        variant.fields = Fields::Named(FieldsNamed {
                             brace_token: Default::default(),
                             named: fields,
                         });
@@ -155,7 +158,7 @@ fn resolve_and_inject_location(
 }
 
 /// Ensures the field has `#[snafu(implicit)]`. Adds it if missing.
-fn ensure_snafu_implicit(field: &mut syn::Field) {
+fn ensure_snafu_implicit(field: &mut Field) {
     let has_implicit = field.attrs.iter().any(|attr| {
         if !attr.path().is_ident("snafu") {
             return false;
@@ -173,16 +176,16 @@ fn ensure_snafu_implicit(field: &mut syn::Field) {
 
 /// Constructs a synthetic `location: Location` field with
 /// `#[snafu(implicit)]` + `#[stack(location)]`.
-fn location_field_impl(crate_path: &TokenStream) -> syn::Field {
-    syn::Field {
+fn location_field_impl(crate_path: &TokenStream) -> Field {
+    Field {
         attrs: vec![
             syn::parse_quote!(#[snafu(implicit)]),
             syn::parse_quote!(#[stack(location)]),
         ],
-        vis: syn::Visibility::Inherited,
+        vis: Visibility::Inherited,
         ident: Some(format_ident!("location")),
-        colon_token: Some(syn::token::Colon::default()),
+        colon_token: Some(Colon::default()),
         ty: syn::parse_quote!(#crate_path::Location),
-        mutability: syn::FieldMutability::None,
+        mutability: FieldMutability::None,
     }
 }

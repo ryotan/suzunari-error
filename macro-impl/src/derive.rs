@@ -1,7 +1,9 @@
 use crate::helper::{find_location_field, find_source_field, get_crate_path};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
+use syn::token::Comma;
 use syn::{Data, DeriveInput, Error, Fields, FieldsNamed, Generics, Variant};
 
 pub(crate) fn stack_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
@@ -83,7 +85,7 @@ fn generate_struct_impl(
 /// Generates the StackError implementation for an enum
 fn generate_enum_impl(
     name: &Ident,
-    variants: &syn::punctuated::Punctuated<Variant, syn::token::Comma>,
+    variants: &Punctuated<Variant, Comma>,
     crate_path: &TokenStream,
     generics: &Generics,
 ) -> Result<TokenStream, Error> {

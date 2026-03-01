@@ -7,7 +7,7 @@
 use crate::helper::{
     extract_display_error_inner, looks_like_location_type, snafu_tokens_contain_keyword,
 };
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -83,7 +83,7 @@ fn process_fields(
     let mut errors = Vec::new();
     // Track the first #[suzu(location)] span to detect duplicates with
     // accurate span on the second occurrence (before it becomes #[stack(location)]).
-    let mut first_location_span: Option<proc_macro2::Span> = None;
+    let mut first_location_span: Option<Span> = None;
 
     for field in fields.iter_mut() {
         // Take ownership of attrs to avoid borrow conflicts when mutating field.ty

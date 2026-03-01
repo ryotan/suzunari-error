@@ -1,8 +1,9 @@
-use proc_macro2::{Ident, TokenStream};
+use proc_macro2::{Ident, TokenStream, TokenTree};
 use quote::{format_ident, quote};
 use syn::ext::IdentExt;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Error, Field, FieldsNamed, Meta, PathArguments, Type};
+use syn::{Error, Field, FieldsNamed, GenericArgument, Meta, PathArguments, Type};
 
 /// Returns a token stream for the absolute crate path (e.g., `::suzunari_error`).
 ///
@@ -95,9 +96,8 @@ pub(crate) fn has_stack_location_attr(field: &Field) -> Result<bool, Error> {
                 "#[stack] requires arguments, e.g., #[stack(location)]",
             ));
         };
-        let nested = meta_list.parse_args_with(
-            syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated,
-        )?;
+        let nested =
+            meta_list.parse_args_with(Punctuated::<Meta, syn::Token![,]>::parse_terminated)?;
         if nested.is_empty() {
             return Err(Error::new(
                 attr.span(),
@@ -138,14 +138,14 @@ pub(crate) fn extract_display_error_inner(ty: &Type) -> Option<&Type> {
         return None;
     }
     match &args.args[0] {
-        syn::GenericArgument::Type(inner) => Some(inner),
+        GenericArgument::Type(inner) => Some(inner),
         _ => None,
     }
 }
 
-pub(crate) fn looks_like_location_type(ty: &syn::Type) -> bool {
+pub(crate) fn looks_like_location_type(ty: &Type) -> bool {
     match ty {
-        syn::Type::Path(p) => p
+        Type::Path(p) => p
             .path
             .segments
             .last()
@@ -175,9 +175,9 @@ fn is_source_field(field: &Field) -> bool {
                 return None;
             };
             // Try structured parsing first (handles simple cases).
-            if let Ok(nested) = meta_list.parse_args_with(
-                syn::punctuated::Punctuated::<Meta, syn::Token![,]>::parse_terminated,
-            ) {
+            if let Ok(nested) =
+                meta_list.parse_args_with(Punctuated::<Meta, syn::Token![,]>::parse_terminated)
+            {
                 // Use filter_map + last to be consistent with the outer .last():
                 // both within a single #[snafu(...)] and across multiple #[snafu]
                 // attributes, the last `source` directive wins.
@@ -216,15 +216,12 @@ fn is_source_field(field: &Field) -> bool {
 ///
 /// Used as fallback when `Punctuated<Meta>` parsing fails (e.g., snafu's
 /// closure syntax in `source(from(T, |e| transform(e)))`).
-pub(crate) fn snafu_tokens_contain_keyword(
-    tokens: &proc_macro2::TokenStream,
-    keyword: &str,
-) -> bool {
+pub(crate) fn snafu_tokens_contain_keyword(tokens: &TokenStream, keyword: &str) -> bool {
     let mut at_start = true;
     for tt in tokens.clone() {
         match &tt {
-            proc_macro2::TokenTree::Ident(ident) if at_start && *ident == keyword => return true,
-            proc_macro2::TokenTree::Punct(p) if p.as_char() == ',' => at_start = true,
+            TokenTree::Ident(ident) if at_start && *ident == keyword => return true,
+            TokenTree::Punct(p) if p.as_char() == ',' => at_start = true,
             _ => at_start = false,
         }
     }
