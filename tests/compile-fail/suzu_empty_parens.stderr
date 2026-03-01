@@ -1,0 +1,5 @@
+error: #[suzu()] requires arguments, e.g., #[suzu(location)] or #[suzu(display("..."))]
+ --> tests/compile-fail/suzu_empty_parens.rs:5:1
+  |
+5 | #[suzu()]
+  | ^

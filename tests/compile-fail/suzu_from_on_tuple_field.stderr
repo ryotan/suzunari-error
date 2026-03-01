@@ -1,0 +1,5 @@
+error: #[suzu(...)] is not supported on tuple or unit fields
+ --> tests/compile-fail/suzu_from_on_tuple_field.rs:7:11
+  |
+7 |     Tuple(#[suzu(from)] String),
+  |           ^
