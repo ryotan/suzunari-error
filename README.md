@@ -204,6 +204,21 @@ For `no_std` usage, disable default features:
 suzunari-error = { version = "0.1", default-features = false }
 ```
 
+## Why suzunari-error?
+
+Standard Rust error approaches have a tradeoff between traceability and ergonomics:
+
+| Approach | Per-level location | Auto-capture | Type-safe chain | `no_std` |
+|----------|:-:|:-:|:-:|:-:|
+| `thiserror` | - | - | Yes | Limited |
+| `anyhow`/`eyre` | Single backtrace | Yes | - | - |
+| `snafu` alone | Manual | Manual | Yes | Yes |
+| **suzunari-error** | **Automatic** | **Yes** | **Yes** | **Yes (3 tiers)** |
+
+suzunari-error builds on snafu to add what's missing: **automatic per-error-level location tracking** via `#[track_caller]`, a structured `StackReport` formatter that shows type names and locations at each level, and ergonomic macros (`#[suzunari_error]`, `#[suzu(from)]`) that reduce boilerplate.
+
+See `examples/` for runnable demonstrations of each feature.
+
 ## Known Issues
 
 - When using `#[suzunari_error]` without a wildcard import, IntelliJ IDEA may report false compile errors. `cargo build` / `cargo test` will succeed. Workaround: `use suzunari_error::*;`
