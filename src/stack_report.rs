@@ -1,6 +1,9 @@
 use crate::StackError;
 use core::fmt::{Debug, Display, Formatter};
+
+#[cfg(feature = "std")]
 use std::io::{Write, stderr};
+#[cfg(feature = "std")]
 use std::process::{ExitCode, Termination};
 
 /// Formats a [`StackError`] chain as a stack-trace-like report with type names and locations.
