@@ -2,8 +2,11 @@
   <dictionary name="project">
     <words>
       <w>clippy</w>
+      <w>newtype</w>
+      <w>suzu</w>
       <w>suzunari</w>
       <w>tamanegi</w>
+      <w>thiserror</w>
     </words>
   </dictionary>
 </component>
