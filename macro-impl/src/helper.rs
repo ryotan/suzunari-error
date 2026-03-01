@@ -15,7 +15,7 @@ pub(crate) fn get_crate_path(original_name: &str) -> TokenStream {
     quote! { ::#ident }
 }
 
-/// Result of the location field resolution algorithm (steps 1-3).
+/// Result of the location field lookup: marker check → type heuristic → name conflict.
 pub(crate) enum LocationLookup {
     /// Found a location field at the given index.
     /// `needs_stack_attr`: true if found via type heuristic (caller should add

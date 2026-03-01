@@ -24,10 +24,11 @@ pub(crate) fn process_suzu_attrs(
     input: &mut DeriveInput,
     crate_path: &TokenStream,
 ) -> Result<(), Error> {
+    // Type-level attrs are always passthrough-only, regardless of struct/enum.
+    process_non_field_attrs(&mut input.attrs, Level::NonField)?;
+
     match &mut input.data {
         Data::Struct(data_struct) => {
-            process_non_field_attrs(&mut input.attrs, Level::NonField)?;
-
             match &mut data_struct.fields {
                 Fields::Named(fields) => process_fields(&mut fields.named, crate_path)?,
                 // Tuple structs / unit structs have no named fields to process.
@@ -37,8 +38,6 @@ pub(crate) fn process_suzu_attrs(
             Ok(())
         }
         Data::Enum(data_enum) => {
-            process_non_field_attrs(&mut input.attrs, Level::NonField)?;
-
             for variant in &mut data_enum.variants {
                 process_non_field_attrs(&mut variant.attrs, Level::NonField)?;
 
@@ -121,22 +120,23 @@ fn process_fields(
                     if let Some(snafu_attr) = result.snafu_passthrough {
                         new_attrs.push(snafu_attr);
                     }
-                    if result.has_from {
-                        needs_from = true;
-                    }
-                    if result.has_location {
-                        // Detect duplicate #[suzu(location)] early so error points
-                        // at the original #[suzu(location)] attr, not the generated
-                        // #[stack(location)] (which has a call_site span).
-                        if first_location_span.is_some() {
-                            errors.push(Error::new(
-                                attr.span(),
-                                "multiple #[suzu(location)] fields; only one is allowed per struct/variant",
-                            ));
-                        } else {
-                            first_location_span = Some(attr.span());
-                            needs_location = true;
+                    match result.effect {
+                        SuzuEffect::From => needs_from = true,
+                        SuzuEffect::Location => {
+                            // Detect duplicate #[suzu(location)] early so error points
+                            // at the original #[suzu(location)] attr, not the generated
+                            // #[stack(location)] (which has a call_site span).
+                            if first_location_span.is_some() {
+                                errors.push(Error::new(
+                                    attr.span(),
+                                    "multiple #[suzu(location)] fields; only one is allowed per struct/variant",
+                                ));
+                            } else {
+                                first_location_span = Some(attr.span());
+                                needs_location = true;
+                            }
                         }
+                        SuzuEffect::PassthroughOnly => {}
                     }
                 }
                 Err(e) => errors.push(e),
@@ -175,13 +175,24 @@ enum Level {
     Field,
 }
 
+/// What suzunari-specific effect a single `#[suzu(...)]` attribute requests.
+///
+/// `from` and `location` are mutually exclusive; passthrough-only or empty
+/// effects carry no suzunari semantics.
+enum SuzuEffect {
+    /// No suzunari keyword — all tokens passed through to snafu.
+    PassthroughOnly,
+    /// `from` keyword found — wraps field type in `DisplayError<T>`.
+    From,
+    /// `location` keyword found — marks field as the location field.
+    Location,
+}
+
 struct SingleAttrResult {
     /// The passthrough `#[snafu(...)]` attribute, if any non-suzunari tokens exist.
     snafu_passthrough: Option<Attribute>,
-    /// Whether `from` was found.
-    has_from: bool,
-    /// Whether `location` was found.
-    has_location: bool,
+    /// Which suzunari extension (if any) was requested.
+    effect: SuzuEffect,
 }
 
 /// Parses a single `#[suzu(...)]` attribute.
@@ -205,52 +216,51 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
         ));
     }
 
-    let mut has_from = false;
-    let mut has_location = false;
+    let mut effect = SuzuEffect::PassthroughOnly;
     let mut passthrough_tokens: Vec<Meta> = Vec::new();
     let mut has_source_in_passthrough = false;
 
     for meta in &nested {
-        let is_from = meta_is_ident(meta, "from");
-        let is_location = meta_is_ident(meta, "location");
-
-        // Reject from(...)/from=... and location(...)/location=... forms with clear error
-        if matches!(meta, Meta::List(l) if l.path.is_ident("from"))
-            || matches!(meta, Meta::NameValue(nv) if nv.path.is_ident("from"))
-        {
-            return Err(Error::new(
-                meta.span(),
-                "`from` does not accept arguments; use `#[suzu(from)]` as a bare keyword",
-            ));
-        }
-        if matches!(meta, Meta::List(l) if l.path.is_ident("location"))
-            || matches!(meta, Meta::NameValue(nv) if nv.path.is_ident("location"))
-        {
-            return Err(Error::new(
-                meta.span(),
-                "`location` does not accept arguments; use `#[suzu(location)]` as a bare keyword",
-            ));
-        }
-
-        if is_from {
-            match level {
-                Level::Field => has_from = true,
-                _ => {
-                    return Err(Error::new(meta.span(), "`from` can only be used on fields"));
-                }
+        if meta.path().is_ident("from") {
+            // `from` must be a bare keyword — reject list/namevalue forms
+            if !matches!(meta, Meta::Path(_)) {
+                return Err(Error::new(
+                    meta.span(),
+                    "`from` does not accept arguments; use `#[suzu(from)]` as a bare keyword",
+                ));
             }
-        } else if is_location {
-            match level {
-                Level::Field => has_location = true,
-                _ => {
-                    return Err(Error::new(
-                        meta.span(),
-                        "`location` can only be used on fields",
-                    ));
-                }
+            if matches!(level, Level::NonField) {
+                return Err(Error::new(meta.span(), "`from` can only be used on fields"));
             }
+            if matches!(effect, SuzuEffect::Location) {
+                return Err(Error::new(
+                    attr.span(),
+                    "`from` and `location` cannot be used on the same field",
+                ));
+            }
+            effect = SuzuEffect::From;
+        } else if meta.path().is_ident("location") {
+            // `location` must be a bare keyword — reject list/namevalue forms
+            if !matches!(meta, Meta::Path(_)) {
+                return Err(Error::new(
+                    meta.span(),
+                    "`location` does not accept arguments; use `#[suzu(location)]` as a bare keyword",
+                ));
+            }
+            if matches!(level, Level::NonField) {
+                return Err(Error::new(
+                    meta.span(),
+                    "`location` can only be used on fields",
+                ));
+            }
+            if matches!(effect, SuzuEffect::From) {
+                return Err(Error::new(
+                    attr.span(),
+                    "`from` and `location` cannot be used on the same field",
+                ));
+            }
+            effect = SuzuEffect::Location;
         } else {
-            // Check if this is a `source(...)` passthrough (for conflict detection)
             if meta.path().is_ident("source") {
                 has_source_in_passthrough = true;
             }
@@ -259,18 +269,10 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
     }
 
     // Conflict: from + source(...) in the same #[suzu(...)]
-    if has_from && has_source_in_passthrough {
+    if matches!(effect, SuzuEffect::From) && has_source_in_passthrough {
         return Err(Error::new(
             attr.span(),
             "`from` conflicts with `source(...)` — `from` generates `source(from(...))` automatically",
-        ));
-    }
-
-    // Conflict: from + location on the same field
-    if has_from && has_location {
-        return Err(Error::new(
-            attr.span(),
-            "`from` and `location` cannot be used on the same field",
         ));
     }
 
@@ -282,17 +284,19 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
 
     Ok(SingleAttrResult {
         snafu_passthrough,
-        has_from,
-        has_location,
+        effect,
     })
 }
 
 /// Applies `from` to a field: wraps type in `DisplayError<T>` and generates
 /// `#[snafu(source(from(T, DisplayError::new)))]`.
 ///
-/// `existing_attrs` contains all non-suzu attrs plus passthrough snafu attrs
-/// already collected for this field. `field.attrs` is empty at this point
-/// (taken via `std::mem::take` in the caller).
+/// # Preconditions
+///
+/// - `existing_attrs` must contain all attributes that will be set on this field
+///   (i.e., `field.attrs` is not yet populated).
+/// - No `#[snafu(source(...))]` should be present in `existing_attrs` (caller
+///   should check for conflicts beforehand or let this function report it).
 fn apply_from(
     field: &mut Field,
     existing_attrs: &[Attribute],
@@ -328,8 +332,10 @@ fn apply_from(
 /// location field. `#[snafu(implicit)]` is consumed by `derive(Snafu)` for
 /// auto-filling via `GenerateImplicitData`.
 ///
-/// `attrs` contains all non-suzu attrs plus passthrough snafu attrs already
-/// collected for this field. `field.attrs` is empty at this point.
+/// # Preconditions
+///
+/// - `attrs` must contain all attributes that will be set on this field
+///   (i.e., the field's own `attrs` vec is not yet populated).
 fn apply_location(attrs: &mut Vec<Attribute>) {
     if !has_snafu_keyword(attrs, "implicit") {
         attrs.push(parse_quote!(#[snafu(implicit)]));
@@ -338,10 +344,6 @@ fn apply_location(attrs: &mut Vec<Attribute>) {
 }
 
 // --- Helpers ---
-
-fn meta_is_ident(meta: &Meta, name: &str) -> bool {
-    matches!(meta, Meta::Path(p) if p.is_ident(name))
-}
 
 fn combine_errors(errors: Vec<Error>) -> Result<(), Error> {
     let mut iter = errors.into_iter();

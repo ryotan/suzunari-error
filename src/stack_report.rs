@@ -158,6 +158,13 @@ impl Display for StackReportFormatter<'_> {
         // Phase 1: StackError chain (with location)
         let mut current_stack: &dyn StackError = error;
         while let Some(next) = current_stack.stack_source() {
+            // Invariant: stack_source() implies source() (StackError is a sub-chain of Error).
+            debug_assert!(
+                current_stack.source().is_some(),
+                "StackError::stack_source() returned Some but Error::source() returned None \
+                 for type {}. This indicates an incorrect StackError implementation.",
+                current_stack.type_name()
+            );
             writeln!(
                 f,
                 "  {index}| {}: {next}, at {}",

@@ -84,8 +84,8 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
 
 /// Location resolution flow for a single struct/variant.
 ///
-/// Delegates steps 1–3 (marker check, type heuristic, name conflict) to
-/// [`lookup_location_field`], then applies the result:
+/// Delegates the lookup phase (marker check → type heuristic → name conflict)
+/// to [`lookup_location_field`], then applies the result:
 /// - `Found` → ensure `#[stack(location)]` + `#[snafu(implicit)]` on the field
 /// - `NotFound` → auto-inject a synthetic `location: Location` field
 fn resolve_and_inject_location(
