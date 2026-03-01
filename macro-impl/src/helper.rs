@@ -81,7 +81,7 @@ pub(crate) fn lookup_location_field(
             });
         }
         2.. => {
-            return Err(Error::new(
+            let mut err = Error::new(
                 fields.named[location_typed[1]].span(),
                 format!(
                     "multiple fields with type name ending in `Location` found; \
@@ -89,7 +89,12 @@ pub(crate) fn lookup_location_field(
                      Note: detection uses the last path segment, so types like \
                      `geo::Location` also match."
                 ),
+            );
+            err.combine(Error::new(
+                fields.named[location_typed[0]].span(),
+                "first Location-typed field found here",
             ));
+            return Err(err);
         }
         0 => {}
     }

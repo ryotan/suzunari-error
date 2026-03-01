@@ -124,8 +124,10 @@ fn process_fields(
         // Take ownership of attrs to avoid borrow conflicts when mutating field.ty
         let old_attrs = std::mem::take(&mut field.attrs);
         let mut new_attrs = Vec::new();
-        let mut needs_from = false;
-        let mut needs_location = false;
+        // Per-field span: Some(span) means this field has the keyword.
+        // first_from_span/first_location_span track cross-field duplicates.
+        let mut current_from_span: Option<Span> = None;
+        let mut current_location_span: Option<Span> = None;
 
         for attr in old_attrs {
             if !attr.path().is_ident("suzu") {
@@ -151,7 +153,7 @@ fn process_fields(
                                 errors.push(err);
                             } else {
                                 first_from_span = Some(attr.span());
-                                needs_from = true;
+                                current_from_span = Some(attr.span());
                             }
                         }
                         SuzuEffect::Location => {
@@ -170,7 +172,7 @@ fn process_fields(
                                 errors.push(err);
                             } else {
                                 first_location_span = Some(attr.span());
-                                needs_location = true;
+                                current_location_span = Some(attr.span());
                             }
                         }
                         SuzuEffect::PassthroughOnly => {}
@@ -183,19 +185,22 @@ fn process_fields(
         // Apply from/location after the attrs loop so field is freely borrowable.
         // Check cross-attribute conflict first — from and location on the same field
         // is always invalid regardless of how they were specified.
-        if needs_from && needs_location {
-            errors.push(Error::new(
-                field.span(),
-                "`from` and `location` cannot be used on the same field",
-            ));
-        } else {
-            if needs_from {
-                match apply_from(field, &new_attrs, crate_path) {
+        match (current_from_span, current_location_span) {
+            (Some(from_span), Some(loc_span)) => {
+                let mut err = Error::new(
+                    from_span,
+                    "`from` and `location` cannot be used on the same field",
+                );
+                err.combine(Error::new(loc_span, "`location` defined here"));
+                errors.push(err);
+            }
+            (Some(from_span), None) => {
+                match apply_from(field, &new_attrs, crate_path, from_span) {
                     Ok(snafu_source_attr) => new_attrs.push(snafu_source_attr),
                     Err(e) => errors.push(e),
                 }
             }
-            if needs_location {
+            (None, Some(_)) => {
                 if !looks_like_location_type(&field.ty) {
                     errors.push(Error::new(
                         field.ty.span(),
@@ -205,6 +210,7 @@ fn process_fields(
                     apply_location(&mut new_attrs);
                 }
             }
+            (None, None) => {}
         }
 
         field.attrs = new_attrs;
@@ -318,7 +324,7 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
     if matches!(effect, SuzuEffect::From) && has_source_in_passthrough {
         return Err(Error::new(
             attr.span(),
-            "`from` conflicts with `source(...)` — `from` generates `source(from(...))` automatically",
+            "`from` conflicts with `source(...)`: `from` generates `source(from(...))` automatically",
         ));
     }
 
@@ -347,11 +353,12 @@ fn apply_from(
     field: &mut Field,
     existing_attrs: &[Attribute],
     crate_path: &TokenStream,
+    from_span: Span,
 ) -> Result<Attribute, Error> {
     // Check for conflict with existing #[snafu(source(...))]
     if has_snafu_keyword(existing_attrs, "source") {
         return Err(Error::new(
-            field.span(),
+            from_span,
             "`from` conflicts with existing `#[snafu(source(...))]`",
         ));
     }

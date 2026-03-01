@@ -1,5 +1,5 @@
 error: `from` conflicts with existing `#[snafu(source(...))]`
- --> tests/compile-fail/suzu_from_conflicts_existing_snafu_source.rs:8:5
+ --> tests/compile-fail/suzu_from_conflicts_existing_snafu_source.rs:7:5
   |
-8 |     source: String,
-  |     ^^^^^^
+7 |     #[suzu(from)]
+  |     ^

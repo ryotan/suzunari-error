@@ -3,3 +3,9 @@ error: multiple fields with type name ending in `Location` found; use #[suzu(loc
   |
 9 |     #[snafu(implicit)]
   |     ^
+
+error: first Location-typed field found here
+ --> tests/compile-fail/suzu_multiple_location_types.rs:7:5
+  |
+7 |     #[snafu(implicit)]
+  |     ^

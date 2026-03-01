@@ -19,7 +19,7 @@ pub(crate) fn report_impl(attr: TokenStream, stream: TokenStream) -> Result<Toke
     if input.sig.asyncness.is_some() {
         return Err(Error::new(
             input.sig.asyncness.span(),
-            "#[report] does not support async functions. Place #[report] below #[tokio::main] or similar runtime attributes so that async is resolved first.",
+            "#[report] does not support async functions; place it below the async runtime attribute",
         ));
     }
     if input.sig.unsafety.is_some() {
@@ -100,21 +100,27 @@ fn extract_result_error_type(ty: &Type) -> Result<&Type, Error> {
     if last_segment.ident != "Result" {
         return Err(Error::new(
             last_segment.ident.span(),
-            "#[report] requires the return type to be Result<(), E>",
+            format!(
+                "#[report] requires the return type to be Result<(), E>, found `{}`",
+                last_segment.ident
+            ),
         ));
     }
 
     let syn::PathArguments::AngleBracketed(ref args) = last_segment.arguments else {
         return Err(Error::new(
             last_segment.span(),
-            "#[report] requires the return type to be Result<(), E>",
+            "#[report] requires Result to have type arguments: Result<(), E>",
         ));
     };
 
     if args.args.len() != 2 {
         return Err(Error::new(
             args.span(),
-            "#[report] requires the return type to be Result<(), E>",
+            format!(
+                "#[report] requires exactly 2 type arguments (Result<(), E>), found {}",
+                args.args.len()
+            ),
         ));
     }
 

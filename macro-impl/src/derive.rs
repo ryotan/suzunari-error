@@ -39,11 +39,9 @@ fn generate_struct_impl(
     generics: &Generics,
 ) -> Result<TokenStream, Error> {
     let loc_field = find_location_field(fields)?;
+    // find_location_field operates on FieldsNamed, so ident is always Some.
     let Some(loc_name) = loc_field.ident.as_ref() else {
-        return Err(Error::new(
-            loc_field.span(),
-            "location field must be a named field",
-        ));
+        unreachable!("find_location_field operates on FieldsNamed; ident is always present");
     };
 
     let type_name_str = name.to_string();
@@ -51,11 +49,9 @@ fn generate_struct_impl(
 
     let stack_source_impl = match find_source_field(fields) {
         Some(field) => {
+            // find_source_field operates on FieldsNamed, so ident is always Some.
             let Some(field_name) = field.ident.as_ref() else {
-                return Err(Error::new(
-                    field.span(),
-                    "source field must be a named field",
-                ));
+                unreachable!("find_source_field operates on FieldsNamed; ident is always present");
             };
             quote! {
                 fn stack_source(&self) -> Option<&dyn #crate_path::StackError> {
@@ -101,7 +97,7 @@ fn generate_enum_impl(
     for variant in variants {
         let Fields::Named(fields) = &variant.fields else {
             errors.push(Error::new(
-                variant.span(),
+                variant.fields.span(),
                 "StackError can only be derived for enums with named fields in all variants",
             ));
             continue;
@@ -113,12 +109,9 @@ fn generate_enum_impl(
                 continue;
             }
         };
+        // find_location_field operates on FieldsNamed, so ident is always Some.
         let Some(loc_name) = loc_field.ident.as_ref() else {
-            errors.push(Error::new(
-                loc_field.span(),
-                "location field must be a named field",
-            ));
-            continue;
+            unreachable!("find_location_field operates on FieldsNamed; ident is always present");
         };
         let source_field_name = find_source_field(fields).and_then(|f| f.ident.as_ref());
         variant_infos.push(VariantInfo {
