@@ -4,7 +4,9 @@
 //! (`from`, `location`) are handled here, and everything else is passed
 //! through as `#[snafu(...)]`.
 
-use crate::helper::{extract_display_error_inner, has_snafu_keyword, looks_like_location_type};
+use crate::helper::{
+    combine_errors, extract_display_error_inner, has_snafu_keyword, looks_like_location_type,
+};
 use proc_macro2::{Span, TokenStream};
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
@@ -343,15 +345,3 @@ fn apply_location(attrs: &mut Vec<Attribute>) {
     attrs.push(parse_quote!(#[stack(location)]));
 }
 
-// --- Helpers ---
-
-fn combine_errors(errors: Vec<Error>) -> Result<(), Error> {
-    let mut iter = errors.into_iter();
-    let Some(mut combined) = iter.next() else {
-        return Ok(());
-    };
-    for e in iter {
-        combined.combine(e);
-    }
-    Err(combined)
-}

@@ -315,3 +315,18 @@ pub(crate) fn snafu_tokens_contain_keyword(tokens: &TokenStream, keyword: &str) 
     }
     false
 }
+
+/// Combines multiple `syn::Error`s into a single error, or returns `Ok(())` if empty.
+///
+/// Used by macro implementations to accumulate and report all errors at once,
+/// instead of stopping at the first error.
+pub(crate) fn combine_errors(errors: Vec<Error>) -> Result<(), Error> {
+    let mut iter = errors.into_iter();
+    let Some(mut combined) = iter.next() else {
+        return Ok(());
+    };
+    for e in iter {
+        combined.combine(e);
+    }
+    Err(combined)
+}

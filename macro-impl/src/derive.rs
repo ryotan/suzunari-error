@@ -1,4 +1,4 @@
-use crate::helper::{find_location_field, find_source_field, get_crate_path};
+use crate::helper::{combine_errors, find_location_field, find_source_field, get_crate_path};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::punctuated::Punctuated;
@@ -89,26 +89,36 @@ fn generate_enum_impl(
     crate_path: &TokenStream,
     generics: &Generics,
 ) -> Result<TokenStream, Error> {
-    // Analyze each variant: resolve location and source field names
+    // Analyze each variant: resolve location and source field names.
+    // Accumulate all errors so the user sees every problem at once.
     struct VariantInfo<'a> {
         ident: &'a Ident,
         loc_name: &'a Ident,
         source_field_name: Option<&'a Ident>,
     }
     let mut variant_infos = Vec::with_capacity(variants.len());
+    let mut errors = Vec::new();
     for variant in variants {
         let Fields::Named(fields) = &variant.fields else {
-            return Err(Error::new(
+            errors.push(Error::new(
                 variant.span(),
                 "StackError can only be derived for enums with named fields in all variants",
             ));
+            continue;
         };
-        let loc_field = find_location_field(fields)?;
+        let loc_field = match find_location_field(fields) {
+            Ok(field) => field,
+            Err(e) => {
+                errors.push(e);
+                continue;
+            }
+        };
         let Some(loc_name) = loc_field.ident.as_ref() else {
-            return Err(Error::new(
+            errors.push(Error::new(
                 loc_field.span(),
                 "location field must be a named field",
             ));
+            continue;
         };
         let source_field_name = find_source_field(fields).and_then(|f| f.ident.as_ref());
         variant_infos.push(VariantInfo {
@@ -117,6 +127,7 @@ fn generate_enum_impl(
             source_field_name,
         });
     }
+    combine_errors(errors)?;
 
     let enum_name_str = name.to_string();
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();

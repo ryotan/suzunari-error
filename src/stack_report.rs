@@ -53,7 +53,7 @@ use std::process::{ExitCode, Termination};
 /// assert!(output.contains("Error: AppError: app error"));
 /// assert!(output.contains("Caused by"));
 /// ```
-pub struct StackReport<E: StackError>(Result<(), E>);
+pub struct StackReport<E>(Result<(), E>);
 
 impl<E: StackError> StackReport<E> {
     /// Creates a report from an error value.
