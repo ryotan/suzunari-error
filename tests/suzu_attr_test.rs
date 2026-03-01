@@ -39,7 +39,7 @@ fn test_from_enum_basic() {
         Err(FakeLibError { message: "boom" })
     }
     let err = fake_hash().context(HashFailedSnafu).unwrap_err();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("hashing failed"));
     assert!(report.contains("boom"));
 }
@@ -53,7 +53,7 @@ fn test_from_enum_non_from_variant() {
         ))
     }
     let err = io_op().context(IoSnafu).unwrap_err();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("io error"));
     assert!(report.contains("not found"));
 }
@@ -75,7 +75,7 @@ fn test_from_struct() {
         })
     }
     let err = fake_op().context(FromStructSnafu).unwrap_err();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("struct from error"));
     assert!(report.contains("struct boom"));
 }
@@ -97,7 +97,7 @@ fn test_from_already_display_error() {
         })
     }
     let err = fake_op().context(AlreadyWrappedSnafu).unwrap_err();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("already wrapped"));
 }
 
@@ -118,7 +118,7 @@ fn test_from_non_source_named_field() {
         Err(FakeLibError { message: "renamed" })
     }
     let err = fake_op().context(RenamedSourceSnafu).unwrap_err();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("renamed source"));
     assert!(report.contains("renamed"));
 }
@@ -139,7 +139,7 @@ fn test_from_with_generic_type() {
     }
     // snafu erases generic params in context selectors
     let err = fake_op().context(GenericFromSnafu).unwrap_err();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("generic from error"));
     assert!(report.contains("generic"));
 }
@@ -202,7 +202,7 @@ fn test_passthrough_only() {
         msg: "through".to_string(),
     }
     .build();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("pass through"));
 }
 
@@ -230,7 +230,7 @@ fn test_mixed_suzu_attrs() {
             context: "ctx".to_string(),
         })
         .unwrap_err();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("mixed display: ctx"));
     assert!(report.contains("mixed boom"));
 }
@@ -256,7 +256,7 @@ fn test_from_and_location_on_different_fields() {
     let err = fake_op().context(CombinedFromLocationSnafu).unwrap_err();
     // Verify both effects are applied: from wraps source, location is tracked
     assert!(err.location().file().ends_with("suzu_attr_test.rs"));
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("combined from and location"));
     assert!(report.contains("combined test"));
 }
@@ -283,7 +283,7 @@ fn test_from_and_location_on_different_fields_enum() {
     }
     let err = fake_op().context(CombinedSnafu).unwrap_err();
     assert!(err.location().file().ends_with("suzu_attr_test.rs"));
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("enum combined"));
 }
 
@@ -314,7 +314,7 @@ fn test_stack_report_with_from_chain() {
     let err = outer().unwrap_err();
     // Should have depth 2: OuterError -> FromEnumError::HashFailed -> DisplayError
     assert_eq!(err.depth(), 2);
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("outer error"));
     assert!(report.contains("hashing failed"));
     assert!(report.contains("hash fail"));
@@ -342,7 +342,7 @@ fn test_closure_syntax_source() {
         })
     }
     let err = fake_op().context(ClosureSourceSnafu).unwrap_err();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("closure source error"));
     assert!(report.contains("closure test"));
 }

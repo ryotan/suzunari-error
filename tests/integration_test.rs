@@ -30,7 +30,7 @@ fn test_stack_trace_single() {
     }
     let err = make_error().unwrap_err();
     assert_eq!(
-        format!("{:?}", StackReport::from_error(err)),
+        format!("{:?}", StackReport::from(err)),
         format!("Error: ErrorStruct: ErrorStruct, at {file}:{ensure_line}:9\n")
     );
 }
@@ -54,7 +54,7 @@ fn test_nested_stack_trace() {
     }
     let err = nested_error().unwrap_err();
     let file = file!();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains(&format!(
         "Error: ErrorAggregate: ErrorAggregate, at {file}:"
     )));
@@ -97,7 +97,7 @@ fn read_external() -> Result<(), SomeError> {
 fn test_retrieve_data() {
     let err = retrieve_data().unwrap_err();
     let file = file!();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains(&format!(
         "Error: RetrieveFailed: Failed to retrieve, at {file}:"
     )));
@@ -151,7 +151,7 @@ fn test_validate() {
     }
     let err = validate().unwrap_err();
     assert_eq!(
-        format!("{:?}", StackReport::from_error(err)),
+        format!("{:?}", StackReport::from(err)),
         format!(
             "Error: SomeError::ValidationFailed: 0 is an invalid value. Must be larger than 1, at {file}:{ensure_line}:9\n"
         )
@@ -204,7 +204,7 @@ fn test_custom_location_struct() {
     assert!(err.location().file().ends_with("integration_test.rs"));
     assert!(line > 0);
     assert_eq!(
-        format!("{:?}", StackReport::from_error(err)),
+        format!("{:?}", StackReport::from(err)),
         format!("Error: CustomLocStruct: custom location struct, at {file}:{line}:9\n")
     );
 }
@@ -248,7 +248,7 @@ fn test_stack_report_with_mixed_location_names() {
     }
     let err = outer_a().unwrap_err();
     let file = file!();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains(&format!(
         "Error: CustomLocChain: custom loc chain, at {file}:"
     )));
@@ -265,7 +265,7 @@ fn test_stack_report_with_mixed_location_names() {
         Ok(())
     }
     let err = outer_b().unwrap_err();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains(&format!(
         "1| CustomLocEnum::VariantB: variant B: hi, at {file}:"
     )));
@@ -313,7 +313,7 @@ fn test_stack_source_and_error_source_are_consistent() {
 #[test]
 fn test_report_ends_with_newline() {
     let err = retrieve_data().unwrap_err();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(
         report.ends_with('\n'),
         "StackReport output should end with a newline"
@@ -343,7 +343,7 @@ fn test_context_captures_exact_line() {
     // .context() line is the `inner().context(...)` line above
     // We verify the location points to this file with the correct line
     assert!(err.location().file().ends_with("integration_test.rs"));
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     // The report must contain the file and a line number for this test file
     assert!(report.contains(&format!(
         "Error: ContextWrapperError: context wrapper, at {file}:"
@@ -368,7 +368,7 @@ fn test_context_line_differs_from_ensure_line() {
     let err = with_context().unwrap_err();
     // RetrieveFailed's location should be the .context() line, not the ensure! line
     let file = file!();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains(&format!(
         "Error: RetrieveFailed: Failed to retrieve, at {file}:"
     )));
@@ -458,7 +458,7 @@ fn test_deep_stack_chain_numbering() {
     assert_eq!(err.depth(), 3);
 
     let file = file!();
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
 
     // Phase 1 (StackError chain with locations):
     // Error: Level1Error (top-level)

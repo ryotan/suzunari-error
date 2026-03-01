@@ -268,7 +268,7 @@ mod tests {
         assert!(wrapper_error.location().file().ends_with("stack_error.rs"));
         assert_ne!(wrapper_error.location().line(), root_location);
 
-        let report = format!("{:?}", StackReport::from_error(wrapper_error));
+        let report = format!("{:?}", StackReport::from(wrapper_error));
         let file = file!();
         assert!(report.contains("Error: WrapperError: Wrapper error: Something failed"));
         assert!(report.contains(&format!(", at {file}:")));

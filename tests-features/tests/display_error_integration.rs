@@ -60,7 +60,7 @@ fn test_source_from_auto_convert() {
     }
     let err = fake_op().context(AutoConvertSnafu).unwrap_err();
 
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("operation failed"));
     assert!(report.contains("fake lib broke"));
 }
@@ -76,7 +76,7 @@ fn test_map_err_manual_convert() {
         .context(ManualConvertSnafu)
         .unwrap_err();
 
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("manual convert failed"));
     assert!(report.contains("manual"));
 }
@@ -90,7 +90,7 @@ fn test_from_attr_auto_convert() {
     }
     let err = fake_op().context(FromConvertSnafu).unwrap_err();
 
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("from convert op failed"));
     assert!(report.contains("from broke"));
 }
@@ -104,7 +104,7 @@ fn test_from_attr_already_wrapped() {
     }
     let err = fake_op().context(FromAlreadyWrappedSnafu).unwrap_err();
 
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("from already wrapped"));
 }
 
@@ -116,6 +116,6 @@ fn test_display_error_with_boxed_stack_error() {
     }
     let err = fake_op().context(AutoConvertSnafu).unwrap_err();
     let boxed: BoxedStackError = err.into();
-    let report = format!("{:?}", StackReport::from_error(boxed));
+    let report = format!("{:?}", StackReport::from(boxed));
     assert!(report.contains("operation failed"));
 }

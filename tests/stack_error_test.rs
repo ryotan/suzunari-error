@@ -139,7 +139,7 @@ fn test_error_propagation() {
     let error = result.unwrap_err();
 
     let file = file!();
-    let report = format!("{:?}", StackReport::from_error(error));
+    let report = format!("{:?}", StackReport::from(error));
 
     // TestError::External's source is Box<dyn Error + Send + Sync>,
     // so stack_source() returns None. The rest of the chain is

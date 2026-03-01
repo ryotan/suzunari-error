@@ -83,17 +83,6 @@ fn test_report_with_question_mark_propagation() {
 }
 
 #[test]
-fn test_report_is_ok_and_is_err() {
-    let ok_report: StackReport<TestReportError> = success_case();
-    assert!(ok_report.is_ok());
-    assert!(!ok_report.is_err());
-
-    let err_report: StackReport<TestReportError> = failure_case();
-    assert!(!err_report.is_ok());
-    assert!(err_report.is_err());
-}
-
-#[test]
 fn test_report_termination_success() {
     use std::process::Termination;
     let report: StackReport<TestReportError> = success_case();

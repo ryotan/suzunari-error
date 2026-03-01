@@ -47,7 +47,7 @@ fn test_stack_error_derive() {
     let line = line!() - 3;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{:?}", StackReport::from_error(error)),
+        format!("{:?}", StackReport::from(error)),
         format!("Error: TestError: Test error, at {file}:{line}:6\n")
     );
 }
@@ -63,7 +63,7 @@ fn test_manual_location_struct() {
     let line = line!() - 3;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{:?}", StackReport::from_error(error)),
+        format!("{:?}", StackReport::from(error)),
         format!("Error: TestErrorWithLocation: TestErrorWithLocation, at {file}:{line}:6\n")
     );
 }
@@ -79,7 +79,7 @@ fn test_stack_error_enum_derive() {
     let line = line!() - 3;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{:?}", StackReport::from_error(error)),
+        format!("{:?}", StackReport::from(error)),
         format!("Error: TestErrorEnum::Variant1: Variant1, at {file}:{line}:6\n")
     );
 
@@ -92,7 +92,7 @@ fn test_stack_error_enum_derive() {
     let line = line!() - 3;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{:?}", StackReport::from_error(error)),
+        format!("{:?}", StackReport::from(error)),
         format!("Error: TestErrorEnum::Variant2: Variant2, at {file}:{line}:6\n")
     );
 }
@@ -108,7 +108,7 @@ fn test_manual_location_enum() {
     let line = line!() - 4;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{:?}", StackReport::from_error(error)),
+        format!("{:?}", StackReport::from(error)),
         format!("Error: TestErrorEnumWithLocation::Variant3: Variant3, at {file}:{line}:19\n")
     );
 
@@ -121,7 +121,7 @@ fn test_manual_location_enum() {
     let line = line!() - 4;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{:?}", StackReport::from_error(error)),
+        format!("{:?}", StackReport::from(error)),
         format!("Error: TestErrorEnumWithLocation::Variant4: Variant4, at {file}:{line}:19\n")
     );
 }
@@ -173,7 +173,7 @@ fn test_chain_context() {
     let line = line!() - 4;
     assert_eq!(error.location().file(), file);
     assert_eq!(
-        format!("{:?}", StackReport::from_error(error)),
+        format!("{:?}", StackReport::from(error)),
         format!("Error: TestError: Root error, at {file}:{line}:19\n")
     );
 }

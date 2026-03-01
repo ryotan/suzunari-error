@@ -67,7 +67,7 @@ fn test_stack_report_core_only() {
     let error = CoreTestError {
         location: Location::current(),
     };
-    let report = StackReport::from_error(error);
+    let report = StackReport::from(error);
 
     // StackReport::Display works in core-only (uses core::fmt)
     let mut buf = StackBuf::new();

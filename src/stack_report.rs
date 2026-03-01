@@ -11,7 +11,7 @@ use std::process::{ExitCode, Termination};
 /// Wraps `Result<(), E>` and provides formatted output via `Display` (and `Debug`, which
 /// delegates to `Display`). Used at error display boundaries such as `main()`.
 ///
-/// Create via [`StackReport::from_error`], `Result<(), E>::into()`, or `E::into()`.
+/// Create via `StackReport::from(error)`, `Result::<(), E>::into()`, or `E.into()`.
 ///
 /// # Output Format
 ///
@@ -47,7 +47,7 @@ use std::process::{ExitCode, Termination};
 /// }
 ///
 /// let err = run().unwrap_err();
-/// let report = StackReport::from_error(err);
+/// let report = StackReport::from(err);
 ///
 /// let output = format!("{report}");
 /// assert!(output.contains("Error: AppError: app error"));
@@ -63,26 +63,6 @@ use std::process::{ExitCode, Termination};
 ///   line when used inside `format!()` or `eprintln!("{report}")`.
 pub struct StackReport<E>(Result<(), E>);
 
-impl<E: StackError> StackReport<E> {
-    /// Creates a report from an error value.
-    #[must_use]
-    pub fn from_error(error: E) -> Self {
-        Self(Err(error))
-    }
-
-    /// Returns `true` if the report represents a success (no error).
-    #[must_use]
-    pub fn is_ok(&self) -> bool {
-        self.0.is_ok()
-    }
-
-    /// Returns `true` if the report contains an error.
-    #[must_use]
-    pub fn is_err(&self) -> bool {
-        self.0.is_err()
-    }
-}
-
 impl<E: StackError> From<Result<(), E>> for StackReport<E> {
     fn from(result: Result<(), E>) -> Self {
         Self(result)
@@ -91,7 +71,7 @@ impl<E: StackError> From<Result<(), E>> for StackReport<E> {
 
 impl<E: StackError> From<E> for StackReport<E> {
     fn from(error: E) -> Self {
-        Self::from_error(error)
+        Self(Err(error))
     }
 }
 
