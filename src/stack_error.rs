@@ -12,6 +12,32 @@ use core::error::Error;
 /// Both resolve the location field via `#[stack(location)]` or by detecting a
 /// `Location`-typed field. Manual impl is only needed for wrapper types like
 /// `BoxedStackError`.
+///
+/// # Example
+///
+/// ```
+/// use suzunari_error::*;
+///
+/// #[suzunari_error]
+/// #[suzu(display("fetch failed for {url}"))]
+/// struct FetchError {
+///     url: String,
+///     source: std::io::Error,
+/// }
+///
+/// fn fetch(url: &str) -> Result<(), FetchError> {
+///     std::fs::read(url).context(FetchSnafu { url })?;
+///     Ok(())
+/// }
+///
+/// let err = fetch("/nonexistent").unwrap_err();
+///
+/// // StackError methods:
+/// assert!(err.location().file().ends_with(".rs"));
+/// assert_eq!(err.type_name(), "FetchError");
+/// assert!(err.stack_source().is_none()); // io::Error is not StackError
+/// assert_eq!(err.depth(), 1);            // 1 cause in the chain
+/// ```
 pub trait StackError: Error {
     /// Returns the location where this error was constructed.
     fn location(&self) -> &Location;

@@ -5,6 +5,21 @@ use core::ops::Deref;
 ///
 /// A newtype wrapper around `core::panic::Location` that integrates with
 /// snafu's `GenerateImplicitData` for automatic capture at error construction sites.
+/// Implements `Copy`, `Eq`, and `Hash`. Derefs to `core::panic::Location` for
+/// access to `file()`, `line()`, and `column()`.
+///
+/// # Example
+///
+/// ```
+/// use suzunari_error::Location;
+///
+/// let loc = Location::current();
+/// assert!(loc.file().ends_with(".rs"));
+/// assert!(loc.line() > 0);
+/// ```
+///
+/// When using `#[suzunari_error]`, Location fields are automatically injected
+/// and populated — you rarely need to call `current()` directly.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Location(&'static core::panic::Location<'static>);
 

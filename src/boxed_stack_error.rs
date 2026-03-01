@@ -7,7 +7,44 @@ use core::fmt::{Debug, Display, Formatter, Result};
 /// Type-erased wrapper around `Box<dyn StackError + Send + Sync>`.
 ///
 /// Provides uniform handling of heterogeneous `StackError` types while
-/// preserving location tracking through the error chain.
+/// preserving location tracking through the error chain. Use this instead
+/// of `Box<dyn StackError + Send + Sync>` for shorter type signatures
+/// and automatic `From` generation by the derive macro.
+///
+/// Note: downcasting to the concrete type is not supported through this
+/// wrapper. Use `into_inner()` if you need the raw trait object.
+///
+/// # Example
+///
+/// ```
+/// use suzunari_error::*;
+///
+/// #[suzunari_error]
+/// #[suzu(display("inner error"))]
+/// struct InnerError {}
+///
+/// #[suzunari_error]
+/// #[suzu(display("outer error"))]
+/// struct OuterError {
+///     source: BoxedStackError,
+/// }
+///
+/// fn inner() -> Result<(), InnerError> {
+///     ensure!(false, InnerSnafu);
+///     Ok(())
+/// }
+///
+/// fn outer() -> Result<(), OuterError> {
+///     inner()
+///         .map_err(BoxedStackError::new)
+///         .context(OuterSnafu)?;
+///     Ok(())
+/// }
+///
+/// let err = outer().unwrap_err();
+/// assert_eq!(err.type_name(), "OuterError");
+/// assert!(err.stack_source().is_some());
+/// ```
 pub struct BoxedStackError {
     inner: Box<dyn StackError + Send + Sync>,
 }

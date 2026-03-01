@@ -11,7 +11,7 @@ use std::process::{ExitCode, Termination};
 /// Wraps `Result<(), E>` and provides formatted output via `Display` (and `Debug`, which
 /// delegates to `Display`). Used at error display boundaries such as `main()`.
 ///
-/// Create via [`StackReport::from_error`] or `Result<(), E>::into()`.
+/// Create via [`StackReport::from_error`], `Result<(), E>::into()`, or `E::into()`.
 ///
 /// # Output Format
 ///
@@ -29,6 +29,30 @@ use std::process::{ExitCode, Termination};
 /// With the `std` feature, implements [`Termination`] for use as the
 /// return type of `main()`. The [`#[suzunari_error::report]`](crate::report) macro
 /// can transform `fn() -> Result<(), E>` into `fn() -> StackReport<E>` automatically.
+///
+/// # Example
+///
+/// ```
+/// use suzunari_error::*;
+///
+/// #[suzunari_error]
+/// #[suzu(display("app error"))]
+/// struct AppError {
+///     source: std::io::Error,
+/// }
+///
+/// fn run() -> Result<(), AppError> {
+///     std::fs::read("/nonexistent").context(AppSnafu)?;
+///     Ok(())
+/// }
+///
+/// let err = run().unwrap_err();
+/// let report = StackReport::from_error(err);
+///
+/// let output = format!("{report}");
+/// assert!(output.contains("Error: AppError: app error"));
+/// assert!(output.contains("Caused by"));
+/// ```
 pub struct StackReport<E: StackError>(Result<(), E>);
 
 impl<E: StackError> StackReport<E> {
