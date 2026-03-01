@@ -236,6 +236,58 @@ fn test_mixed_suzu_attrs() {
     assert!(report.contains("mixed boom"));
 }
 
+// --- from + location on different fields in the same struct ---
+
+#[suzunari_error]
+#[suzu(display("combined from and location"))]
+struct CombinedFromLocationError {
+    #[suzu(from)]
+    source: FakeLibError,
+    #[suzu(location)]
+    origin: Location,
+}
+
+#[test]
+fn test_from_and_location_on_different_fields() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "combined test",
+        })
+    }
+    let err = fake_op().context(CombinedFromLocationSnafu).unwrap_err();
+    // Verify both effects are applied: from wraps source, location is tracked
+    assert!(err.location().file().ends_with("suzu_attr_test.rs"));
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains("combined from and location"));
+    assert!(report.contains("combined test"));
+}
+
+// --- from + location on different fields in an enum variant ---
+
+#[suzunari_error]
+enum CombinedFromLocationEnum {
+    #[suzu(display("enum combined"))]
+    Combined {
+        #[suzu(from)]
+        source: FakeLibError,
+        #[suzu(location)]
+        origin: Location,
+    },
+}
+
+#[test]
+fn test_from_and_location_on_different_fields_enum() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "enum combined",
+        })
+    }
+    let err = fake_op().context(CombinedSnafu).unwrap_err();
+    assert!(err.location().file().ends_with("suzu_attr_test.rs"));
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains("enum combined"));
+}
+
 // --- StackReport output verification ---
 
 #[suzunari_error]

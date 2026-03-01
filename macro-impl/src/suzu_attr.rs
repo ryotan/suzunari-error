@@ -358,4 +358,3 @@ fn apply_location(attrs: &mut Vec<Attribute>) {
     }
     attrs.push(parse_quote!(#[stack(location)]));
 }
-
