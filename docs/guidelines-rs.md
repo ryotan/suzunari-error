@@ -126,9 +126,7 @@ async fn fetch_data(url: &str) -> Result<Data, ApiError> {
 
 - Design clear and intuitive public APIs
 - Use proper error handling for library functions
-- Serialize/deserialize data using `serde` with consistent patterns when needed
 - Keep public functions focused on a single responsibility
-- Use appropriate logging levels for debugging and error reporting
 - Consider API stability and backward compatibility
 
 ## Common Pitfalls to Avoid

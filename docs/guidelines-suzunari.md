@@ -120,6 +120,7 @@ pub enum DatabaseError {
 ### Error Propagation
 
 ```rust
+// Illustrative — external types are placeholders.
 use suzunari_error::OptionExt;
 
 fn get_user(id: &str, conn: &Connection) -> Result<User, DatabaseError> {
@@ -138,6 +139,7 @@ fn get_user(id: &str, conn: &Connection) -> Result<User, DatabaseError> {
 ### Error Handling
 
 ```rust
+// Illustrative — external types are placeholders.
 fn process_user_data(id: &str) -> Result<ProcessedData, ApplicationError> {
     let conn = establish_connection()
         .context(DatabaseConnectionSnafu)?;

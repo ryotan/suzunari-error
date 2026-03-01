@@ -128,7 +128,7 @@ Attribute ownership: each attribute is consumed by a specific macro.
 
 ## Publication Scope
 
-This is a **personal library**, not targeting broad crates.io discoverability. crates.io metadata such as `keywords`, `categories`, `documentation`, CI badges, and CHANGELOG are intentionally omitted. Focus code quality and API design reviews on the library itself, not on packaging/infrastructure.
+This is a **personal library**, not targeting broad crates.io discoverability. Basic crates.io metadata (`name`, `description`, `version`, `license`, `repository`, `readme`) is present for publication. Advanced metadata such as `keywords`, `categories`, `documentation`, CI badges, and CHANGELOG are intentionally omitted. Focus code quality and API design reviews on the library itself, not on packaging/infrastructure.
 
 ## Toolchain
 

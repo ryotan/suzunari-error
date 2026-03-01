@@ -24,7 +24,6 @@ aspects of the project, regardless of the programming language or technology use
 
 - Unit tests are mandatory
 - E2E tests are mandatory only for important features
-- Target test coverage of 80% or higher
 
 ## 5. Documentation Conventions
 
@@ -53,9 +52,7 @@ aspects of the project, regardless of the programming language or technology use
 - Balance between error context richness and performance
   - Provide sufficient context for debugging without excessive overhead
   - Consider optional detailed context that can be enabled in debug builds
-- Benchmark error handling performance
-  - Compare against standard Rust error handling approaches
-  - Measure impact on both happy and error paths
+- Consider benchmarking error handling performance if performance regressions are suspected
 
 ## 8. `no_std` Compatibility
 

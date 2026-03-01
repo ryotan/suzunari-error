@@ -56,8 +56,11 @@ use std::process::{ExitCode, Termination};
 ///
 /// # Notes
 ///
-/// Both `Display` and `Debug` produce an empty string for the `Ok` case.
-/// This is intentional — in the `Termination` use case, success should be silent.
+/// - Both `Display` and `Debug` produce an empty string for the `Ok` case.
+///   This is intentional — in the `Termination` use case, success should be silent.
+/// - Error output always ends with a trailing newline. This matches the
+///   convention for terminal error output but may produce an extra blank
+///   line when used inside `format!()` or `eprintln!("{report}")`.
 pub struct StackReport<E>(Result<(), E>);
 
 impl<E: StackError> StackReport<E> {

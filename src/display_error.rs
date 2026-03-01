@@ -52,6 +52,13 @@ use core::fmt::{Debug, Display, Formatter};
 /// }
 /// ```
 ///
+/// ## Caveats
+///
+/// `DisplayError` is intended for types that do **not** implement `Error`.
+/// Wrapping a type that already implements `Error` will lose its original
+/// `source()` chain, because `DisplayError`'s `Error` impl always returns
+/// `None` from `source()`.
+///
 /// ## Pattern C: `map_err` — direct wrapping without snafu context
 ///
 /// ```

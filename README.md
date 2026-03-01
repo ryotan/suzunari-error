@@ -81,10 +81,10 @@ fn run() -> Result<(), RetrieveFailed> {
 fn main() {
     if let Err(e) = run() {
         eprintln!("{}", StackReport::from_error(e));
-        // Output:
-        // Error: RetrieveFailed: failed to retrieve data, at src/main.rs:4:5
+        // Output (line numbers are illustrative):
+        // Error: RetrieveFailed: failed to retrieve data, at src/main.rs:12:5
         // Caused by the following errors (recent errors listed first):
-        //   1| AppError::ReadTimeout: read timed out after 3sec, at src/lib.rs:12:5
+        //   1| AppError::ReadTimeout: read timed out after 3sec, at src/main.rs:18:5
         //   2| timeout
     }
 }
@@ -191,8 +191,11 @@ When using `#[suzunari_error]`, prefer `#[suzu(...)]` over `#[snafu(...)]` for c
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `std`   | Yes     | Enables `alloc` + `snafu/std` + `StackReport` `Termination` impl + `#[report]` macro |
+| `std`   | Yes     | Enables `alloc` + `snafu/std` + `StackReport`'s `Termination` impl + `#[report]` macro |
 | `alloc` | No      | Enables `BoxedStackError` and `From<T> for BoxedStackError` macro generation |
+| _(none)_ | —      | Core-only: `Location`, `StackError`, `StackReport` (formatting only), `DisplayError` |
+
+> **Note:** `StackReport` itself uses only `core::fmt` and is available in all tiers. Only the `Termination` impl (for use as `main()` return type) and `#[report]` require `std`.
 
 For `no_std` usage, disable default features:
 
