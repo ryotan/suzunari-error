@@ -102,6 +102,53 @@ fn test_from_already_display_error() {
     assert!(report.contains("already wrapped"));
 }
 
+// --- from: non-source-named field ---
+// #[suzu(from)] generates #[snafu(source(from(...)))] which implicitly marks
+// the field as a source, so it works regardless of field name.
+
+#[suzunari_error]
+#[suzu(display("renamed source"))]
+struct RenamedSourceError {
+    #[suzu(from)]
+    cause: FakeLibError,
+}
+
+#[test]
+fn test_from_non_source_named_field() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "renamed",
+        })
+    }
+    let err = fake_op().context(RenamedSourceSnafu).unwrap_err();
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains("renamed source"));
+    assert!(report.contains("renamed"));
+}
+
+// --- from: generic type parameter ---
+
+#[suzunari_error]
+#[suzu(display("generic from error"))]
+struct GenericFromError<E: core::fmt::Debug + core::fmt::Display + 'static> {
+    #[suzu(from)]
+    source: E,
+}
+
+#[test]
+fn test_from_with_generic_type() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "generic",
+        })
+    }
+    // snafu erases generic params in context selectors
+    let err = fake_op().context(GenericFromSnafu).unwrap_err();
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains("generic from error"));
+    assert!(report.contains("generic"));
+}
+
 // --- location: explicit #[suzu(location)] ---
 
 #[suzunari_error]
