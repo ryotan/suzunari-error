@@ -90,6 +90,8 @@ pub use stack_report::StackReport;
 // Note: bumping the snafu dependency version is a semver-breaking change for
 // downstream crates, because these re-exports are part of our public API.
 pub use snafu;
+// OptionExt is not used within this crate but re-exported for downstream
+// convenience: it enables `.context()` on `Option<T>` to convert None into errors.
 pub use snafu::{OptionExt, ResultExt, ensure};
 
 // Proc-macro re-exports (wildcard is the only way to re-export proc macros).

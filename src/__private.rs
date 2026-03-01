@@ -27,6 +27,9 @@ impl<'a, T: StackError> StackSourceResolver<'a, T> {
 pub struct NotStackErrorFallback;
 
 impl NotStackErrorFallback {
+    // 'static is required even though this always returns None: with elided
+    // lifetime, the return type would be tied to the temporary NotStackErrorFallback
+    // created via Deref in generated code, causing a borrow-checker error.
     pub fn resolve(&self) -> Option<&'static dyn StackError> {
         None
     }

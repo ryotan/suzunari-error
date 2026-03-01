@@ -52,8 +52,10 @@ impl Display for Location {
 }
 
 impl Debug for Location {
+    /// Delegates to `core::panic::Location`'s Debug for C-DEBUG compliance.
+    /// Produces struct-style output instead of the Display format `file:line:col`.
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        Display::fmt(self, f)
+        Debug::fmt(self.0, f)
     }
 }
 
@@ -112,28 +114,23 @@ mod tests {
     mod alloc_tests {
         use super::*;
         use alloc::format;
+        use alloc::string::ToString;
 
         #[test]
         fn test_debug_format() {
             let loc = Location::current();
-            assert_eq!(
-                format!("{:?}", loc),
-                format!("{}:{}:{}", loc.file(), loc.line(), loc.column())
-            );
+            let debug = format!("{:?}", loc);
+            // Debug delegates to core::panic::Location's Debug
+            assert!(debug.contains(loc.file()));
+            assert!(debug.contains(&loc.line().to_string()));
+            // Debug and Display produce different formats
+            let display = format!("{}", loc);
+            assert_ne!(debug, display);
         }
 
         #[test]
-        fn test_method_consistency() {
+        fn test_debug_differs_across_call_sites() {
             let loc = Location::current();
-
-            let direct_format = format!("{}:{}:{}", loc.file(), loc.line(), loc.column());
-            let debug_format = format!("{:?}", loc);
-
-            assert_eq!(
-                direct_format, debug_format,
-                "Direct format and Debug format should match"
-            );
-
             fn get_another_location() -> Location {
                 Location::current()
             }

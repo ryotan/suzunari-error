@@ -128,10 +128,10 @@ impl Display for StackReportFormatter<'_> {
             error.location()
         )?;
 
-        // Check if there are any causes
-        let has_stack_cause = error.stack_source().is_some();
-        let has_error_cause = error.source().is_some();
-        if !(has_stack_cause || has_error_cause) {
+        // Check if there are any causes.
+        // source() suffices: the StackError contract guarantees that
+        // stack_source().is_some() implies source().is_some().
+        if error.source().is_none() {
             return writeln!(f);
         }
 
@@ -146,6 +146,9 @@ impl Display for StackReportFormatter<'_> {
         let mut current_stack: &dyn StackError = error;
         while let Some(next) = current_stack.stack_source() {
             // Invariant: stack_source() implies source() (StackError is a sub-chain of Error).
+            // In release builds this assert is stripped; a broken impl would produce
+            // truncated output (missing causes) rather than a panic, which is preferable
+            // to crashing inside a Display formatter.
             debug_assert!(
                 current_stack.source().is_some(),
                 "StackError::stack_source() returned Some but Error::source() returned None \

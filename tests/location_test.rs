@@ -36,14 +36,12 @@ fn test_snafu_implicit_generation() {
     let file = file!();
     let line = line!() - 7; // 7 lines above is where SomeSnafu is used
     assert_eq!(format!("{error}"), "SomeError");
-    assert_eq!(
-        format!("{error:?}"),
-        format!("SomeError {{ location: {file}:{line}:9 }}")
-    );
-    assert_eq!(
-        format!("{error:#?}"),
-        format!("SomeError {{\n    location: {file}:{line}:9,\n}}")
-    );
+    // Location's Debug now delegates to core::panic::Location's derive(Debug),
+    // producing struct-style output instead of the Display format.
+    let debug = format!("{error:?}");
+    assert!(debug.contains(&format!("file: \"{file}\"")));
+    assert!(debug.contains(&format!("line: {line}")));
+    assert!(debug.contains("col: 9"));
 }
 
 /// Tests using Location with a custom error type manually.
