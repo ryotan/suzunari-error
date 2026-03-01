@@ -1,7 +1,6 @@
 //! Verifies that DisplayError works correctly with both snafu and suzunari-error.
 #![cfg(feature = "test-std")]
 
-use snafu::prelude::*;
 use suzunari_error::*;
 
 // A type that implements Debug + Display but NOT Error (simulates e.g. argon2::Error)

@@ -5,6 +5,7 @@
 //! and integrates well with the snafu error handling system.
 
 use snafu::{Snafu, ensure};
+use std::collections::HashSet;
 use std::path::Path;
 use suzunari_error::Location;
 
@@ -107,4 +108,55 @@ fn test_location_file_path() {
         file_name, "location_test.rs",
         "The file name should match this test file"
     );
+}
+
+// --- GAP-03: Location PartialEq, Eq, Hash, Clone, Copy ---
+
+#[test]
+fn test_location_eq_same_site() {
+    // Copy of the same Location should be equal
+    let a = Location::current();
+    let b = a;
+    assert_eq!(a, b);
+}
+
+#[test]
+fn test_location_ne_different_site() {
+    let a = Location::current();
+    let b = Location::current();
+    // Different lines → not equal
+    assert_ne!(a, b);
+}
+
+#[test]
+fn test_location_hash() {
+    let loc = Location::current();
+    let mut set = HashSet::new();
+    set.insert(loc);
+    // Same location inserted again — set size should not change
+    set.insert(loc);
+    assert_eq!(set.len(), 1);
+
+    // Different location should increase set size
+    let loc2 = Location::current();
+    set.insert(loc2);
+    assert_eq!(set.len(), 2);
+}
+
+#[test]
+fn test_location_copy() {
+    let loc = Location::current();
+    let copied = loc; // Copy
+    // Both should be usable (not moved)
+    assert_eq!(loc.line(), copied.line());
+    assert_eq!(loc.file(), copied.file());
+}
+
+#[test]
+fn test_location_clone() {
+    let loc = Location::current();
+    // Intentionally using clone() on a Copy type to verify Clone impl works.
+    #[allow(clippy::clone_on_copy)]
+    let cloned = loc.clone();
+    assert_eq!(loc, cloned);
 }

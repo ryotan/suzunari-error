@@ -1,7 +1,6 @@
 #![cfg(feature = "std")]
 
 use core::error::Error;
-use snafu::{ResultExt, ensure};
 use suzunari_error::*;
 
 #[suzunari_error]
@@ -417,4 +416,58 @@ fn test_stack_error_source_returns_some_for_stack_source() {
         err.source().is_some(),
         "Error::source() should also return Some"
     );
+}
+
+// --- GAP-01: 3+ level deep StackError chain with phase transition ---
+
+#[suzunari_error]
+#[suzu(display("level 3"))]
+struct Level3Error {
+    source: std::io::Error,
+}
+
+#[suzunari_error]
+#[suzu(display("level 2"))]
+struct Level2Error {
+    source: Level3Error,
+}
+
+#[suzunari_error]
+#[suzu(display("level 1"))]
+struct Level1Error {
+    source: Level2Error,
+}
+
+#[test]
+fn test_deep_stack_chain_numbering() {
+    fn level3() -> Result<(), Level3Error> {
+        std::fs::read("/nonexistent").context(Level3Snafu)?;
+        Ok(())
+    }
+    fn level2() -> Result<(), Level2Error> {
+        level3().context(Level2Snafu)?;
+        Ok(())
+    }
+    fn level1() -> Result<(), Level1Error> {
+        level2().context(Level1Snafu)?;
+        Ok(())
+    }
+    let err = level1().unwrap_err();
+
+    // depth = 3: Level2Error, Level3Error, io::Error
+    assert_eq!(err.depth(), 3);
+
+    let file = file!();
+    let report = format!("{:?}", StackReport::from_error(err));
+
+    // Phase 1 (StackError chain with locations):
+    // Error: Level1Error (top-level)
+    // 1| Level2Error
+    // 2| Level3Error
+    assert!(report.contains(&format!("Error: Level1Error: level 1, at {file}:")));
+    assert!(report.contains(&format!("1| Level2Error: level 2, at {file}:")));
+    assert!(report.contains(&format!("2| Level3Error: level 3, at {file}:")));
+    // Phase 2 (plain Error chain without location):
+    // 3| No such file or directory (os error 2)
+    assert!(report.contains("3| "));
 }

@@ -3,7 +3,6 @@
 //! Tests verify `from`, `location`, and snafu passthrough behavior.
 //! .build() is snafu's standard test pattern for constructing errors in tests.
 
-use snafu::prelude::*;
 use suzunari_error::*;
 
 // --- from: basic enum usage ---
@@ -319,4 +318,31 @@ fn test_stack_report_with_from_chain() {
     assert!(report.contains("outer error"));
     assert!(report.contains("hashing failed"));
     assert!(report.contains("hash fail"));
+}
+
+// --- GAP-10: closure syntax in source(from(...)) ---
+// Verifies the token-level fallback scanner correctly detects `source`
+// when Meta parsing fails due to closure syntax.
+
+#[suzunari_error]
+#[suzu(display("closure source error"))]
+struct ClosureSourceError {
+    // Closure syntax triggers the token-level fallback in is_source_field
+    // because |e| fails Meta parsing. The extra block makes it non-trivial
+    // for clippy's redundant_closure lint.
+    #[snafu(source(from(FakeLibError, |e| { DisplayError::new(e) })))]
+    cause: DisplayError<FakeLibError>,
+}
+
+#[test]
+fn test_closure_syntax_source() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "closure test",
+        })
+    }
+    let err = fake_op().context(ClosureSourceSnafu).unwrap_err();
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains("closure source error"));
+    assert!(report.contains("closure test"));
 }

@@ -177,3 +177,105 @@ fn test_chain_context() {
         format!("Error: TestError: Root error, at {file}:{line}:19\n")
     );
 }
+
+// --- GAP-05: source(false) interaction ---
+
+#[suzunari_error]
+#[suzu(display("source false test"))]
+struct SourceFalseError {
+    // Field named "source" but explicitly disabled as a snafu source.
+    // stack_source() should return None for this field.
+    #[suzu(source(false))]
+    source: String,
+}
+
+#[test]
+fn test_source_false_suppresses_stack_source() {
+    let err = SourceFalseSnafu {
+        source: "not a real source".to_string(),
+    }
+    .build();
+    assert!(
+        err.stack_source().is_none(),
+        "source(false) should suppress stack_source()"
+    );
+    // Error::source() should also be None because snafu respects source(false)
+    use core::error::Error;
+    assert!(err.source().is_none());
+}
+
+// --- GAP-07: single-variant enum ---
+
+#[suzunari_error]
+enum SingleVariantEnum {
+    #[suzu(display("only variant: {msg}"))]
+    Only { msg: String },
+}
+
+#[test]
+fn test_single_variant_enum() {
+    let err = OnlySnafu {
+        msg: "hello".to_string(),
+    }
+    .build();
+    assert_eq!(err.type_name(), "SingleVariantEnum::Only");
+    assert!(err.location().file().ends_with("macro_test.rs"));
+    assert_eq!(format!("{err}"), "only variant: hello");
+}
+
+// --- GAP-11: generic struct with where clause ---
+
+#[suzunari_error]
+#[suzu(display("where clause: {value}"))]
+struct WhereClauseError<T>
+where
+    T: core::fmt::Display + core::fmt::Debug + Send + Sync + 'static,
+{
+    value: T,
+}
+
+#[test]
+fn test_generic_with_where_clause() {
+    let err: WhereClauseError<i32> = WhereClauseSnafu { value: 123 }.build();
+    assert_eq!(format!("{err}"), "where clause: 123");
+    assert!(err.location().file().ends_with("macro_test.rs"));
+
+    // Verify From<T> for BoxedStackError works with where clause
+    let boxed: suzunari_error::BoxedStackError = err.into();
+    assert_eq!(format!("{boxed}"), "where clause: 123");
+}
+
+// --- GAP-12: error types in nested modules ---
+
+mod nested {
+    use suzunari_error::*;
+
+    #[suzunari_error]
+    #[suzu(visibility(pub), display("nested module error"))]
+    pub struct NestedModError {}
+
+    #[suzunari_error]
+    #[suzu(visibility(pub))]
+    pub enum NestedModEnum {
+        #[suzu(display("nested variant"))]
+        Variant {},
+    }
+}
+
+#[test]
+fn test_nested_module_errors() {
+    fn make_struct_error() -> Result<(), nested::NestedModError> {
+        ensure!(false, nested::NestedModSnafu);
+        Ok(())
+    }
+    let err = make_struct_error().unwrap_err();
+    assert_eq!(err.type_name(), "NestedModError");
+    assert!(err.location().file().ends_with("macro_test.rs"));
+
+    fn make_enum_error() -> Result<(), nested::NestedModEnum> {
+        ensure!(false, nested::VariantSnafu);
+        Ok(())
+    }
+    let err = make_enum_error().unwrap_err();
+    assert_eq!(err.type_name(), "NestedModEnum::Variant");
+}

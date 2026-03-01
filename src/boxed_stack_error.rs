@@ -188,4 +188,39 @@ mod tests {
     }
 
     fn handle_stack_error<T: StackError>(_: T) {}
+
+    #[test]
+    fn test_inner_ref() {
+        let test_error = TestSnafu {
+            message: "inner ref test",
+        }
+        .build();
+        let original_line = test_error.location().line();
+        let error = BoxedStackError::new(test_error);
+
+        let inner = error.inner();
+        assert_eq!(inner.location().line(), original_line);
+        assert_eq!(inner.type_name(), "TestError");
+    }
+
+    #[test]
+    fn test_into_inner_round_trip() {
+        let test_error = TestSnafu {
+            message: "round trip",
+        }
+        .build();
+        let original_line = test_error.location().line();
+
+        // BoxedStackError → into_inner → Box<dyn StackError + Send + Sync>
+        let boxed = BoxedStackError::new(test_error);
+        let inner: Box<dyn StackError + Send + Sync> = boxed.into_inner();
+
+        assert_eq!(inner.location().line(), original_line);
+        assert_eq!(inner.type_name(), "TestError");
+        assert!(format!("{inner}").contains("round trip"));
+
+        // Box<dyn StackError + Send + Sync> → BoxedStackError (via From)
+        let boxed_again: BoxedStackError = inner.into();
+        assert_eq!(boxed_again.location().line(), original_line);
+    }
 }

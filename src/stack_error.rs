@@ -336,4 +336,24 @@ mod tests {
     }
 
     fn handle_stack_error<T: StackError>(_: T) {}
+
+    // --- GAP-08: Box<dyn StackError> (non-Send-Sync) Error and StackError impls ---
+    #[test]
+    fn test_box_dyn_stack_error_non_send_sync() {
+        let concrete = SimpleSnafu {
+            message: "boxed non-send-sync",
+        }
+        .build();
+        let original_line = concrete.location().line();
+        let boxed: Box<dyn StackError> = Box::new(concrete);
+
+        // StackError methods should work
+        assert_eq!(boxed.location().line(), original_line);
+        assert_eq!(boxed.type_name(), "SimpleError");
+        assert!(boxed.stack_source().is_none());
+
+        // Error impl should work
+        let err: &dyn Error = &boxed;
+        assert!(format!("{err}").contains("boxed non-send-sync"));
+    }
 }

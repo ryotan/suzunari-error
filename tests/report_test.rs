@@ -1,6 +1,5 @@
 #![cfg(feature = "std")]
 
-use snafu::ensure;
 use suzunari_error::*;
 
 #[suzunari_error]
@@ -70,7 +69,6 @@ struct IoWrapperError {
 
 #[suzunari_error::report]
 fn report_with_question_mark() -> Result<(), IoWrapperError> {
-    use snafu::ResultExt;
     // This will fail because the file doesn't exist, testing ? propagation
     std::fs::read("this_file_does_not_exist_for_test").context(IoWrapperSnafu)?;
     Ok(())
