@@ -80,9 +80,29 @@ pub fn suzunari_error(attr: TokenStream, item: TokenStream) -> TokenStream {
 /// formats error chains on failure. Can also be applied to other functions to
 /// convert `Result<(), E>` to `StackReport<E>` (e.g., for testing).
 ///
-/// Does not support generics, `where` clauses, `async fn`, `const fn`,
-/// `unsafe fn`, or `extern fn`. Return type must be written literally as
-/// `Result<(), E>` (type aliases are not resolved).
+/// # Usage
+///
+/// Use the qualified path `#[suzunari_error::report]` (not `#[report]` alone):
+///
+/// ```rust,ignore
+/// use suzunari_error::*;
+///
+/// #[suzunari_error::report]
+/// fn main() -> Result<(), AppError> {
+///     run()?;
+///     Ok(())
+/// }
+/// ```
+///
+/// # Limitations
+///
+/// - Does not support generics, `where` clauses, `async fn`, `const fn`,
+///   `unsafe fn`, or `extern fn`.
+/// - Return type must be written literally as `Result<(), E>` (type aliases
+///   are not resolved).
+/// - Function parameters with complex patterns (e.g., `(a, b): (u32, u32)`)
+///   are forwarded as-is to the generated closure, which may not compile
+///   depending on the pattern form.
 #[proc_macro_attribute]
 pub fn report(attr: TokenStream, item: TokenStream) -> TokenStream {
     report_impl(attr.into(), item.into())

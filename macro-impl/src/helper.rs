@@ -272,6 +272,13 @@ fn is_source_field(field: &Field) -> bool {
             // source(from(T, |e| transform(e))) which fails Meta parsing.
             // snafu itself will validate the syntax; we only need to detect
             // that `source` is present for StackError's stack_source() generation.
+            //
+            // Limitation: this fallback cannot distinguish `source(false)` from
+            // `source(from(...))` — both would match. In practice this is safe
+            // because `source(false)` parses fine as Meta (the fallback only
+            // triggers for closure syntax), but if a future snafu syntax breaks
+            // Meta parsing while meaning "not a source", this would produce an
+            // incorrect stack_source() that returns Some for a non-source field.
             if snafu_tokens_contain_keyword(&meta_list.tokens, "source") {
                 return Some(true);
             }
@@ -286,6 +293,10 @@ fn is_source_field(field: &Field) -> bool {
 /// keyword (e.g., `source`, `implicit`).
 ///
 /// Uses token-level scanning via [`snafu_tokens_contain_keyword`].
+///
+/// Non-list forms (`#[snafu]`, `#[snafu = "..."]`) are silently skipped:
+/// snafu doesn't use these forms and will report its own errors during
+/// derive expansion. We only need to detect keywords in valid list syntax.
 pub(crate) fn has_snafu_keyword(attrs: &[syn::Attribute], keyword: &str) -> bool {
     attrs.iter().any(|attr| {
         if !attr.path().is_ident("snafu") {
@@ -308,6 +319,11 @@ pub(crate) fn ensure_snafu_implicit(field: &mut Field) {
 /// Scans a token stream for `keyword` as a leading ident in any
 /// comma-separated segment. Does not descend into groups (parentheses,
 /// brackets, braces), so `display("source")` won't match `source`.
+///
+/// Because groups are opaque, a hypothetical snafu keyword like
+/// `wrapper(source)` where `source` appears only inside parentheses
+/// would NOT match. This is the desired behavior for current snafu
+/// syntax where keywords are always top-level.
 ///
 /// Used as fallback when `Punctuated<Meta>` parsing fails (e.g., snafu's
 /// closure syntax in `source(from(T, |e| transform(e)))`).

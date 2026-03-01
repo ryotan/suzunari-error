@@ -63,6 +63,10 @@ pub trait StackError: Error {
     /// must also return `Some` pointing to the same error. The derive
     /// macro upholds this automatically; manual impls must ensure
     /// consistency.
+    ///
+    /// Violating this contract causes `StackReport` to produce incomplete
+    /// output in release builds (the `debug_assert!` that checks this is
+    /// stripped). In debug builds, a panic will occur instead.
     fn stack_source(&self) -> Option<&dyn StackError> {
         None
     }
