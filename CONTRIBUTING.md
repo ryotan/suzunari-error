@@ -56,8 +56,6 @@ See [docs/guidelines-rs.md](./docs/guidelines-rs.md) for Rust style guidelines a
 
 ## Git Conventions
 
-See [docs/guidelines-git.md](./docs/guidelines-git.md) for details.
-
 ### Branches
 
 [Conventional Branch](https://conventional-branch.github.io/) format:
