@@ -128,11 +128,16 @@ fn process_fields(
                             // Detect duplicate #[suzu(location)] early so error points
                             // at the original #[suzu(location)] attr, not the generated
                             // #[stack(location)] (which has a call_site span).
-                            if first_location_span.is_some() {
-                                errors.push(Error::new(
+                            if let Some(first_span) = first_location_span {
+                                let mut err = Error::new(
                                     attr.span(),
                                     "multiple #[suzu(location)] fields; only one is allowed per struct/variant",
+                                );
+                                err.combine(Error::new(
+                                    first_span,
+                                    "first #[suzu(location)] defined here",
                                 ));
+                                errors.push(err);
                             } else {
                                 first_location_span = Some(attr.span());
                                 needs_location = true;
@@ -145,21 +150,30 @@ fn process_fields(
             }
         }
 
-        // Apply from/location after the attrs loop so field is freely borrowable
-        if needs_from {
-            match apply_from(field, &new_attrs, crate_path) {
-                Ok(snafu_source_attr) => new_attrs.push(snafu_source_attr),
-                Err(e) => errors.push(e),
+        // Apply from/location after the attrs loop so field is freely borrowable.
+        // Check cross-attribute conflict first — from and location on the same field
+        // is always invalid regardless of how they were specified.
+        if needs_from && needs_location {
+            errors.push(Error::new(
+                field.span(),
+                "`from` and `location` cannot be used on the same field",
+            ));
+        } else {
+            if needs_from {
+                match apply_from(field, &new_attrs, crate_path) {
+                    Ok(snafu_source_attr) => new_attrs.push(snafu_source_attr),
+                    Err(e) => errors.push(e),
+                }
             }
-        }
-        if needs_location {
-            if !looks_like_location_type(&field.ty) {
-                errors.push(Error::new(
-                    field.ty.span(),
-                    "#[suzu(location)] requires the field type to be Location",
-                ));
-            } else {
-                apply_location(&mut new_attrs);
+            if needs_location {
+                if !looks_like_location_type(&field.ty) {
+                    errors.push(Error::new(
+                        field.ty.span(),
+                        "#[suzu(location)] requires the field type to be Location",
+                    ));
+                } else {
+                    apply_location(&mut new_attrs);
+                }
             }
         }
 

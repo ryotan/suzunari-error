@@ -16,6 +16,8 @@ Built on [SNAFU](https://docs.rs/snafu), inspired by [Error Handling for Large R
 
 ## Usage
 
+> **Note:** The examples below use `std::io::Error` and require the default `std` feature. For `no_std` usage, see [Feature Flags](#feature-flags).
+
 `use suzunari_error::*` brings in everything you need — macros, traits (`ResultExt`, `OptionExt`), and the `ensure!` macro. No need to add `snafu` as a direct dependency.
 
 ```rust
