@@ -113,8 +113,9 @@ fn process_fields(
     crate_path: &TokenStream,
 ) -> Result<(), Error> {
     let mut errors = Vec::new();
-    // Track the first #[suzu(location)] span to detect duplicates with
-    // accurate span on the second occurrence (before it becomes #[stack(location)]).
+    // Track first occurrence spans to detect cross-field duplicates.
+    // Both from and location allow at most one per struct/variant.
+    let mut first_from_span: Option<Span> = None;
     let mut first_location_span: Option<Span> = None;
 
     for field in fields.iter_mut() {
@@ -135,7 +136,22 @@ fn process_fields(
                         new_attrs.push(snafu_attr);
                     }
                     match result.effect {
-                        SuzuEffect::From => needs_from = true,
+                        SuzuEffect::From => {
+                            if let Some(first_span) = first_from_span {
+                                let mut err = Error::new(
+                                    attr.span(),
+                                    "multiple #[suzu(from)] fields; only one source field is allowed per struct/variant",
+                                );
+                                err.combine(Error::new(
+                                    first_span,
+                                    "first #[suzu(from)] defined here",
+                                ));
+                                errors.push(err);
+                            } else {
+                                first_from_span = Some(attr.span());
+                                needs_from = true;
+                            }
+                        }
                         SuzuEffect::Location => {
                             // Detect duplicate #[suzu(location)] early so error points
                             // at the original #[suzu(location)] attr, not the generated

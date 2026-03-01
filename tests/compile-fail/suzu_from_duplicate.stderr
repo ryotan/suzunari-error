@@ -1,0 +1,11 @@
+error: multiple #[suzu(from)] fields; only one source field is allowed per struct/variant
+ --> tests/compile-fail/suzu_from_duplicate.rs:7:5
+  |
+7 |     #[suzu(from)]
+  |     ^
+
+error: first #[suzu(from)] defined here
+ --> tests/compile-fail/suzu_from_duplicate.rs:6:5
+  |
+6 |     #[suzu(from)]
+  |     ^
