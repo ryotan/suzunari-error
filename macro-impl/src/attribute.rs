@@ -7,9 +7,7 @@ use quote::{format_ident, quote};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Colon;
-use syn::{
-    Data, DeriveInput, Error, Field, FieldMutability, Fields, FieldsNamed, Visibility,
-};
+use syn::{Data, DeriveInput, Error, Field, FieldMutability, Fields, FieldsNamed, Visibility};
 
 /// Implementation of `#[suzunari_error]`.
 ///

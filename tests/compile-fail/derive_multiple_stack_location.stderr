@@ -1,0 +1,5 @@
+error: multiple #[stack(location)] fields; only one is allowed per struct/variant
+  --> tests/compile-fail/derive_multiple_stack_location.rs:10:5
+   |
+10 |     #[snafu(implicit)]
+   |     ^
