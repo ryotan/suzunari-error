@@ -62,6 +62,8 @@ pub(crate) fn process_suzu_attrs(
             }
             combine_errors(errors)
         }
+        // Currently unreachable: suzunari_error_impl rejects unions before calling
+        // process_suzu_attrs. Kept as a defensive guard for direct callers.
         Data::Union(_) => Err(Error::new(input.span(), "#[suzu] cannot be used on unions")),
     }
 }

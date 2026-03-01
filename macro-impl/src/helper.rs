@@ -246,43 +246,29 @@ fn is_source_field(field: &Field) -> bool {
             let Meta::List(meta_list) = &attr.meta else {
                 return None;
             };
-            // Try structured parsing first (handles simple cases).
-            if let Ok(nested) =
-                meta_list.parse_args_with(Punctuated::<Meta, syn::Token![,]>::parse_terminated)
-            {
-                // Use filter_map + last to be consistent with the outer .last():
-                // both within a single #[snafu(...)] and across multiple #[snafu]
-                // attributes, the last `source` directive wins.
-                return nested
-                    .iter()
-                    .filter_map(|meta| match meta {
-                        Meta::Path(path) if path.is_ident("source") => Some(true),
-                        Meta::List(list) if list.path.is_ident("source") => {
-                            // `source(false)` explicitly disables source detection.
-                            let is_disabled = list
-                                .parse_args_with(Ident::parse_any)
-                                .is_ok_and(|ident| ident == "false");
-                            Some(!is_disabled)
-                        }
-                        _ => None,
-                    })
-                    .last();
-            }
-            // Fallback: token-level scan for closure syntax like
-            // source(from(T, |e| transform(e))) which fails Meta parsing.
-            // snafu itself will validate the syntax; we only need to detect
-            // that `source` is present for StackError's stack_source() generation.
-            //
-            // Limitation: this fallback cannot distinguish `source(false)` from
-            // `source(from(...))` — both would match. In practice this is safe
-            // because `source(false)` parses fine as Meta (the fallback only
-            // triggers for closure syntax), but if a future snafu syntax breaks
-            // Meta parsing while meaning "not a source", this would produce an
-            // incorrect stack_source() that returns Some for a non-source field.
-            if snafu_tokens_contain_keyword(&meta_list.tokens, "source") {
-                return Some(true);
-            }
-            None
+            // Structured Meta parsing handles all current snafu syntax including
+            // closure forms like source(from(T, |e| ...)): the closure lives inside
+            // a parenthesized group which Meta::List stores as a raw TokenStream.
+            let nested = meta_list
+                .parse_args_with(Punctuated::<Meta, syn::Token![,]>::parse_terminated)
+                .ok()?;
+            // Use filter_map + last to be consistent with the outer .last():
+            // both within a single #[snafu(...)] and across multiple #[snafu]
+            // attributes, the last `source` directive wins.
+            nested
+                .iter()
+                .filter_map(|meta| match meta {
+                    Meta::Path(path) if path.is_ident("source") => Some(true),
+                    Meta::List(list) if list.path.is_ident("source") => {
+                        // `source(false)` explicitly disables source detection.
+                        let is_disabled = list
+                            .parse_args_with(Ident::parse_any)
+                            .is_ok_and(|ident| ident == "false");
+                        Some(!is_disabled)
+                    }
+                    _ => None,
+                })
+                .last()
         })
         .last();
 
@@ -325,9 +311,9 @@ pub(crate) fn ensure_snafu_implicit(field: &mut Field) {
 /// would NOT match. This is the desired behavior for current snafu
 /// syntax where keywords are always top-level.
 ///
-/// Used as fallback when `Punctuated<Meta>` parsing fails (e.g., snafu's
-/// closure syntax in `source(from(T, |e| transform(e)))`).
-pub(crate) fn snafu_tokens_contain_keyword(tokens: &TokenStream, keyword: &str) -> bool {
+/// Used by [`has_snafu_keyword`] for best-effort keyword detection without
+/// full Meta parsing.
+fn snafu_tokens_contain_keyword(tokens: &TokenStream, keyword: &str) -> bool {
     let mut at_start = true;
     for tt in tokens.clone() {
         match &tt {
