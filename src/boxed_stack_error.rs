@@ -61,6 +61,12 @@ impl BoxedStackError {
         }
     }
 
+    /// Returns a reference to the inner trait object.
+    #[must_use]
+    pub fn inner(&self) -> &(dyn StackError + Send + Sync) {
+        &*self.inner
+    }
+
     /// Unwraps into the inner trait object.
     #[must_use]
     pub fn into_inner(self) -> Box<dyn StackError + Send + Sync> {
