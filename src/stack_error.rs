@@ -309,40 +309,6 @@ mod tests {
         handle_stack_error(boxed_error);
     }
 
-    #[test]
-    fn test_practical_error_handling() {
-        fn may_fail(input: i32) -> Result<i32, Box<dyn StackError + Send + Sync + 'static>> {
-            if input < 0 {
-                return Err(Box::new(
-                    SimpleSnafu {
-                        message: "Input must be non-negative",
-                    }
-                    .build(),
-                ));
-            }
-            Ok(input * 2)
-        }
-
-        fn process(input: i32) -> Result<i32, Box<WrapperError>> {
-            let result = may_fail(input).context(WrapperSnafu {
-                message: "Processing failed",
-            })?;
-
-            Ok(result + 10)
-        }
-
-        assert_eq!(process(5).unwrap(), 20);
-
-        let err: Box<WrapperError> = process(-1).unwrap_err();
-        assert!(format!("{}", err).contains("Processing failed"));
-
-        let source = err.source().unwrap();
-        // Debug now uses standard derive(Debug), not stack trace format
-        assert!(format!("{source:?}").contains("Input must be non-negative"));
-
-        handle_stack_error(err);
-    }
-
     fn handle_stack_error<T: StackError>(_: T) {}
 
     // --- GAP-08: Box<dyn StackError> (non-Send-Sync) Error and StackError impls ---

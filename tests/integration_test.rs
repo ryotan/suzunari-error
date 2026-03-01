@@ -354,21 +354,20 @@ fn test_context_captures_exact_line() {
 fn test_context_line_differs_from_ensure_line() {
     // ensure! and .context() should capture different lines
     fn with_ensure() -> Result<(), SomeError> {
-        let ensure_line = line!() + 1;
         ensure!(false, ValidationFailedSnafu { param: 0 });
-        let _ = ensure_line; // suppress unused
         Ok(())
     }
     fn with_context() -> Result<(), RetrieveFailed> {
-        let context_line = line!() + 1;
         with_ensure().context(RetrieveFailedSnafu)?;
-        let _ = context_line; // suppress unused
         Ok(())
     }
-    let err = with_context().unwrap_err();
-    // RetrieveFailed's location should be the .context() line, not the ensure! line
+    let ensure_err = with_ensure().unwrap_err();
+    let context_err = with_context().unwrap_err();
+    // The core assertion: ensure! and .context() produce different location lines
+    assert_ne!(ensure_err.location().line(), context_err.location().line());
+
     let file = file!();
-    let report = format!("{:?}", StackReport::from(err));
+    let report = format!("{:?}", StackReport::from(context_err));
     assert!(report.contains(&format!(
         "Error: RetrieveFailed: Failed to retrieve, at {file}:"
     )));
