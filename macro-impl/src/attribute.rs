@@ -18,8 +18,6 @@ use syn::{Data, DeriveInput, Error, Field, FieldMutability, Fields, FieldsNamed,
 pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
     let mut input: DeriveInput = syn::parse2(stream)?;
     let crate_path = get_crate_path("suzunari-error");
-    let snafu_path = get_crate_path("snafu");
-
     // Reject unions early — before process_suzu_attrs, so the error message
     // refers to #[suzunari_error] (the macro the user actually wrote).
     if matches!(input.data, Data::Union(_)) {
@@ -80,7 +78,13 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
     }
 
     // Step 3: Emit derives (location injection is done above)
-    let derive_attribute = quote! { #[derive(Debug, #snafu_path::Snafu, #crate_path::StackError)] };
+    // crate_root redirects snafu's generated paths from ::snafu to ::suzunari_error::snafu,
+    // so downstream crates don't need snafu as a direct dependency.
+    let snafu_path = quote! { #crate_path::snafu };
+    let derive_attribute = quote! {
+        #[derive(Debug, #snafu_path::Snafu, #crate_path::StackError)]
+        #[snafu(crate_root(#snafu_path))]
+    };
 
     Ok(quote! {
         #derive_attribute

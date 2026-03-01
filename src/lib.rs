@@ -84,9 +84,12 @@ pub use location::Location;
 pub use stack_error::StackError;
 pub use stack_report::StackReport;
 
-// Re-export snafu essentials so `use suzunari_error::*` is sufficient.
+// Re-export snafu so downstream crates don't need it as a direct dependency.
+// The proc-macro generates `#[snafu(crate_root(::suzunari_error::snafu))]`
+// to redirect snafu's generated paths here.
 // Note: bumping the snafu dependency version is a semver-breaking change for
 // downstream crates, because these re-exports are part of our public API.
+pub use snafu;
 pub use snafu::{OptionExt, ResultExt, ensure};
 
 // Proc-macro re-exports (wildcard is the only way to re-export proc macros).
