@@ -10,7 +10,7 @@ struct ErrorStruct {}
 #[suzunari_error]
 enum ErrorEnum {
     Variant1Unit,
-    #[snafu(display("Variant2 {message}"))]
+    #[suzu(display("Variant2 {message}"))]
     Variant2NamedField {
         message: String,
     },
@@ -67,18 +67,18 @@ fn test_nested_stack_trace() {
 
 #[suzunari_error]
 enum SomeError {
-    #[snafu(display("after {}sec", timeout_sec))]
+    #[suzu(display("after {}sec", timeout_sec))]
     ReadTimeout {
         timeout_sec: u32,
-        #[snafu(source)]
+        #[suzu(source)]
         error: std::io::Error,
     },
-    #[snafu(display("{} is an invalid value. Must be larger than 1", param))]
+    #[suzu(display("{} is an invalid value. Must be larger than 1", param))]
     ValidationFailed { param: i32 },
 }
 
 #[suzunari_error]
-#[snafu(display("Failed to retrieve"))]
+#[suzu(display("Failed to retrieve"))]
 struct RetrieveFailed {
     source: SomeError,
 }
@@ -163,7 +163,7 @@ fn test_validate() {
 
 /// #[suzu(location)] allows naming the location field anything.
 #[suzunari_error]
-#[snafu(display("custom location struct"))]
+#[suzu(display("custom location struct"))]
 struct CustomLocStruct {
     #[suzu(location)]
     error_origin: Location,
@@ -172,12 +172,12 @@ struct CustomLocStruct {
 /// Enum with custom-named location via #[suzu(location)].
 #[suzunari_error]
 enum CustomLocEnum {
-    #[snafu(display("variant A"))]
+    #[suzu(display("variant A"))]
     VariantA {
         #[suzu(location)]
         origin: Location,
     },
-    #[snafu(display("variant B: {msg}"))]
+    #[suzu(display("variant B: {msg}"))]
     VariantB {
         msg: String,
         #[suzu(location)]
@@ -187,9 +187,9 @@ enum CustomLocEnum {
 
 /// Struct with auto-detected Location field (no #[suzu(location)] needed).
 #[suzunari_error]
-#[snafu(display("auto detect"))]
+#[suzu(display("auto detect"))]
 struct AutoDetectLoc {
-    #[snafu(implicit)]
+    #[suzu(implicit)]
     my_loc: Location,
 }
 

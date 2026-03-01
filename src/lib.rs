@@ -35,14 +35,14 @@
 //! | `alloc` | via `std` | [`BoxedStackError`] + `From<T> for BoxedStackError` generation |
 //! | _(none)_ | —      | Core-only: [`Location`], [`StackError`], [`StackReport`] (formatting only), [`DisplayError`] |
 //!
-//! # `#[suzu(...)]` vs `#[snafu(...)]`
+//! # `#[suzu(...)]` Attribute
 //!
-//! Under [`#[suzunari_error]`](macro@suzunari_error), both `#[suzu(...)]` and `#[snafu(...)]`
-//! work on fields. `#[suzu(...)]` is a superset — standard snafu keywords (`display`,
-//! `source`, `visibility`, etc.) are passed through as `#[snafu(...)]`. Use `#[suzu(...)]`
-//! when you need suzunari extensions; `#[snafu(...)]` is fine for everything else.
+//! Use `#[suzu(...)]` for all attributes under [`#[suzunari_error]`](macro@suzunari_error).
+//! It is a superset of `#[snafu(...)]` — standard snafu keywords (`display`, `source`,
+//! `visibility`, etc.) pass through as-is, plus suzunari extensions are available.
+//! `#[snafu(...)]` also works but `#[suzu(...)]` is preferred for consistency.
 //!
-//! Suzunari-only extensions (must use `#[suzu(...)]`):
+//! Suzunari extensions:
 //!
 //! - **`from`** (field-level) — wraps field type in [`DisplayError<T>`] and generates
 //!   `#[snafu(source(from(T, DisplayError::new)))]`

@@ -4,7 +4,7 @@ use snafu::ensure;
 use suzunari_error::*;
 
 #[suzunari_error]
-#[snafu(display("test error: {message}"))]
+#[suzu(display("test error: {message}"))]
 struct TestReportError {
     message: String,
 }

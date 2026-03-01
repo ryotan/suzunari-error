@@ -9,7 +9,7 @@ use suzunari_error::{Location, StackError, StackReport, suzunari_error};
 
 // Test struct with #[suzunari_error] (auto-injects location)
 #[suzunari_error]
-#[snafu(display("{}", message))]
+#[suzu(display("{}", message))]
 struct TestError {
     message: String,
 }
