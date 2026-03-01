@@ -75,6 +75,7 @@ use core::fmt::{Debug, Display, Formatter};
 ///     Ok(())
 /// }
 /// ```
+#[derive(Clone)]
 pub struct DisplayError<E>(E);
 
 impl<E: Debug + Display> DisplayError<E> {
@@ -85,6 +86,11 @@ impl<E: Debug + Display> DisplayError<E> {
 }
 
 impl<E> DisplayError<E> {
+    /// Returns a reference to the wrapped value.
+    pub fn inner(&self) -> &E {
+        &self.0
+    }
+
     /// Unwraps and returns the inner value.
     pub fn into_inner(self) -> E {
         self.0

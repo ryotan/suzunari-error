@@ -37,6 +37,18 @@ impl<E: StackError> StackReport<E> {
     pub fn from_error(error: E) -> Self {
         Self(Err(error))
     }
+
+    /// Returns `true` if the report represents a success (no error).
+    #[must_use]
+    pub fn is_ok(&self) -> bool {
+        self.0.is_ok()
+    }
+
+    /// Returns `true` if the report contains an error.
+    #[must_use]
+    pub fn is_err(&self) -> bool {
+        self.0.is_err()
+    }
 }
 
 impl<E: StackError> From<Result<(), E>> for StackReport<E> {

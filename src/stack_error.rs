@@ -16,9 +16,14 @@ pub trait StackError: Error {
     /// Returns the location where this error was constructed.
     fn location(&self) -> &Location;
 
-    /// Returns the error type name for display in stack traces.
+    /// Returns a human-readable type name for display in stack traces.
     ///
-    /// The derive macro generates this as a `&'static str` literal from the type name.
+    /// The derive macro generates this as a `&'static str` literal:
+    /// - Structs: `"StructName"`
+    /// - Enum variants: `"EnumName::VariantName"`
+    ///
+    /// Generic type parameters are not included. This is intended for display
+    /// purposes only — do not parse or match against it programmatically.
     fn type_name(&self) -> &'static str;
 
     /// Returns the source error as a StackError, if available.
@@ -38,8 +43,8 @@ pub trait StackError: Error {
 
     /// Returns the number of errors in the `Error::source()` chain (excluding self).
     ///
-    /// Counts the full chain via `Error::source()`, including both
-    /// `StackError` and non-`StackError` causes.
+    /// Traverses the full `Error::source()` chain (not `stack_source()`),
+    /// counting both `StackError` and non-`StackError` causes.
     fn depth(&self) -> usize {
         // successors() can't be used here due to trait object lifetime constraints:
         // source() returns Option<&dyn Error> with a lifetime tied to &self,
