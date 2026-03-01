@@ -16,26 +16,27 @@ Built on [SNAFU](https://docs.rs/snafu), inspired by [Error Handling for Large R
 
 ## Usage
 
+`use suzunari_error::*` brings in everything you need — macros, traits (`ResultExt`, `OptionExt`), and the `ensure!` macro. No need to add `snafu` as a direct dependency.
+
 ```rust
 use suzunari_error::*;
-use snafu::ResultExt;
 
 #[suzunari_error]
-enum SomeError {
-    #[snafu(display("after {}sec", timeout_sec))]
+enum AppError {
+    #[suzu(display("read timed out after {timeout_sec}sec"))]
     ReadTimeout {
         timeout_sec: u32,
-        #[snafu(source)]
+        #[suzu(source)]
         error: std::io::Error,
     },
-    #[snafu(display("{} is an invalid value. Must be larger than 1", param))]
+    #[suzu(display("{param} is invalid, must be > 0"))]
     ValidationFailed { param: i32 },
 }
 
 #[suzunari_error]
-#[snafu(display("Failed to retrieve"))]
+#[suzu(display("failed to retrieve data"))]
 struct RetrieveFailed {
-    source: SomeError,
+    source: AppError,
 }
 
 fn retrieve_data() -> Result<(), RetrieveFailed> {
@@ -43,7 +44,7 @@ fn retrieve_data() -> Result<(), RetrieveFailed> {
     Ok(())
 }
 
-fn read_external() -> Result<(), SomeError> {
+fn read_external() -> Result<(), AppError> {
     let err = std::io::Error::new(std::io::ErrorKind::TimedOut, "timeout");
     Err(err).context(ReadTimeoutSnafu { timeout_sec: 3u32 })?;
     Ok(())
@@ -56,6 +57,19 @@ Use `StackReport` at error display boundaries to produce stack-trace-like output
 
 ```rust
 use suzunari_error::*;
+# #[suzunari_error]
+# enum AppError {
+#     #[suzu(display("read timed out after {timeout_sec}sec"))]
+#     ReadTimeout { timeout_sec: u32, #[suzu(source)] error: std::io::Error },
+# }
+# #[suzunari_error]
+# #[suzu(display("failed to retrieve data"))]
+# struct RetrieveFailed { source: AppError }
+# fn retrieve_data() -> Result<(), RetrieveFailed> {
+#     let err = std::io::Error::new(std::io::ErrorKind::TimedOut, "timeout");
+#     Err(err).context(ReadTimeoutSnafu { timeout_sec: 3u32 }).context(RetrieveFailedSnafu)?;
+#     Ok(())
+# }
 
 fn run() -> Result<(), RetrieveFailed> {
     retrieve_data()?;
@@ -66,9 +80,9 @@ fn main() {
     if let Err(e) = run() {
         eprintln!("{}", StackReport::from_error(e));
         // Output:
-        // Error: RetrieveFailed: Failed to retrieve, at src/main.rs:4:5
+        // Error: RetrieveFailed: failed to retrieve data, at src/main.rs:4:5
         // Caused by the following errors (recent errors listed first):
-        //   1| SomeError::ReadTimeout: after 3sec, at src/lib.rs:12:5
+        //   1| AppError::ReadTimeout: read timed out after 3sec, at src/lib.rs:12:5
         //   2| timeout
     }
 }
@@ -80,7 +94,10 @@ Use `#[suzunari_error::report]` on `main()` to automatically convert the return 
 
 ```rust
 use suzunari_error::*;
-use snafu::ResultExt;
+# #[suzunari_error]
+# #[suzu(display("error"))]
+# struct RetrieveFailed {}
+# fn retrieve_data() -> Result<(), RetrieveFailed> { Ok(()) }
 
 #[suzunari_error::report]
 fn main() -> Result<(), RetrieveFailed> {
@@ -95,12 +112,20 @@ This is equivalent to `snafu::report` but uses `StackReport` for location-aware 
 
 ```rust
 use suzunari_error::*;
-use snafu::ResultExt;
 
 #[suzunari_error]
-#[snafu(display("database query failed"))]
+#[suzu(display("inner error"))]
+struct InnerError {}
+
+#[suzunari_error]
+#[suzu(display("database query failed"))]
 struct DbError {
     source: BoxedStackError,
+}
+
+fn query_user() -> Result<(), InnerError> {
+    ensure!(false, InnerSnafu);
+    Ok(())
 }
 
 fn run() -> Result<(), DbError> {
@@ -118,24 +143,47 @@ For third-party types that implement `Debug + Display` but not `Error`, use `#[s
 ```rust
 use suzunari_error::*;
 
+// A third-party type: Debug + Display but no Error impl
+#[derive(Debug)]
+struct LibError(String);
+impl std::fmt::Display for LibError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
 #[suzunari_error]
 #[suzu(display("hashing failed"))]
 struct HashError {
     #[suzu(from)]
-    source: argon2::Error,
+    source: LibError,
 }
 ```
 
 This expands to the equivalent manual form:
 
 ```rust
+# use suzunari_error::*;
+# #[derive(Debug)]
+# struct LibError(String);
+# impl std::fmt::Display for LibError {
+#     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+#         f.write_str(&self.0)
+#     }
+# }
 #[suzunari_error]
-#[snafu(display("hashing failed"))]
+#[suzu(display("hashing failed"))]
 struct HashError {
-    #[snafu(source(from(argon2::Error, DisplayError::new)))]
-    source: DisplayError<argon2::Error>,
+    #[suzu(source(from(LibError, DisplayError::new)))]
+    source: DisplayError<LibError>,
 }
 ```
+
+## `#[suzu(...)]` vs `#[snafu(...)]`
+
+`#[suzu(...)]` is a superset of `#[snafu(...)]`. All snafu keywords (`display`, `source`, `implicit`, etc.) work inside `#[suzu(...)]` and are passed through to snafu. Additionally, `#[suzu(...)]` supports `from` and `location` extensions.
+
+When using `#[suzunari_error]`, prefer `#[suzu(...)]` over `#[snafu(...)]` for consistency. `#[snafu(...)]` also works but mixing the two styles is discouraged.
 
 ## Feature Flags
 
