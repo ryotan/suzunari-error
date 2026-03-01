@@ -35,7 +35,6 @@ We follow Test Driven Development to ensure code quality and maintainability:
 Our testing approach focuses on efficiency and effectiveness:
 
 - Priority for unit testing of pure functions (they're easier to test and provide high value)
-- Repository testing with in-memory implementation (allows testing without external dependencies)
 - Build testability into design (consider how code will be tested during design phase)
 - Assert first: work backwards from expected results (start with the assertion and work backwards to setup)
 
@@ -58,13 +57,6 @@ The recommended sequence is:
 
 - Push IO operations to function boundaries
 - Use Result or Option types for operations with side-effects
-- Consider using async/await for asynchronous operations
-
-4.**Adapter implementation**
-
-- Use traits for abstraction of external dependencies
-- Implement traits for concrete implementations
-- Create mock implementations for testing
 
 ## Rust Examples
 

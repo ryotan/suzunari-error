@@ -22,14 +22,16 @@ aspects of the project, regardless of the programming language or technology use
 
 ## 4. Testing Policy
 
-- Unit tests are mandatory
-- E2E tests are mandatory only for important features
+- Unit tests for all public types and functions
+- Compile-fail tests (trybuild) for all proc-macro error paths
+- Feature-tier tests to verify core-only / alloc / std independently
+- Doc-tests for all public API examples
 
 ## 5. Documentation Conventions
 
-- Prepare README.md for each feature
-- Generate API documentation automatically
+- Rustdoc (`///`) on all public items with compilable examples
 - Include concrete examples for error cases
+- Document known limitations and edge-case behaviors
 
 ## 6. Versioning
 
