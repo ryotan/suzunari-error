@@ -6,6 +6,14 @@ use core::error::Error;
 /// Types implementing this trait carry a `Location` at each level of the
 /// error chain, enabling `StackReport` to produce stack-trace-like output.
 ///
+/// # Design note: no `Send + Sync` supertrait
+///
+/// Unlike anyhow/eyre which require `Send + Sync + 'static`, this trait
+/// only requires `Error`. This allows non-Send error types to implement
+/// `StackError`. [`BoxedStackError`](crate::BoxedStackError) adds `Send + Sync`
+/// bounds for the common thread-safe case. Adding a supertrait later is a
+/// breaking change, so this must be decided before v1.0.
+///
 /// # Deriving
 ///
 /// Use `#[suzunari_error]` (recommended) or `#[derive(StackError)]` directly.

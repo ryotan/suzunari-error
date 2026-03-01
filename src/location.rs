@@ -34,6 +34,10 @@ impl Location {
     }
 }
 
+// NOTE: Deref on a non-smart-pointer type deviates from C-DEREF guidelines.
+// Pragmatic for v0.1: gives ergonomic access to file()/line()/column().
+// Risk: methods added to core::panic::Location auto-appear on Location.
+// Revisit before v1.0 — consider replacing with explicit delegation methods.
 impl Deref for Location {
     type Target = core::panic::Location<'static>;
     fn deref(&self) -> &Self::Target {
