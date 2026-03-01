@@ -1,0 +1,5 @@
+error: multiple #[suzu(location)] fields; only one is allowed per struct/variant
+ --> tests/compile-fail/suzu_multiple_location.rs:8:5
+  |
+8 |     #[suzu(location)]
+  |     ^

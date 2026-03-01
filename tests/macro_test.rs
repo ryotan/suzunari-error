@@ -1,21 +1,20 @@
 #![cfg(feature = "std")]
 // Tests verify derive macros and attributes individually and in combination.
-// Uses #[suzunari_location] + #[derive(StackError)], raw #[derive(StackError)] with
-// manual location field, and #[suzunari_error] to test each layer independently.
+// Uses #[suzunari_error] for the all-in-one macro, raw #[derive(StackError)] with
+// manual location field, and manual enum construction to test each layer independently.
 // .build() is snafu's standard test pattern.
 
 use snafu::prelude::*;
-use suzunari_error::{Location, StackError, StackReport, suzunari_error, suzunari_location};
+use suzunari_error::{Location, StackError, StackReport, suzunari_error};
 
-// Test struct with StackError derive macro
-#[suzunari_location]
-#[derive(Debug, Snafu, StackError)]
+// Test struct with #[suzunari_error] (auto-injects location)
+#[suzunari_error]
 #[snafu(display("{}", message))]
 struct TestError {
     message: String,
 }
 
-// Test struct with manual location field
+// Test struct with manual location field (raw derive)
 #[derive(Debug, Snafu, StackError)]
 struct TestErrorWithLocation {
     message: String,
@@ -23,23 +22,19 @@ struct TestErrorWithLocation {
     location: Location,
 }
 
-// No need to implement Error manually, Snafu already does this
-
-// Test enum with StackError derive macro
+// Test enum with #[suzunari_error]
 #[suzunari_error]
 enum TestErrorEnum {
     Variant1 { message: String },
     Variant2 { context: String },
 }
 
-// Test enum with manual location field
+// Test enum with manual location field (raw derive)
 #[derive(Debug, Snafu, StackError)]
 enum TestErrorEnumWithLocation {
     Variant3 { message: String, location: Location },
     Variant4 { context: String, location: Location },
 }
-
-// No need to implement Error manually, Snafu already does this
 
 #[test]
 fn test_stack_error_derive() {
@@ -58,7 +53,7 @@ fn test_stack_error_derive() {
 }
 
 #[test]
-fn test_suzunari_location_attribute() {
+fn test_manual_location_struct() {
     let error = TestErrorWithLocationSnafu {
         message: "Test error".to_string(),
     }
@@ -103,7 +98,7 @@ fn test_stack_error_enum_derive() {
 }
 
 #[test]
-fn test_suzunari_location_enum_attribute() {
+fn test_manual_location_enum() {
     let error = TestErrorEnumWithLocation::Variant3 {
         message: "Test error".to_string(),
         location: Location::current(),
@@ -129,6 +124,42 @@ fn test_suzunari_location_enum_attribute() {
         format!("{:?}", StackReport::from_error(error)),
         format!("Error: TestErrorEnumWithLocation::Variant4: Variant4, at {file}:{line}:19\n")
     );
+}
+
+// Generic struct with #[suzunari_error]
+#[suzunari_error]
+#[suzu(display("generic: {value}"))]
+struct GenericError<T: core::fmt::Display + core::fmt::Debug> {
+    value: T,
+}
+
+#[test]
+fn test_generic_struct() {
+    let error: GenericError<i32> = GenericSnafu { value: 42 }.build();
+    assert!(error.location().file().ends_with("macro_test.rs"));
+    assert_eq!(format!("{error}"), "generic: 42");
+}
+
+// Generic enum with #[suzunari_error]
+#[suzunari_error]
+enum GenericEnumError<T: core::fmt::Display + core::fmt::Debug> {
+    #[suzu(display("a: {value}"))]
+    VariantA { value: T },
+    #[suzu(display("b: {msg}"))]
+    VariantB { msg: String },
+}
+
+#[test]
+fn test_generic_enum() {
+    let error: GenericEnumError<i32> = VariantASnafu { value: 99 }.build();
+    assert!(error.location().file().ends_with("macro_test.rs"));
+    assert_eq!(format!("{error}"), "a: 99");
+
+    let error: GenericEnumError<i32> = VariantBSnafu {
+        msg: "hello".to_string(),
+    }
+    .build();
+    assert_eq!(format!("{error}"), "b: hello");
 }
 
 #[test]

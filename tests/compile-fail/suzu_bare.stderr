@@ -1,0 +1,5 @@
+error: #[suzu] requires arguments
+ --> tests/compile-fail/suzu_bare.rs:6:5
+  |
+6 |     #[suzu]
+  |     ^

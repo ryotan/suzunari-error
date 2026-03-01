@@ -11,6 +11,34 @@ use suzunari_error::{DisplayError, StackError};
 #[snafu(display("core only error"))]
 pub struct CoreOnlyError {}
 
+// #[suzu(from)] works in core-only mode
+struct FakeNonError;
+impl core::fmt::Display for FakeNonError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "fake")
+    }
+}
+impl core::fmt::Debug for FakeNonError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "FakeNonError")
+    }
+}
+
+#[suzunari_error::suzunari_error]
+#[suzu(display("from in core"))]
+pub struct FromInCore {
+    #[suzu(from)]
+    source: FakeNonError,
+}
+
+// #[suzu(location)] works in core-only mode
+#[suzunari_error::suzunari_error]
+#[suzu(display("explicit location in core"))]
+pub struct ExplicitLocationInCore {
+    #[suzu(location)]
+    location: suzunari_error::Location,
+}
+
 // DisplayError is available in core-only mode
 fn _use_display_error() {
     let _: DisplayError<&str> = DisplayError::new("test");

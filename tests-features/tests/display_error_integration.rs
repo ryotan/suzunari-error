@@ -27,6 +27,22 @@ struct AutoConvertError {
     source: DisplayError<FakeLibError>,
 }
 
+// --- Pattern A2: automatic conversion via #[suzu(from)] ---
+#[suzunari_error]
+#[suzu(display("from convert op failed"))]
+struct FromConvertError {
+    #[suzu(from)]
+    source: FakeLibError,
+}
+
+// --- Pattern A3: #[suzu(from)] with already-wrapped DisplayError ---
+#[suzunari_error]
+#[suzu(display("from already wrapped"))]
+struct FromAlreadyWrappedError {
+    #[suzu(from)]
+    source: DisplayError<FakeLibError>,
+}
+
 // --- Pattern B: manual conversion via map_err ---
 #[suzunari_error]
 #[snafu(display("manual convert failed"))]
@@ -63,6 +79,33 @@ fn test_map_err_manual_convert() {
     let report = format!("{:?}", StackReport::from_error(err));
     assert!(report.contains("manual convert failed"));
     assert!(report.contains("manual"));
+}
+
+#[test]
+fn test_from_attr_auto_convert() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "from broke",
+        })
+    }
+    let err = fake_op().context(FromConvertSnafu).unwrap_err();
+
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains("from convert op failed"));
+    assert!(report.contains("from broke"));
+}
+
+#[test]
+fn test_from_attr_already_wrapped() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "already wrapped",
+        })
+    }
+    let err = fake_op().context(FromAlreadyWrappedSnafu).unwrap_err();
+
+    let report = format!("{:?}", StackReport::from_error(err));
+    assert!(report.contains("from already wrapped"));
 }
 
 #[cfg(feature = "test-alloc")]

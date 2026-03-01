@@ -1,5 +1,14 @@
 //! Internal helpers for derive macro code generation.
 //! Not public API — may change without notice.
+//!
+//! Uses the **autoref specialization** technique to conditionally resolve
+//! `stack_source()` at compile time. When the source type implements
+//! `StackError`, the inherent `resolve()` method takes priority via autoref.
+//! Otherwise, `Deref` coercion kicks in, calling the fallback `resolve()` on
+//! `NotStackErrorFallback` which returns `None`. This avoids requiring
+//! `StackError` bounds on source types in generated code.
+//!
+//! See: <https://github.com/dtolnay/case-studies/blob/master/autoref-specialization/README.md>
 
 use crate::StackError;
 

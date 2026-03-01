@@ -1,0 +1,5 @@
+error: `from` can only be used on fields
+ --> tests/compile-fail/suzu_from_on_variant.rs:5:12
+  |
+5 |     #[suzu(from)]
+  |            ^^^^

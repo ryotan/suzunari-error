@@ -9,12 +9,11 @@
 //! Use [`#[suzunari_error]`](macro@suzunari_error) to define error types — it combines
 //! location injection, `Snafu` derive, and `StackError` derive in one attribute:
 //!
-//! ```rust,ignore
+//! ```
 //! use suzunari_error::*;
-//! use snafu::ResultExt;
 //!
 //! #[suzunari_error]
-//! #[snafu(display("operation failed"))]
+//! #[suzu(display("operation failed"))]
 //! struct AppError {
 //!     source: std::io::Error,
 //! }

@@ -14,6 +14,7 @@ pub struct BoxedStackError {
 
 impl BoxedStackError {
     /// Wraps a concrete `StackError` in a type-erased box.
+    #[must_use]
     pub fn new<T: StackError + Send + Sync + 'static>(inner: T) -> Self {
         Self {
             inner: Box::new(inner),
