@@ -17,7 +17,7 @@ quote = "1.0"
 syn = "2.0"
 # Workspace local crates
 suzunari-error = { path = ".", default-features = false }
-suzunari-error-macro-impl = { path = "./macro-impl", default-features = false }
+suzunari-error-macro-impl = { version = "0.1.0", path = "./macro-impl", default-features = false }
 
 [package]
 name = "suzunari-error"

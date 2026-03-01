@@ -117,7 +117,16 @@ pub(crate) fn lookup_location_field(
 /// Used by `derive(StackError)` to resolve the location field dynamically.
 pub(crate) fn find_location_field(fields: &FieldsNamed) -> Result<&Field, Error> {
     match lookup_location_field(fields, "#[stack(location)]")? {
-        LocationLookup::Found { index, .. } => Ok(&fields.named[index]),
+        LocationLookup::Found { index, .. } => {
+            let field = &fields.named[index];
+            if !looks_like_location_type(&field.ty) {
+                return Err(Error::new(
+                    field.ty.span(),
+                    "location field must be of type Location",
+                ));
+            }
+            Ok(field)
+        }
         LocationLookup::NotFound => Err(Error::new(
             fields.span(),
             "StackError requires a Location field. Use #[suzunari_error] to auto-inject, \
@@ -189,6 +198,10 @@ pub(crate) fn extract_display_error_inner(ty: &Type) -> Option<&Type> {
     }
 }
 
+/// Returns true if the type's last path segment is `Location`.
+///
+/// Uses segment name only (not the full path), so `my_module::Location`
+/// would also match. See Known Limitations in lib.rs.
 pub(crate) fn looks_like_location_type(ty: &Type) -> bool {
     match ty {
         Type::Path(p) => p
@@ -209,6 +222,12 @@ pub(crate) fn find_source_field(fields: &FieldsNamed) -> Option<&Field> {
     fields.named.iter().find(|field| is_source_field(field))
 }
 
+/// Determines whether `field` is a snafu source field.
+///
+/// Parse errors in `#[snafu(...)]` attributes are silently ignored here:
+/// snafu owns its attribute namespace and will separately report syntax
+/// errors during its own derive expansion. We only need a best-effort
+/// answer for `derive(StackError)`'s `stack_source()` generation.
 fn is_source_field(field: &Field) -> bool {
     let is_named_source = field.ident.as_ref().is_some_and(|ident| ident == "source");
 

@@ -126,6 +126,10 @@ Attribute ownership: each attribute is consumed by a specific macro.
 4. **Hierarchical** — Enum variants for categories, `source` chaining for the error trail
 5. **Performance-conscious** — Defer formatting until display; minimize allocations in error paths
 
+## Publication Scope
+
+This is a **personal library**, not targeting broad crates.io discoverability. crates.io metadata such as `keywords`, `categories`, `documentation`, CI badges, and CHANGELOG are intentionally omitted. Focus code quality and API design reviews on the library itself, not on packaging/infrastructure.
+
 ## Toolchain
 
 Rust 1.85.1 (pinned in `rust-toolchain.toml`). Edition 2024.

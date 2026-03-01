@@ -14,6 +14,9 @@ use core::fmt::{Debug, Display, Formatter, Result};
 /// Note: downcasting to the concrete type is not supported through this
 /// wrapper. Use `into_inner()` if you need the raw trait object.
 ///
+/// `Clone` is not implemented because the inner trait object
+/// (`Box<dyn StackError + Send + Sync>`) cannot be cloned.
+///
 /// # Example
 ///
 /// ```

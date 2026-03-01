@@ -71,6 +71,9 @@ pub trait StackError: Error {
     ///
     /// Traverses the full `Error::source()` chain (not `stack_source()`),
     /// counting both `StackError` and non-`StackError` causes.
+    ///
+    /// Note: this count may differ from the number of lines in `StackReport`
+    /// output, which also shows the top-level error on the first line.
     fn depth(&self) -> usize {
         // successors() can't be used here due to trait object lifetime constraints:
         // source() returns Option<&dyn Error> with a lifetime tied to &self,

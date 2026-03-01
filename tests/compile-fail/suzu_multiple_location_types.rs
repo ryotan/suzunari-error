@@ -2,7 +2,7 @@
 use suzunari_error::*;
 
 #[suzunari_error]
-#[snafu(display("error"))]
+#[suzu(display("error"))]
 struct MyError {
     #[snafu(implicit)]
     origin: Location,

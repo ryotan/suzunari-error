@@ -93,6 +93,8 @@ impl<E: StackError> Debug for StackReport<E> {
     }
 }
 
+/// Note: both `Display` and `Debug` produce an empty string for the `Ok` case.
+/// This is intentional — in the `Termination` use case, success should be silent.
 impl<E: StackError> Display for StackReport<E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match &self.0 {
@@ -119,7 +121,7 @@ impl<E: StackError> Termination for StackReport<E> {
 }
 
 /// Internal formatter that formats a StackError chain.
-pub(crate) struct StackReportFormatter<'a>(pub(crate) &'a dyn StackError);
+struct StackReportFormatter<'a>(&'a dyn StackError);
 
 impl Debug for StackReportFormatter<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {

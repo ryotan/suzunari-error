@@ -85,6 +85,7 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 ### Error Type Definition
 
 ```rust
+// Illustrative — external types (sqlx, argon2, reqwest) are placeholders
 #[suzunari_error]
 pub enum DatabaseError {
     #[suzu(display("connection to {connection_string} failed"))]
@@ -117,7 +118,7 @@ pub enum DatabaseError {
 ### Error Propagation
 
 ```rust
-use snafu::OptionExt;
+use suzunari_error::OptionExt;
 
 fn get_user(id: &str, conn: &Connection) -> Result<User, DatabaseError> {
     let query = format!("SELECT * FROM users WHERE id = '{}'", id);

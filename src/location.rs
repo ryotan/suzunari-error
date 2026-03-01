@@ -27,6 +27,7 @@ impl Location {
     /// Returns the location of the immediate caller.
     ///
     /// Captures file, line, and column of the call site via `#[track_caller]`.
+    #[must_use]
     #[track_caller]
     pub fn current() -> Self {
         Self(core::panic::Location::caller())

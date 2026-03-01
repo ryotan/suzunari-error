@@ -8,7 +8,7 @@ use suzunari_error::{DisplayError, StackError};
 
 // Derive macros work in core-only mode
 #[suzunari_error::suzunari_error]
-#[snafu(display("core only error"))]
+#[suzu(display("core only error"))]
 pub struct CoreOnlyError {}
 
 // #[suzu(from)] works in core-only mode

@@ -56,12 +56,12 @@ guidelines will ensure code consistency, readability, and maintainability across
 ```rust
 #[suzunari_error]
 enum ApiError {
-    #[snafu(display("data fetch failed"))]
+    #[suzu(display("data fetch failed"))]
     FetchFailed {
         source: reqwest::Error,
     },
 
-    #[snafu(display("invalid parameter '{param_name}': {reason}"))]
+    #[suzu(display("invalid parameter '{param_name}': {reason}"))]
     ValidationFailed {
         param_name: String,
         reason: String,

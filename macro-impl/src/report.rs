@@ -13,7 +13,7 @@ pub(crate) fn report_impl(attr: TokenStream, stream: TokenStream) -> Result<Toke
         ));
     }
 
-    let input: ItemFn = syn::parse2(stream.clone())?;
+    let input: ItemFn = syn::parse2(stream)?;
 
     // Reject function qualifiers that the closure wrap cannot preserve.
     if input.sig.asyncness.is_some() {

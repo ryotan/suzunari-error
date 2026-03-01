@@ -80,6 +80,7 @@ pub struct DisplayError<E>(E);
 
 impl<E: Debug + Display> DisplayError<E> {
     /// Wraps `error` in a `DisplayError`, making it usable as a `source` field.
+    #[must_use]
     pub fn new(error: E) -> Self {
         Self(error)
     }

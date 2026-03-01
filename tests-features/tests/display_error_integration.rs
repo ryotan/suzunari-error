@@ -1,4 +1,5 @@
 //! Verifies that DisplayError works correctly with both snafu and suzunari-error.
+#![cfg(feature = "test-std")]
 
 use snafu::prelude::*;
 use suzunari_error::*;
@@ -21,7 +22,7 @@ impl core::fmt::Debug for FakeLibError {
 
 // --- Pattern A: automatic conversion via source(from(...)) ---
 #[suzunari_error]
-#[snafu(display("operation failed"))]
+#[suzu(display("operation failed"))]
 struct AutoConvertError {
     #[snafu(source(from(FakeLibError, DisplayError::new)))]
     source: DisplayError<FakeLibError>,
@@ -45,7 +46,7 @@ struct FromAlreadyWrappedError {
 
 // --- Pattern B: manual conversion via map_err ---
 #[suzunari_error]
-#[snafu(display("manual convert failed"))]
+#[suzu(display("manual convert failed"))]
 struct ManualConvertError {
     source: DisplayError<FakeLibError>,
 }

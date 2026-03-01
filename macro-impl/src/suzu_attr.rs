@@ -214,14 +214,18 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
         let is_from = meta_is_ident(meta, "from");
         let is_location = meta_is_ident(meta, "location");
 
-        // Reject from(...) and location(...) list forms with clear error
-        if matches!(meta, Meta::List(l) if l.path.is_ident("from")) {
+        // Reject from(...)/from=... and location(...)/location=... forms with clear error
+        if matches!(meta, Meta::List(l) if l.path.is_ident("from"))
+            || matches!(meta, Meta::NameValue(nv) if nv.path.is_ident("from"))
+        {
             return Err(Error::new(
                 meta.span(),
                 "`from` does not accept arguments; use `#[suzu(from)]` as a bare keyword",
             ));
         }
-        if matches!(meta, Meta::List(l) if l.path.is_ident("location")) {
+        if matches!(meta, Meta::List(l) if l.path.is_ident("location"))
+            || matches!(meta, Meta::NameValue(nv) if nv.path.is_ident("location"))
+        {
             return Err(Error::new(
                 meta.span(),
                 "`location` does not accept arguments; use `#[suzu(location)]` as a bare keyword",
@@ -247,7 +251,7 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
             }
         } else {
             // Check if this is a `source(...)` passthrough (for conflict detection)
-            if meta_is_ident_prefix(meta, "source") {
+            if meta.path().is_ident("source") {
                 has_source_in_passthrough = true;
             }
             passthrough_tokens.push(meta.clone());
@@ -337,14 +341,6 @@ fn apply_location(attrs: &mut Vec<Attribute>) {
 
 fn meta_is_ident(meta: &Meta, name: &str) -> bool {
     matches!(meta, Meta::Path(p) if p.is_ident(name))
-}
-
-fn meta_is_ident_prefix(meta: &Meta, name: &str) -> bool {
-    match meta {
-        Meta::Path(p) => p.is_ident(name),
-        Meta::List(l) => l.path.is_ident(name),
-        Meta::NameValue(nv) => nv.path.is_ident(name),
-    }
 }
 
 fn combine_errors(errors: Vec<Error>) -> Result<(), Error> {
