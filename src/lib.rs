@@ -80,5 +80,8 @@ pub use location::Location;
 pub use stack_error::StackError;
 pub use stack_report::StackReport;
 
+// Re-export snafu essentials so `use suzunari_error::*` is sufficient.
+pub use snafu::{ensure, OptionExt, ResultExt};
+
 // Proc-macro re-exports (wildcard is the only way to re-export proc macros).
 pub use suzunari_error_macro_impl::*;
