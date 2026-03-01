@@ -26,6 +26,33 @@
 //! - [`StackReport`] — Formats a `StackError` chain for display with location info
 //! - [`BoxedStackError`] — Type-erased `StackError` wrapper (requires `alloc`)
 //! - [`DisplayError`] — Adapter for `Debug + Display` types that don't implement `Error`
+//!
+//! # Feature Flags
+//!
+//! | Feature | Default | Provides |
+//! |---------|---------|----------|
+//! | `std`   | Yes     | `alloc` + [`StackReport`]'s [`Termination`](std::process::Termination) impl + [`#[report]`](macro@report) macro |
+//! | `alloc` | via `std` | [`BoxedStackError`] + `From<T> for BoxedStackError` generation |
+//! | _(none)_ | —      | Core-only: [`Location`], [`StackError`], [`StackReport`] (formatting only), [`DisplayError`] |
+//!
+//! # `#[suzu(...)]` Attribute
+//!
+//! `#[suzu(...)]` is a superset of `#[snafu(...)]` — all snafu keywords pass through.
+//! Suzunari extensions:
+//!
+//! - **`from`** (field-level) — wraps field type in [`DisplayError<T>`] and generates
+//!   `#[snafu(source(from(T, DisplayError::new)))]`
+//! - **`location`** (field-level) — marks a field as the location field with a custom name;
+//!   converts to `#[stack(location)]` + `#[snafu(implicit)]`
+//!
+//! # Known Limitations
+//!
+//! - **Location type detection** uses the last path segment name (`Location`), not the
+//!   full path. A user-defined `my_module::Location` type may trigger false auto-detection.
+//!   Use `#[suzu(location)]` or `#[stack(location)]` to disambiguate.
+//! - **Crate renaming** (`my_error = { package = "suzunari-error" }`) is not supported.
+//!   The generated code always references `::suzunari_error`. This matches the approach
+//!   used by snafu and thiserror.
 
 #![no_std]
 
