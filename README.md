@@ -217,7 +217,7 @@ Standard Rust error approaches have a tradeoff between traceability and ergonomi
 
 suzunari-error builds on snafu to add what's missing: **automatic per-error-level location tracking** via `#[track_caller]`, a structured `StackReport` formatter that shows type names and locations at each level, and ergonomic macros (`#[suzunari_error]`, `#[suzu(from)]`) that reduce boilerplate.
 
-See `examples/` for runnable demonstrations of each feature.
+See `examples/` for runnable demonstrations.
 
 ## Known Issues
 
