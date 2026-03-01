@@ -34,13 +34,13 @@ pub(crate) fn find_location_field(fields: &FieldsNamed) -> Result<&Field, Error>
 
     match marked.len() {
         1 => return Ok(marked[0]),
-        n if n > 1 => {
+        2.. => {
             return Err(Error::new(
                 marked[1].span(),
                 "multiple #[stack(location)] fields; only one is allowed per struct/variant",
             ));
         }
-        _ => {}
+        0 => {}
     }
 
     // Priority 2: single field with Location type
@@ -52,13 +52,13 @@ pub(crate) fn find_location_field(fields: &FieldsNamed) -> Result<&Field, Error>
 
     match location_typed.len() {
         1 => return Ok(location_typed[0]),
-        n if n > 1 => {
+        2.. => {
             return Err(Error::new(
                 location_typed[1].span(),
                 "multiple Location fields found; use #[stack(location)] to specify which one",
             ));
         }
-        _ => {}
+        0 => {}
     }
 
     // Near-miss: field named "location" but wrong type

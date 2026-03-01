@@ -170,14 +170,20 @@ struct SingleAttrResult {
 /// Separates suzunari keywords from snafu passthrough tokens.
 fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttrResult, Error> {
     let Meta::List(meta_list) = &attr.meta else {
-        return Err(Error::new(attr.span(), "#[suzu] requires arguments"));
+        return Err(Error::new(
+            attr.span(),
+            "#[suzu] requires arguments, e.g., #[suzu(location)] or #[suzu(display(\"...\"))]",
+        ));
     };
 
     let nested: Punctuated<Meta, Token![,]> =
         meta_list.parse_args_with(Punctuated::parse_terminated)?;
 
     if nested.is_empty() {
-        return Err(Error::new(attr.span(), "#[suzu] requires arguments"));
+        return Err(Error::new(
+            attr.span(),
+            "#[suzu()] requires arguments, e.g., #[suzu(location)] or #[suzu(display(\"...\"))]",
+        ));
     }
 
     let mut has_from = false;

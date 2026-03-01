@@ -22,6 +22,15 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
     let crate_path = get_crate_path("suzunari-error");
     let snafu_path = get_crate_path("snafu");
 
+    // Reject unions early — before process_suzu_attrs, so the error message
+    // refers to #[suzunari_error] (the macro the user actually wrote).
+    if matches!(input.data, Data::Union(_)) {
+        return Err(Error::new(
+            input.span(),
+            "#[suzunari_error] cannot be used on unions",
+        ));
+    }
+
     // Step 1: Process #[suzu(...)] attrs (from, location, snafu passthrough)
     // - #[suzu(location)] → #[stack(location)] + #[snafu(implicit)]
     // - #[suzu(from)] → DisplayError wrapping + #[snafu(source(from(...)))]
@@ -37,7 +46,7 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
             _ => {
                 return Err(Error::new(
                     data_struct.fields.span(),
-                    "suzunari_error can only be used on structs with named fields",
+                    "#[suzunari_error] can only be used on structs with named fields",
                 ));
             }
         },
@@ -58,19 +67,14 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
                     }
                     _ => {
                         return Err(Error::new(
-                            variant.span(),
-                            "suzunari_error can only be used on enum variants with named fields",
+                            variant.fields.span(),
+                            "#[suzunari_error] can only be used on enum variants with named fields",
                         ));
                     }
                 }
             }
         }
-        Data::Union(_) => {
-            return Err(Error::new(
-                input.span(),
-                "suzunari_error cannot be used on unions",
-            ));
-        }
+        Data::Union(_) => unreachable!("unions are rejected before this point"),
     }
 
     // Step 3: Emit derives (location injection is done above)
@@ -105,13 +109,13 @@ fn resolve_and_inject_location(
             ensure_snafu_implicit(&mut fields.named[stack_marked[0]]);
             return Ok(());
         }
-        n if n > 1 => {
+        2.. => {
             return Err(Error::new(
                 fields.named[stack_marked[1]].span(),
                 "multiple #[stack(location)] fields; only one is allowed per struct/variant",
             ));
         }
-        _ => {}
+        0 => {}
     }
 
     // 2. Check Location-typed fields
@@ -130,13 +134,13 @@ fn resolve_and_inject_location(
             ensure_snafu_implicit(field);
             return Ok(());
         }
-        n if n > 1 => {
+        2.. => {
             return Err(Error::new(
                 fields.named[location_typed[1]].span(),
                 "multiple Location fields found; use #[suzu(location)] to specify which one",
             ));
         }
-        _ => {}
+        0 => {}
     }
 
     // 3. Check for "location" name conflict
@@ -148,7 +152,7 @@ fn resolve_and_inject_location(
         return Err(Error::new(
             field.span(),
             "field 'location' exists but is not of type Location; \
-             rename it or change its type to Location",
+             rename it or use #[suzu(location)] on the correct field",
         ));
     }
 

@@ -1,4 +1,4 @@
-error: #[report] does not support unsafe functions
+error: #[report] does not support unsafe functions.
  --> tests/compile-fail/report_unsafe_fn.rs:9:1
   |
 9 | unsafe fn main() -> Result<(), MyError> {

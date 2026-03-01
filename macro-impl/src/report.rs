@@ -25,19 +25,19 @@ pub(crate) fn report_impl(attr: TokenStream, stream: TokenStream) -> Result<Toke
     if input.sig.unsafety.is_some() {
         return Err(Error::new(
             input.sig.unsafety.span(),
-            "#[report] does not support unsafe functions",
+            "#[report] does not support unsafe functions.",
         ));
     }
     if input.sig.abi.is_some() {
         return Err(Error::new(
             input.sig.abi.span(),
-            "#[report] does not support extern functions",
+            "#[report] does not support extern functions.",
         ));
     }
     if input.sig.constness.is_some() {
         return Err(Error::new(
             input.sig.constness.span(),
-            "#[report] does not support const functions",
+            "#[report] does not support const functions.",
         ));
     }
 
