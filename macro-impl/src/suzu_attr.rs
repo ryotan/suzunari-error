@@ -22,10 +22,6 @@ use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, Meta, Token};
 /// `#[snafu(implicit)]`, and `#[suzu(from)]` fields have their type wrapped in
 /// `DisplayError<T>` with `#[snafu(source(from(...)))]`.
 ///
-/// # Precondition
-///
-/// Callers must reject tuple structs/variants before calling this function.
-/// `#[suzu(...)]` on non-Named fields is silently skipped (not validated here).
 pub(crate) fn process_suzu_attrs(
     input: &mut DeriveInput,
     crate_path: &TokenStream,
@@ -34,8 +30,11 @@ pub(crate) fn process_suzu_attrs(
         Data::Struct(data_struct) => {
             process_non_field_attrs(&mut input.attrs, Level::NonField)?;
 
-            if let Fields::Named(fields) = &mut data_struct.fields {
-                process_fields(&mut fields.named, crate_path)?;
+            match &mut data_struct.fields {
+                Fields::Named(fields) => process_fields(&mut fields.named, crate_path)?,
+                // Tuple structs / unit structs have no named fields to process.
+                // Reject any stray #[suzu(...)] on their fields.
+                fields => reject_suzu_on_non_named_fields(fields)?,
             }
             Ok(())
         }
@@ -45,14 +44,31 @@ pub(crate) fn process_suzu_attrs(
             for variant in &mut data_enum.variants {
                 process_non_field_attrs(&mut variant.attrs, Level::NonField)?;
 
-                if let Fields::Named(fields) = &mut variant.fields {
-                    process_fields(&mut fields.named, crate_path)?;
+                match &mut variant.fields {
+                    Fields::Named(fields) => process_fields(&mut fields.named, crate_path)?,
+                    fields => reject_suzu_on_non_named_fields(fields)?,
                 }
             }
             Ok(())
         }
         Data::Union(_) => Err(Error::new(input.span(), "#[suzu] cannot be used on unions")),
     }
+}
+
+/// Rejects `#[suzu(...)]` on fields of tuple/unit structs or variants.
+fn reject_suzu_on_non_named_fields(fields: &Fields) -> Result<(), Error> {
+    let mut errors = Vec::new();
+    for field in fields {
+        for attr in &field.attrs {
+            if attr.path().is_ident("suzu") {
+                errors.push(Error::new(
+                    attr.span(),
+                    "#[suzu(...)] is not supported on tuple or unit fields",
+                ));
+            }
+        }
+    }
+    combine_errors(errors)
 }
 
 /// Processes `#[suzu(...)]` on type/variant-level attributes.
