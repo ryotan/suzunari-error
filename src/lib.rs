@@ -47,9 +47,11 @@ pub mod __private;
 mod boxed_stack_error;
 
 #[cfg(feature = "alloc")]
-pub use boxed_stack_error::*;
-pub use display_error::*;
-pub use location::*;
-pub use stack_error::*;
-pub use stack_report::*;
+pub use boxed_stack_error::BoxedStackError;
+pub use display_error::DisplayError;
+pub use location::Location;
+pub use stack_error::StackError;
+pub use stack_report::StackReport;
+
+// Proc-macro re-exports (wildcard is the only way to re-export proc macros).
 pub use suzunari_error_macro_impl::*;
