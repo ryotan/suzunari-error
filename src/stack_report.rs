@@ -61,6 +61,7 @@ use std::process::{ExitCode, Termination};
 /// - Error output always ends with a trailing newline. This matches the
 ///   convention for terminal error output but may produce an extra blank
 ///   line when used inside `format!()` or `eprintln!("{report}")`.
+///   Use `write!` to avoid the double newline: `write!(stderr(), "{report}")`.
 pub struct StackReport<E>(Result<(), E>);
 
 impl<E: StackError> From<Result<(), E>> for StackReport<E> {

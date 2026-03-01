@@ -15,6 +15,8 @@ use suzunari_error::Location;
 /// 1. The Location is correctly captured when an error is generated using snafu
 /// 2. The file name and line number in the Location match where the error was created
 /// 3. The error's Display and Debug formats work as expected
+// Tests Location's GenerateImplicitData integration with raw snafu,
+// without #[suzunari_error], to verify the trait impl works independently.
 #[test]
 fn test_snafu_implicit_generation() {
     #[derive(Debug, Snafu)]

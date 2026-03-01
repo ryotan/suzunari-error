@@ -44,6 +44,7 @@ cargo test -p suzunari-error-feature-tests --no-default-features --features test
 │       ├── report.rs     # #[suzunari_error::report]
 │       ├── suzu_attr.rs  # #[suzu(...)] attribute processing
 │       └── helper.rs     # Shared utilities
+├── examples/             # Runnable usage examples
 ├── tests/                # Integration tests (std)
 ├── tests-features/       # Feature-tier compile checks and integration tests
 ├── docs/                 # Development guidelines

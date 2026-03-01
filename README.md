@@ -7,7 +7,7 @@ Built on [SNAFU](https://docs.rs/snafu), inspired by [Error Handling for Large R
 ## Features
 
 - **`#[suzunari_error]`** — The primary macro. Annotate your error type and get `Snafu` + `StackError` derives plus automatic `location` field injection. Supports `#[suzu(...)]` attributes for snafu passthrough and suzunari extensions (`from`, `location`).
-- **`StackError` trait** — Error location-aware contextual chained errors. Provides `location()`, `type_name()`, and `stack_source()` for traversing error chains with location info.
+- **`StackError` trait** — Error location-aware contextual chained errors. Provides `location()`, `type_name()`, `stack_source()`, and `depth()` for traversing error chains with location info.
 - **`StackReport`** — Formats a `StackError` chain as a stack-trace-like report with type names and locations at each level. Use at error display boundaries.
 - **`Location`** — Memory-efficient location structure compatible with SNAFU's implicit context.
 - **`DisplayError<E>`** — Adapter to wrap external types that implement `Debug + Display` but not `Error`, making them usable as snafu `source` fields.
