@@ -91,7 +91,8 @@ async fn fetch_data(url: &str) -> Result<Data, ApiError> {
 - Document all public APIs using rustdoc comments (`///`)
 - Include examples in documentation where appropriate
 - Document complex or non-obvious implementations with regular comments (`//`)
-- Use `//TODO:` or `//FIXME:` comments for temporary solutions or known issues
+- Avoid long-lived `TODO`/`FIXME` comments — address issues immediately or document limitations in doc comments
+- Write all code comments in English
 
 ## Functional Programming Style
 

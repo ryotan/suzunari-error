@@ -85,7 +85,8 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 ### Error Type Definition
 
 ```rust
-// Illustrative — external types (sqlx, argon2, reqwest) are placeholders
+// Illustrative — external types are placeholders.
+// See tests/suzu_attr_test.rs for runnable examples of #[suzu(from)] usage.
 #[suzunari_error]
 pub enum DatabaseError {
     #[suzu(display("connection to {connection_string} failed"))]
@@ -106,7 +107,8 @@ pub enum DatabaseError {
         table: String,
     },
 
-    // #[suzu(from)] wraps non-Error types in DisplayError automatically
+    // #[suzu(from)] wraps non-Error types in DisplayError automatically.
+    // Use this for third-party types that implement Debug + Display but not Error.
     #[suzu(display("hashing failed"))]
     HashFailed {
         #[suzu(from)]

@@ -15,11 +15,10 @@ aspects of the project, regardless of the programming language or technology use
 - Clear and predictable function behavior
 - Error messages should be specific and practical
 
-## 3. Security Policy
+## 3. Security Considerations
 
-- Request only the minimum necessary system permissions
-- Store sensitive data securely
-- Operate offline by default
+- Error messages should not leak sensitive information (e.g., credentials, connection strings)
+- Callers should be mindful of what context they include in error fields
 
 ## 4. Testing Policy
 
@@ -58,29 +57,9 @@ aspects of the project, regardless of the programming language or technology use
   - Compare against standard Rust error handling approaches
   - Measure impact on both happy and error paths
 
-## 8. Cross-Platform Support
+## 8. `no_std` Compatibility
 
-- Ensure library works consistently across all supported platforms
-  - Primary targets: Windows, macOS, Linux
-  - Consider compatibility with WebAssembly (wasm32) targets
-  - Support embedded and no_std environments where feasible
-- Use Rust's platform abstraction features
-  - Leverage std::path for filesystem path handling
-  - Use std::env for environment variables
-  - Rely on std::fs for filesystem operations
-- Handle platform-specific error types appropriately
-  - Abstract platform-specific errors into common error types
-  - Provide context about the originating platform when relevant
-  - Test error conversion on different platforms
-- Use conditional compilation judiciously
-  - Use #[cfg(target_os = "...")] for platform-specific code
-  - Isolate platform-specific code in separate modules
-  - Document platform-specific behavior clearly
-- Test on all supported platforms before release
-  - Set up CI to test on multiple platforms
-  - Consider using cross-compilation for testing
-  - Verify error handling works correctly on each platform
-- Avoid assumptions about platform behavior
-  - Don't assume specific error codes or messages
-  - Be cautious with assumptions about filesystem behavior
-  - Consider differences in threading and async behavior
+- The library supports three feature tiers: core-only, `alloc`, and `std`
+- Use `#[cfg(feature = "...")]` to gate tier-specific functionality
+- Test all three tiers in CI to prevent accidental `std` dependency leaks
+- `Location` relies on `core::panic::Location` — available in all tiers

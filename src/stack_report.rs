@@ -53,6 +53,11 @@ use std::process::{ExitCode, Termination};
 /// assert!(output.contains("Error: AppError: app error"));
 /// assert!(output.contains("Caused by"));
 /// ```
+///
+/// # Notes
+///
+/// Both `Display` and `Debug` produce an empty string for the `Ok` case.
+/// This is intentional — in the `Termination` use case, success should be silent.
 pub struct StackReport<E>(Result<(), E>);
 
 impl<E: StackError> StackReport<E> {
@@ -93,8 +98,6 @@ impl<E: StackError> Debug for StackReport<E> {
     }
 }
 
-/// Note: both `Display` and `Debug` produce an empty string for the `Ok` case.
-/// This is intentional — in the `Termination` use case, success should be silent.
 impl<E: StackError> Display for StackReport<E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match &self.0 {

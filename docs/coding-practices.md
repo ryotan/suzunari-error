@@ -21,16 +21,6 @@ We prefer a functional programming approach for its clarity, testability, and re
 - Isolate side-effects (keep I/O operations separate from business logic)
 - Flatten conditional branches with early returns
 
-### Domain-driven design (DDD)
-
-We apply domain-driven design principles to model complex business domains effectively:
-
-- Distinguish between value objects (immutable, identified by attributes) and entities (mutable, identified by ID)
-- Aggregation guarantees consistency (treat related entities as a single unit)
-- Abstraction of data access in repositories
-- Bounded context awareness (recognize that the same term may have different meanings in different contexts)
-- Enumerated definitions of errors and use cases
-
 ### Test Driven Development (TDD)
 
 We follow Test Driven Development to ensure code quality and maintainability:
@@ -48,24 +38,6 @@ Our testing approach focuses on efficiency and effectiveness:
 - Repository testing with in-memory implementation (allows testing without external dependencies)
 - Build testability into design (consider how code will be tested during design phase)
 - Assert first: work backwards from expected results (start with the assertion and work backwards to setup)
-
-## Notes about stereotypes
-
-In software development, certain patterns and concepts are frequently used but can be interpreted differently by
-different developers. We clearly define commonly used stereotypes whose roles are often ambiguous to ensure consistent
-implementation across the codebase.
-
-### Repository
-
-- Deals only with domain models
-- Hides persistence details
-- Provides in-memory implementation for testing
-
-### Adapter pattern
-
-- Abstraction of external dependencies
-- Interfaces are defined by the caller
-- Easily replaceable for testing
 
 ## Implementation steps
 
@@ -122,79 +94,6 @@ fn apply_discount(item: Item, discount_percent: f64) -> Item {
 }
 ```
 
-### Domain-Driven Design Example
-
-```rust
-// Value Object example
-#[derive(Debug, Clone, PartialEq)]
-struct Money {
-    amount: f64,
-    currency: Currency,
-}
-
-impl Money {
-    fn new(amount: f64, currency: Currency) -> Self {
-        Self { amount, currency }
-    }
-
-    fn add(&self, other: &Money) -> Result<Money, DomainError> {
-        if self.currency != other.currency {
-            return Err(DomainError::CurrencyMismatch);
-        }
-        Ok(Money::new(self.amount + other.amount, self.currency.clone()))
-    }
-}
-
-// Entity example
-#[derive(Debug)]
-struct Order {
-    id: OrderId,
-    items: Vec<OrderItem>,
-    status: OrderStatus,
-}
-
-impl Order {
-    fn add_item(&mut self, item: OrderItem) -> Result<(), DomainError> {
-        if self.status != OrderStatus::Draft {
-            return Err(DomainError::OrderNotModifiable);
-        }
-        self.items.push(item);
-        Ok(())
-    }
-
-    fn submit(&mut self) -> Result<(), DomainError> {
-        if self.items.is_empty() {
-            return Err(DomainError::EmptyOrder);
-        }
-        self.status = OrderStatus::Submitted;
-        Ok(())
-    }
-}
-
-// Repository trait example
-trait OrderRepository {
-    fn find_by_id(&self, id: &OrderId) -> Result<Option<Order>, RepositoryError>;
-    fn save(&self, order: &Order) -> Result<(), RepositoryError>;
-}
-
-// In-memory implementation for testing
-struct InMemoryOrderRepository {
-    orders: std::collections::HashMap<OrderId, Order>,
-}
-
-impl OrderRepository for InMemoryOrderRepository {
-    fn find_by_id(&self, id: &OrderId) -> Result<Option<Order>, RepositoryError> {
-        Ok(self.orders.get(id).cloned())
-    }
-
-    fn save(&self, order: &Order) -> Result<(), RepositoryError> {
-        let mut orders = self.orders.clone();
-        orders.insert(order.id.clone(), order.clone());
-        Ok(())
-    }
-}
-```
-
 ### Testing Example
 
 ```rust
@@ -238,17 +137,16 @@ mod tests {
 ### Error Handling Example
 
 ```rust
-use snafu::ResultExt;
 use suzunari_error::*;
 
 #[suzunari_error]
 enum ApiError {
-    #[snafu(display("data fetch failed"))]
+    #[suzu(display("data fetch failed"))]
     FetchFailed {
         source: reqwest::Error,
     },
 
-    #[snafu(display("response parse failed"))]
+    #[suzu(display("response parse failed"))]
     ParseFailed {
         source: serde_json::Error,
     },
