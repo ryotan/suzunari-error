@@ -17,7 +17,7 @@ use std::process::{ExitCode, Termination};
 ///
 /// ```text
 /// Error: AppError::IoFailed: io failed, at src/main.rs:42:5
-/// Caused by the following errors (recent errors listed first):
+/// Caused by (recent first):
 ///   1| InfraError::Read: read failed, at src/infra.rs:10:9
 ///   2| No such file or directory (os error 2)
 /// ```
@@ -137,7 +137,7 @@ impl Display for StackReportFormatter<'_> {
 
         writeln!(
             f,
-            "\nCaused by the following errors (recent errors listed first):"
+            "\nCaused by (recent first):"
         )?;
 
         let mut index = 1;

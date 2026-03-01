@@ -83,7 +83,7 @@ fn main() {
         eprintln!("{}", StackReport::from(e));
         // Output (line numbers are illustrative):
         // Error: RetrieveFailed: failed to retrieve data, at src/main.rs:12:5
-        // Caused by the following errors (recent errors listed first):
+        // Caused by (recent first):
         //   1| AppError::ReadTimeout: read timed out after 3sec, at src/main.rs:18:5
         //   2| timeout
     }
