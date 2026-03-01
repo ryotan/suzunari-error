@@ -1,4 +1,6 @@
-use crate::helper::{LocationLookup, ensure_snafu_implicit, get_crate_path, lookup_location_field};
+use crate::helper::{
+    LocationLookup, combine_errors, ensure_snafu_implicit, get_crate_path, lookup_location_field,
+};
 use crate::suzu_attr;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
@@ -47,10 +49,13 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
             }
         },
         Data::Enum(data_enum) => {
+            let mut errors = Vec::new();
             for variant in &mut data_enum.variants {
                 match &mut variant.fields {
                     Fields::Named(fields) => {
-                        resolve_and_inject_location(fields, &crate_path)?;
+                        if let Err(e) = resolve_and_inject_location(fields, &crate_path) {
+                            errors.push(e);
+                        }
                     }
                     Fields::Unit => {
                         let location_field = location_field_impl(&crate_path);
@@ -62,13 +67,14 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
                         });
                     }
                     _ => {
-                        return Err(Error::new(
+                        errors.push(Error::new(
                             variant.fields.span(),
                             "#[suzunari_error] can only be used on enum variants with named fields",
                         ));
                     }
                 }
             }
+            combine_errors(errors)?;
         }
         Data::Union(_) => unreachable!("unions are rejected before this point"),
     }

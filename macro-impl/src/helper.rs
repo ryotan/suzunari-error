@@ -84,7 +84,10 @@ pub(crate) fn lookup_location_field(
             return Err(Error::new(
                 fields.named[location_typed[1]].span(),
                 format!(
-                    "multiple Location fields found; use {location_attr_hint} to specify which one"
+                    "multiple fields with type name ending in `Location` found; \
+                     use {location_attr_hint} to specify the correct one. \
+                     Note: detection uses the last path segment, so types like \
+                     `geo::Location` also match."
                 ),
             ));
         }
@@ -122,7 +125,7 @@ pub(crate) fn find_location_field(fields: &FieldsNamed) -> Result<&Field, Error>
             if !looks_like_location_type(&field.ty) {
                 return Err(Error::new(
                     field.ty.span(),
-                    "location field must be of type Location",
+                    "#[stack(location)] field must be of type `suzunari_error::Location`",
                 ));
             }
             Ok(field)
@@ -202,6 +205,10 @@ pub(crate) fn extract_display_error_inner(ty: &Type) -> Option<&Type> {
 ///
 /// Uses segment name only (not the full path), so `my_module::Location`
 /// would also match. See Known Limitations in lib.rs.
+///
+/// When this heuristic causes a false positive (e.g., `geo::Location`),
+/// error messages from [`lookup_location_field`] and [`find_location_field`]
+/// explain the heuristic so the user can disambiguate with `#[stack(location)]`.
 pub(crate) fn looks_like_location_type(ty: &Type) -> bool {
     match ty {
         Type::Path(p) => p

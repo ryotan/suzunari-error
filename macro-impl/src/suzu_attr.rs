@@ -40,15 +40,27 @@ pub(crate) fn process_suzu_attrs(
             Ok(())
         }
         Data::Enum(data_enum) => {
+            // Accumulate errors across all variants so the user sees every
+            // problem at once, matching the pattern in derive.rs's generate_enum_impl.
+            let mut errors = Vec::new();
             for variant in &mut data_enum.variants {
-                process_non_field_attrs(&mut variant.attrs, Level::NonField)?;
-
+                if let Err(e) = process_non_field_attrs(&mut variant.attrs, Level::NonField) {
+                    errors.push(e);
+                }
                 match &mut variant.fields {
-                    Fields::Named(fields) => process_fields(&mut fields.named, crate_path)?,
-                    fields => reject_suzu_on_non_named_fields(fields)?,
+                    Fields::Named(fields) => {
+                        if let Err(e) = process_fields(&mut fields.named, crate_path) {
+                            errors.push(e);
+                        }
+                    }
+                    fields => {
+                        if let Err(e) = reject_suzu_on_non_named_fields(fields) {
+                            errors.push(e);
+                        }
+                    }
                 }
             }
-            Ok(())
+            combine_errors(errors)
         }
         Data::Union(_) => Err(Error::new(input.span(), "#[suzu] cannot be used on unions")),
     }
@@ -169,7 +181,7 @@ fn process_fields(
                 if !looks_like_location_type(&field.ty) {
                     errors.push(Error::new(
                         field.ty.span(),
-                        "#[suzu(location)] requires the field type to be Location",
+                        "#[suzu(location)] requires the field type to be `suzunari_error::Location`",
                     ));
                 } else {
                     apply_location(&mut new_attrs);
