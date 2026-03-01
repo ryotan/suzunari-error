@@ -11,37 +11,68 @@ use core::fmt::{Debug, Display, Formatter};
 ///
 /// ## Pattern A: `#[suzu(from)]` — auto-wraps type and generates `source(from(...))` (recommended)
 ///
-/// ```rust,ignore
-/// // ignore: uses external crate type for illustration
+/// ```
+/// use suzunari_error::*;
+///
+/// // A third-party type that implements Debug + Display but not Error.
+/// #[derive(Debug)]
+/// struct LibError(String);
+/// impl std::fmt::Display for LibError {
+///     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+///         f.write_str(&self.0)
+///     }
+/// }
+///
 /// #[suzunari_error]
-/// #[suzu(display("hashing failed"))]
-/// struct HashError {
+/// #[suzu(display("operation failed"))]
+/// struct AppError {
 ///     #[suzu(from)]
-///     source: argon2::Error,  // becomes DisplayError<argon2::Error>
+///     source: LibError,  // becomes DisplayError<LibError>
 /// }
 /// ```
 ///
 /// ## Pattern B: Manual `source(from(...))` — explicit control
 ///
-/// ```rust,ignore
-/// // ignore: uses external crate type for illustration
+/// ```
+/// use suzunari_error::*;
+///
+/// #[derive(Debug)]
+/// struct LibError(String);
+/// impl std::fmt::Display for LibError {
+///     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+///         f.write_str(&self.0)
+///     }
+/// }
+///
 /// #[suzunari_error]
-/// #[suzu(display("hashing failed"))]
-/// struct HashError {
-///     #[suzu(source(from(argon2::Error, DisplayError::new)))]
-///     source: DisplayError<argon2::Error>,
+/// #[suzu(display("operation failed"))]
+/// struct AppError {
+///     #[suzu(source(from(LibError, DisplayError::new)))]
+///     source: DisplayError<LibError>,
 /// }
 /// ```
 ///
-/// ## Pattern C: `map_err` — for ad-hoc conversions
+/// ## Pattern C: `map_err` — direct wrapping without snafu context
 ///
-/// ```rust,ignore
-/// // ignore: uses external crate type for illustration
-/// fn hash(input: &[u8]) -> Result<Vec<u8>, HashError> {
-///     do_hash(input)
-///         .map_err(DisplayError::new)
-///         .context(HashSnafu)?;
-///     // ...
+/// ```
+/// use suzunari_error::DisplayError;
+///
+/// #[derive(Debug)]
+/// struct LibError(String);
+/// impl std::fmt::Display for LibError {
+///     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+///         f.write_str(&self.0)
+///     }
+/// }
+///
+/// fn fallible() -> Result<(), LibError> {
+///     Err(LibError("boom".into()))
+/// }
+///
+/// // Wrap non-Error type into Error for use with ? or error combinators
+/// fn do_something() -> Result<(), Box<dyn std::error::Error>> {
+///     fallible().map_err(DisplayError::new)?;
+///     Ok(())
 /// }
 /// ```
 pub struct DisplayError<E>(E);
