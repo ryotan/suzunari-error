@@ -11,8 +11,8 @@ fn test_location_core_only() {
 }
 
 // StackReport is available in core-only tier (without Termination impl).
-// Uses raw #[derive(Snafu)] + manual StackError impl because #[suzunari_error]
-// relies on proc-macro-crate resolution which only works in the main crate.
+// Uses raw #[derive(Snafu)] + manual StackError impl to test the trait
+// behavior independently from the proc-macro layer.
 #[derive(Debug, snafu::Snafu)]
 #[snafu(display("core error"))]
 struct CoreTestError {

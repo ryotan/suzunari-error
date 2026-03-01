@@ -210,6 +210,23 @@ fn is_source_field(field: &Field) -> bool {
     snafu_source.unwrap_or(is_named_source)
 }
 
+/// Ensures the field has `#[snafu(implicit)]`. Adds it if missing.
+pub(crate) fn ensure_snafu_implicit(field: &mut Field) {
+    let has_implicit = field.attrs.iter().any(|attr| {
+        if !attr.path().is_ident("snafu") {
+            return false;
+        }
+        let Meta::List(meta_list) = &attr.meta else {
+            return false;
+        };
+        snafu_tokens_contain_keyword(&meta_list.tokens, "implicit")
+    });
+
+    if !has_implicit {
+        field.attrs.push(syn::parse_quote!(#[snafu(implicit)]));
+    }
+}
+
 /// Scans a token stream for `keyword` as a leading ident in any
 /// comma-separated segment. Does not descend into groups (parentheses,
 /// brackets, braces), so `display("source")` won't match `source`.

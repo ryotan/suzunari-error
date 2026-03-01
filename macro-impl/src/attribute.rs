@@ -1,5 +1,5 @@
 use crate::helper::{
-    get_crate_path, has_stack_location_attr, looks_like_location_type, snafu_tokens_contain_keyword,
+    ensure_snafu_implicit, get_crate_path, has_stack_location_attr, looks_like_location_type,
 };
 use crate::suzu_attr;
 use proc_macro2::TokenStream;
@@ -8,7 +8,7 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Colon;
 use syn::{
-    Data, DeriveInput, Error, Field, FieldMutability, Fields, FieldsNamed, Meta, Visibility,
+    Data, DeriveInput, Error, Field, FieldMutability, Fields, FieldsNamed, Visibility,
 };
 
 /// Implementation of `#[suzunari_error]`.
@@ -159,23 +159,6 @@ fn resolve_and_inject_location(
     // 4. Auto-inject location field
     fields.named.push(location_field_impl(crate_path));
     Ok(())
-}
-
-/// Ensures the field has `#[snafu(implicit)]`. Adds it if missing.
-fn ensure_snafu_implicit(field: &mut Field) {
-    let has_implicit = field.attrs.iter().any(|attr| {
-        if !attr.path().is_ident("snafu") {
-            return false;
-        }
-        let Meta::List(meta_list) = &attr.meta else {
-            return false;
-        };
-        snafu_tokens_contain_keyword(&meta_list.tokens, "implicit")
-    });
-
-    if !has_implicit {
-        field.attrs.push(syn::parse_quote!(#[snafu(implicit)]));
-    }
 }
 
 /// Constructs a synthetic `location: Location` field with
