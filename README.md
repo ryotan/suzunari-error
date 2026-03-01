@@ -80,7 +80,7 @@ fn run() -> Result<(), RetrieveFailed> {
 
 fn main() {
     if let Err(e) = run() {
-        eprintln!("{}", StackReport::from_error(e));
+        eprintln!("{}", StackReport::from(e));
         // Output (line numbers are illustrative):
         // Error: RetrieveFailed: failed to retrieve data, at src/main.rs:12:5
         // Caused by the following errors (recent errors listed first):

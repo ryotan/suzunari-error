@@ -30,7 +30,7 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 - Wraps `Result<(), E>` and provides `Debug`/`Display` output
 - Phase 1: traverses `stack_source()` chain (with type name + location)
 - Phase 2: traverses remaining `Error::source()` chain (without location)
-- Create via `StackReport::from_error(e)` or `Result::into()`
+- Create via `StackReport::from(e)`, `e.into()`, or `Result::<(), E>::into()`
 - Implements `Termination` (std only) for use as `main()` return type
 
 ### Macros
