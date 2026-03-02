@@ -5,6 +5,7 @@
 //! and integrates well with the snafu error handling system.
 
 use snafu::{Snafu, ensure};
+use std::collections::HashSet;
 use std::path::Path;
 use suzunari_error::Location;
 
@@ -14,6 +15,8 @@ use suzunari_error::Location;
 /// 1. The Location is correctly captured when an error is generated using snafu
 /// 2. The file name and line number in the Location match where the error was created
 /// 3. The error's Display and Debug formats work as expected
+// Tests Location's GenerateImplicitData integration with raw snafu,
+// without #[suzunari_error], to verify the trait impl works independently.
 #[test]
 fn test_snafu_implicit_generation() {
     #[derive(Debug, Snafu)]
@@ -33,14 +36,13 @@ fn test_snafu_implicit_generation() {
     let file = file!();
     let line = line!() - 7; // 7 lines above is where SomeSnafu is used
     assert_eq!(format!("{error}"), "SomeError");
-    assert_eq!(
-        format!("{error:?}"),
-        format!("SomeError {{ location: {file}:{line}:9 }}")
-    );
-    assert_eq!(
-        format!("{error:#?}"),
-        format!("SomeError {{\n    location: {file}:{line}:9,\n}}")
-    );
+    // Location's Debug now delegates to core::panic::Location's derive(Debug),
+    // producing struct-style output instead of the Display format.
+    let debug = format!("{error:?}");
+    // file!() is escaped via {:?} to match Debug's backslash escaping on Windows.
+    assert!(debug.contains(&format!("file: {:?}", file)));
+    assert!(debug.contains(&format!("line: {line}")));
+    assert!(debug.contains("col: 9"));
 }
 
 /// Tests using Location with a custom error type manually.
@@ -73,14 +75,15 @@ fn test_manual_location_in_error() {
 
     // Verify the location in the error
     let expected_file = file!();
-    let expected_line = line!() - 8; // 5 lines above is where Location::current() was called
+    let expected_line = line!() - 8; // 8 lines above is where Location::current() was called
 
     assert_eq!(error.location.file(), expected_file);
     assert_eq!(error.location.line(), expected_line);
 
-    // Verify the location appears in the display format
+    // Verify the location appears in the display format.
+    // Display uses {:?} for Location, so backslashes are escaped on Windows.
     let display_str = format!("{}", error);
-    assert!(display_str.contains(expected_file));
+    assert!(display_str.contains(&format!("{:?}", expected_file)));
     assert!(display_str.contains(&expected_line.to_string()));
 }
 
@@ -107,4 +110,55 @@ fn test_location_file_path() {
         file_name, "location_test.rs",
         "The file name should match this test file"
     );
+}
+
+// --- GAP-03: Location PartialEq, Eq, Hash, Clone, Copy ---
+
+#[test]
+fn test_location_eq_same_site() {
+    // Copy of the same Location should be equal
+    let a = Location::current();
+    let b = a;
+    assert_eq!(a, b);
+}
+
+#[test]
+fn test_location_ne_different_site() {
+    let a = Location::current();
+    let b = Location::current();
+    // Different lines → not equal
+    assert_ne!(a, b);
+}
+
+#[test]
+fn test_location_hash() {
+    let loc = Location::current();
+    let mut set = HashSet::new();
+    set.insert(loc);
+    // The same location inserted again — set size should not change
+    set.insert(loc);
+    assert_eq!(set.len(), 1);
+
+    // Different location should increase set size
+    let loc2 = Location::current();
+    set.insert(loc2);
+    assert_eq!(set.len(), 2);
+}
+
+#[test]
+fn test_location_copy() {
+    let loc = Location::current();
+    let copied = loc; // Copy
+    // Both should be usable (not moved)
+    assert_eq!(loc.line(), copied.line());
+    assert_eq!(loc.file(), copied.file());
+}
+
+#[test]
+fn test_location_clone() {
+    let loc = Location::current();
+    // Intentionally using clone() on a Copy type to verify Clone impl works.
+    #[allow(clippy::clone_on_copy)]
+    let cloned = loc.clone();
+    assert_eq!(loc, cloned);
 }

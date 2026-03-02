@@ -1,0 +1,11 @@
+error: Can only derive `Snafu` for enums with struct-like and unit enum variants
+  --> tests/compile-fail/derive_enum_tuple_variant.rs:10:10
+   |
+10 |     Tuple(String),
+   |          ^^^^^^^^
+
+error: StackError can only be derived for enums with named fields in all variants
+  --> tests/compile-fail/derive_enum_tuple_variant.rs:10:10
+   |
+10 |     Tuple(String),
+   |          ^^^^^^^^

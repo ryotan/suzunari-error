@@ -1,0 +1,5 @@
+error: #[suzu] requires arguments, e.g., #[suzu(location)] or #[suzu(display("..."))]
+ --> tests/compile-fail/suzu_bare_on_type.rs:4:1
+  |
+4 | #[suzu]
+  | ^

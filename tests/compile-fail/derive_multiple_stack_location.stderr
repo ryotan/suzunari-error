@@ -1,0 +1,11 @@
+error: multiple #[stack(location)] fields; only one is allowed per struct/variant
+  --> tests/compile-fail/derive_multiple_stack_location.rs:11:5
+   |
+11 |     #[stack(location)]
+   |     ^
+
+error: first occurrence of #[stack(location)] is here
+ --> tests/compile-fail/derive_multiple_stack_location.rs:8:5
+  |
+8 |     #[stack(location)]
+  |     ^

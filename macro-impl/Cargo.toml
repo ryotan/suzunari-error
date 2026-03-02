@@ -1,11 +1,12 @@
 [package]
 name = "suzunari-error-macro-impl"
-description = "Macro implementations for Suzunari Error"
+description = "Proc-macro internals for suzunari-error — not intended for direct use"
 version.workspace = true
 edition.workspace = true
 repository.workspace = true
 license.workspace = true
 authors.workspace = true
+rust-version.workspace = true
 
 [lib]
 proc-macro = true
@@ -14,9 +15,9 @@ proc-macro = true
 alloc = []
 
 [dependencies]
-proc-macro-crate.workspace = true
 proc-macro2.workspace = true
 quote.workspace = true
 syn = { workspace = true, features = ["full"] }
+
 [dev-dependencies]
 suzunari-error.workspace = true

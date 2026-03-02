@@ -39,10 +39,12 @@ cargo test -p suzunari-error-feature-tests --no-default-features --features test
 ├── macro-impl/           # Proc-macro crate
 │   └── src/
 │       ├── lib.rs        # Macro entry points
-│       ├── attribute.rs  # #[suzunari_error], #[suzunari_location]
+│       ├── attribute.rs  # #[suzunari_error]
 │       ├── derive.rs     # #[derive(StackError)]
 │       ├── report.rs     # #[suzunari_error::report]
+│       ├── suzu_attr.rs  # #[suzu(...)] attribute processing
 │       └── helper.rs     # Shared utilities
+├── examples/             # Runnable usage examples
 ├── tests/                # Integration tests (std)
 ├── tests-features/       # Feature-tier compile checks and integration tests
 ├── docs/                 # Development guidelines
@@ -54,8 +56,6 @@ cargo test -p suzunari-error-feature-tests --no-default-features --features test
 See [docs/guidelines-rs.md](./docs/guidelines-rs.md) for Rust style guidelines and [docs/coding-practices.md](./docs/coding-practices.md) for general coding practices.
 
 ## Git Conventions
-
-See [docs/guidelines-git.md](./docs/guidelines-git.md) for details.
 
 ### Branches
 

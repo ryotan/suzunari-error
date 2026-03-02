@@ -1,0 +1,5 @@
+error: StackError cannot be derived for unions
+ --> tests/compile-fail/derive_union.rs:5:11
+  |
+5 | pub union MyUnion {
+  |           ^^^^^^^

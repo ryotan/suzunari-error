@@ -5,6 +5,7 @@ edition = "2024"
 repository = "https://github.com/ryotan/suzunari-error"
 license = "MIT OR Apache-2.0"
 authors = ["ryotan"]
+rust-version = "1.85"
 
 [workspace]
 members = ["macro-impl", "tests-features"]
@@ -12,12 +13,11 @@ members = ["macro-impl", "tests-features"]
 [workspace.dependencies]
 snafu = { version = "0.8.6", default-features = false }
 proc-macro2 = "1.0"
-proc-macro-crate = "3.3"
 quote = "1.0"
 syn = "2.0"
 # Workspace local crates
 suzunari-error = { path = ".", default-features = false }
-suzunari-error-macro-impl = { path = "./macro-impl", default-features = false }
+suzunari-error-macro-impl = { version = "0.1.0", path = "./macro-impl", default-features = false }
 
 [package]
 name = "suzunari-error"
@@ -27,6 +27,8 @@ edition.workspace = true
 repository.workspace = true
 license.workspace = true
 authors.workspace = true
+rust-version.workspace = true
+readme = "README.md"
 
 [features]
 default = ["std"]

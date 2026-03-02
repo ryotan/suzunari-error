@@ -20,7 +20,7 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 - Provides error location awareness for contextual chained errors
 - `location()` — returns the `Location` where this error was constructed
 - `type_name()` — returns the error type name for display in stack traces
-- `stack_source()` — returns the source error as a `StackError` if it implements the trait (uses Deref-based specialization in generated code)
+- `stack_source()` — returns the source error as a `StackError` if it implements the trait (uses autoref specialization in generated code)
 - `depth()` — counts the full `Error::source()` chain length
 
 ### StackReport
@@ -30,15 +30,26 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 - Wraps `Result<(), E>` and provides `Debug`/`Display` output
 - Phase 1: traverses `stack_source()` chain (with type name + location)
 - Phase 2: traverses remaining `Error::source()` chain (without location)
-- Create via `StackReport::from_error(e)` or `Result::into()`
+- Create via `StackReport::from(e)`, `e.into()`, or `Result::<(), E>::into()`
 - Implements `Termination` (std only) for use as `main()` return type
 
 ### Macros
 
-- **`#[suzunari_error]`**: The main entry point for defining error types. Combines `#[suzunari_location]` + `#[derive(Debug, Snafu, StackError)]`
-- `#[derive(StackError)]`: Implements the StackError trait for structs and enums. Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
-- `#[suzunari_location]`: Adds a location field to error types with SNAFU's implicit context
+- **`#[suzunari_error]`**: The main entry point for defining error types. Processes `#[suzu(...)]` attributes, resolves/injects location fields, and appends `#[derive(Debug, Snafu, StackError)]`
+- `#[derive(StackError)]`: Implements the StackError trait for structs and enums. Finds location field via `#[stack(location)]` or `Location` type. Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
 - `#[suzunari_error::report]`: Transforms `fn main() -> Result<(), E>` to return `StackReport<E>`. Prints formatted error chain to stderr on failure (std only)
+
+### `#[suzu(...)]` Attribute
+
+`#[suzu(...)]` is a superset of `#[snafu(...)]`. All snafu keywords are passed through as-is. Additionally:
+
+- **`from`** (field-level): Wraps the field type in `DisplayError<T>` and generates `#[snafu(source(from(T, DisplayError::new)))]`
+- **`location`** (field-level): Marks a field as the location field. Converts to `#[stack(location)]` + `#[snafu(implicit)]`. Allows custom field names. Requires `Location` type
+
+### Field Attributes
+
+- `#[suzu(location)]`: Marks a field as the location field (consumed by `#[suzunari_error]`). Allows custom field names instead of the default `location`
+- `#[stack(location)]`: Internal marker consumed by `derive(StackError)` to identify the location field
 
 ### Location Structure
 
@@ -74,24 +85,34 @@ The `StackError` trait is the foundation of the Suzunari Error approach:
 ### Error Type Definition
 
 ```rust
+// Illustrative — external types are placeholders.
+// See tests/suzu_attr_test.rs for runnable examples of #[suzu(from)] usage.
 #[suzunari_error]
 pub enum DatabaseError {
-    #[snafu(display("connection to {connection_string} failed"))]
+    #[suzu(display("connection to {connection_string} failed"))]
     ConnectionFailed {
         connection_string: String,
         source: std::io::Error,
     },
 
-    #[snafu(display("query execution failed"))]
+    #[suzu(display("query execution failed"))]
     QueryFailed {
         query: String,
         source: sqlx::Error,
     },
 
-    #[snafu(display("record {id} not found in {table}"))]
+    #[suzu(display("record {id} not found in {table}"))]
     RecordNotFound {
         id: String,
         table: String,
+    },
+
+    // #[suzu(from)] wraps non-Error types in DisplayError automatically.
+    // Use this for third-party types that implement Debug + Display but not Error.
+    #[suzu(display("hashing failed"))]
+    HashFailed {
+        #[suzu(from)]
+        source: argon2::Error,
     },
 }
 ```
@@ -99,7 +120,8 @@ pub enum DatabaseError {
 ### Error Propagation
 
 ```rust
-use snafu::OptionExt;
+// Illustrative — external types are placeholders.
+use suzunari_error::OptionExt;
 
 fn get_user(id: &str, conn: &Connection) -> Result<User, DatabaseError> {
     let query = format!("SELECT * FROM users WHERE id = '{}'", id);
@@ -117,13 +139,14 @@ fn get_user(id: &str, conn: &Connection) -> Result<User, DatabaseError> {
 ### Error Handling
 
 ```rust
+// Illustrative — external types are placeholders.
 fn process_user_data(id: &str) -> Result<ProcessedData, ApplicationError> {
     let conn = establish_connection()
         .context(DatabaseConnectionSnafu)?;
-        
+
     let user = get_user(id, &conn)
         .context(UserRetrievalSnafu { user_id: id.to_string() })?;
-        
+
     // Process user data
     Ok(ProcessedData::from_user(user))
 }
@@ -140,9 +163,9 @@ fn process_user_data(id: &str) -> Result<ProcessedData, ApplicationError> {
 #[test]
 fn test_error_propagation() {
     let result = get_user("non_existent", &mock_connection());
-    
+
     match result {
-        Err(DatabaseError::RecordNotFound { id, table }) => {
+        Err(DatabaseError::RecordNotFound { id, table, .. }) => {
             assert_eq!(id, "non_existent");
             assert_eq!(table, "users");
         },

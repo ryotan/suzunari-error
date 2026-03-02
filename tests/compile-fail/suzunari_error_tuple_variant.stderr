@@ -1,0 +1,5 @@
+error: #[suzunari_error] can only be used on enum variants with named fields
+ --> tests/compile-fail/suzunari_error_tuple_variant.rs:7:10
+  |
+7 |     Tuple(String),
+  |          ^^^^^^^^

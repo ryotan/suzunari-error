@@ -35,7 +35,7 @@ guidelines will ensure code consistency, readability, and maintainability across
 
 ### Suzunari Error Approach
 
-- Use `#[suzunari_error]` for defining error types (combines `#[suzunari_location]` + `#[derive(Snafu, StackError)]`)
+- Use `#[suzunari_error]` for defining error types (location injection + `#[derive(Debug, Snafu, StackError)]`)
 - Structure error types to capture relevant context:
   - Include fields that provide context about the error situation
   - Use the `source` field to chain errors
@@ -55,34 +55,33 @@ guidelines will ensure code consistency, readability, and maintainability across
 
 ```rust
 #[suzunari_error]
-enum ApiError {
-    #[snafu(display("data fetch failed"))]
-    FetchFailed {
-        source: reqwest::Error,
+enum AppError {
+    #[suzu(display("failed to read config from {path}"))]
+    ReadConfig {
+        path: String,
+        source: std::io::Error,
     },
 
-    #[snafu(display("invalid parameter '{param_name}': {reason}"))]
+    #[suzu(display("invalid value '{value}': {reason}"))]
     ValidationFailed {
-        param_name: String,
+        value: String,
         reason: String,
     },
 }
 
-fn fetch_data(url: &str) -> Result<Data, ApiError> {
-    let response = reqwest::get(url)
-        .await
-        .context(FetchFailedSnafu)?;
+fn load_config(path: &str) -> Result<String, AppError> {
+    let content = std::fs::read_to_string(path)
+        .context(ReadConfigSnafu { path })?;
 
-    // Validation example
     ensure!(
-        response.status().is_success(),
+        !content.is_empty(),
         ValidationFailedSnafu {
-            param_name: "url",
-            reason: format!("received status code {}", response.status())
+            value: path,
+            reason: "config file is empty",
         }
     );
 
-    Ok(Data::from_response(response))
+    Ok(content)
 }
 ```
 
@@ -91,7 +90,8 @@ fn fetch_data(url: &str) -> Result<Data, ApiError> {
 - Document all public APIs using rustdoc comments (`///`)
 - Include examples in documentation where appropriate
 - Document complex or non-obvious implementations with regular comments (`//`)
-- Use `//TODO:` or `//FIXME:` comments for temporary solutions or known issues
+- Avoid long-lived `TODO`/`FIXME` comments — address issues immediately or document limitations in doc comments
+- Write all code comments in English
 
 ## Functional Programming Style
 
@@ -107,13 +107,6 @@ fn fetch_data(url: &str) -> Result<Data, ApiError> {
 - Consider using `Cow<T>` for values that may or may not need to be owned
 - Profile before optimizing; avoid premature optimization
 
-## Concurrency
-
-- Use `async`/`await` for asynchronous operations when appropriate
-- Be explicit about thread safety using appropriate types (`Arc`, `Mutex`, etc.)
-- Prefer message passing over shared state when possible
-- Document thread safety assumptions in multi-threaded code
-
 ## Testing
 
 - Write unit tests for all public functions
@@ -125,9 +118,7 @@ fn fetch_data(url: &str) -> Result<Data, ApiError> {
 
 - Design clear and intuitive public APIs
 - Use proper error handling for library functions
-- Serialize/deserialize data using `serde` with consistent patterns when needed
 - Keep public functions focused on a single responsibility
-- Use appropriate logging levels for debugging and error reporting
 - Consider API stability and backward compatibility
 
 ## Common Pitfalls to Avoid
@@ -137,7 +128,6 @@ fn fetch_data(url: &str) -> Result<Data, ApiError> {
 - Overuse of macros for simple tasks
 - Premature optimization
 - Inconsistent error handling patterns
-- Mixing synchronous and asynchronous code without clear boundaries
 
 ## Dependencies
 

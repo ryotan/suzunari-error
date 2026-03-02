@@ -1,0 +1,5 @@
+error: #[suzu(...)] is not supported on unnamed fields; use named fields instead
+ --> tests/compile-fail/suzu_from_on_tuple_field.rs:7:11
+  |
+7 |     Tuple(#[suzu(from)] String),
+  |           ^

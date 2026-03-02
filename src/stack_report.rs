@@ -1,24 +1,75 @@
 use crate::StackError;
-use core::fmt;
+use core::fmt::{Debug, Display, Formatter};
+
+#[cfg(feature = "std")]
+use std::io::{Write, stderr};
+#[cfg(feature = "std")]
+use std::process::{ExitCode, Termination};
 
 /// Formats a [`StackError`] chain as a stack-trace-like report with type names and locations.
 ///
 /// Wraps `Result<(), E>` and provides formatted output via `Display` (and `Debug`, which
 /// delegates to `Display`). Used at error display boundaries such as `main()`.
 ///
-/// Create via [`StackReport::from_error`] or `Result<(), E>::into()`.
+/// Create via `StackReport::from(error)`, `Result::<(), E>::into()`, or `error.into()`.
 ///
-/// With the `std` feature, implements [`std::process::Termination`] for use as the
+/// # Output Format
+///
+/// ```text
+/// Error: AppError::IoFailed: io failed, at src/main.rs:42:5
+/// Caused by (recent first):
+///   1| InfraError::Read: read failed, at src/infra.rs:10:9
+///   2| No such file or directory (os error 2)
+/// ```
+///
+/// The first line shows the top-level error with type name and location.
+/// StackError sources (with location) are listed first with numbering,
+/// then plain `Error::source()` chain entries (without location) follow.
+///
+/// With the `std` feature, implements [`Termination`] for use as the
 /// return type of `main()`. The [`#[suzunari_error::report]`](crate::report) macro
 /// can transform `fn() -> Result<(), E>` into `fn() -> StackReport<E>` automatically.
-pub struct StackReport<E: StackError>(Result<(), E>);
-
-impl<E: StackError> StackReport<E> {
-    /// Creates a report from an error value.
-    pub fn from_error(error: E) -> Self {
-        Self(Err(error))
-    }
-}
+///
+/// # Example
+///
+/// ```
+/// use suzunari_error::*;
+///
+/// #[suzunari_error]
+/// #[suzu(display("app error"))]
+/// struct AppError {
+///     source: std::io::Error,
+/// }
+///
+/// fn run() -> Result<(), AppError> {
+///     std::fs::read("/nonexistent").context(AppSnafu)?;
+///     Ok(())
+/// }
+///
+/// let err = run().unwrap_err();
+/// let report = StackReport::from(err);
+///
+/// let output = format!("{report}");
+/// assert!(output.contains("Error: AppError: app error"));
+/// assert!(output.contains("Caused by"));
+/// ```
+///
+/// # Notes
+///
+/// - Both `Display` and `Debug` produce an empty string for the `Ok` case.
+///   This is intentional — in the `Termination` use case, success should be silent.
+/// - **`Debug` delegates to `Display`** (same output). This intentionally
+///   deviates from the [C-DEBUG](https://rust-lang.github.io/api-guidelines/debuggability.html#c-debug)
+///   guideline because `Termination` calls `Debug::fmt` to produce the error
+///   output. Making `Debug` structural (e.g., `StackReport(Err(...))`) would
+///   render the terminal output useless. Since `StackReport` is a display
+///   boundary type (not a general-purpose data carrier), the human-readable
+///   format is appropriate for both traits.
+/// - `Display` output does **not** include a trailing newline. This matches
+///   the convention for `Display` implementations and avoids double newlines
+///   with `eprintln!("{report}")`. The `Termination` impl adds a trailing
+///   newline when writing to stderr.
+pub struct StackReport<E>(Result<(), E>);
 
 impl<E: StackError> From<Result<(), E>> for StackReport<E> {
     fn from(result: Result<(), E>) -> Self {
@@ -28,57 +79,54 @@ impl<E: StackError> From<Result<(), E>> for StackReport<E> {
 
 impl<E: StackError> From<E> for StackReport<E> {
     fn from(error: E) -> Self {
-        Self::from_error(error)
+        Self(Err(error))
     }
 }
 
-impl<E: StackError> fmt::Debug for StackReport<E> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self, f)
+impl<E: StackError> Debug for StackReport<E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        Display::fmt(self, f)
     }
 }
 
-impl<E: StackError> fmt::Display for StackReport<E> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl<E: StackError> Display for StackReport<E> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         match &self.0 {
             Ok(()) => Ok(()),
-            Err(e) => fmt::Display::fmt(&StackReportFormatter(e), f),
+            Err(e) => Display::fmt(&StackReportFormatter(e), f),
         }
     }
 }
 
 #[cfg(feature = "std")]
-impl<E: StackError> std::process::Termination for StackReport<E> {
-    fn report(self) -> std::process::ExitCode {
+impl<E: StackError> Termination for StackReport<E> {
+    fn report(self) -> ExitCode {
         match self.0 {
-            Ok(()) => std::process::ExitCode::SUCCESS,
+            Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
                 // Ignore write errors — stderr may be closed, and
                 // panicking here would mask the original error.
-                let _ = std::io::Write::write_fmt(
-                    &mut std::io::stderr(),
-                    format_args!("{}", StackReportFormatter(&e)),
+                // Trailing `\n` is added here because Display omits it
+                // (Display convention: no trailing newline).
+                let _ = Write::write_fmt(
+                    &mut stderr(),
+                    format_args!("{}\n", StackReportFormatter(&e)),
                 );
-                std::process::ExitCode::FAILURE
+                ExitCode::FAILURE
             }
         }
     }
 }
 
 /// Internal formatter that formats a StackError chain.
-pub(crate) struct StackReportFormatter<'a>(pub(crate) &'a dyn StackError);
+struct StackReportFormatter<'a>(&'a dyn StackError);
 
-impl fmt::Debug for StackReportFormatter<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self, f)
-    }
-}
-
-impl fmt::Display for StackReportFormatter<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl Display for StackReportFormatter<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let error = self.0;
 
-        // Top-level error with type name and location (no index)
+        // Top-level error with type name and location (no index).
+        // No trailing newline — Display convention.
         write!(
             f,
             "Error: {}: {error}, at {}",
@@ -86,26 +134,35 @@ impl fmt::Display for StackReportFormatter<'_> {
             error.location()
         )?;
 
-        // Check if there are any causes
-        let has_stack_cause = error.stack_source().is_some();
-        let has_error_cause = error.source().is_some();
-        if !(has_stack_cause || has_error_cause) {
-            return writeln!(f);
+        // Check if there are any causes.
+        // source() suffices: the StackError contract guarantees that
+        // stack_source().is_some() implies source().is_some().
+        if error.source().is_none() {
+            return Ok(());
         }
 
-        writeln!(
-            f,
-            "\nCaused by the following errors (recent errors listed first):"
-        )?;
+        // Prefix each subsequent line with `\n` instead of appending trailing `\n`,
+        // so the overall output has no trailing newline.
+        write!(f, "\nCaused by (recent first):")?;
 
         let mut index = 1;
 
         // Phase 1: StackError chain (with location)
         let mut current_stack: &dyn StackError = error;
         while let Some(next) = current_stack.stack_source() {
-            writeln!(
+            // Invariant: stack_source() implies source() (StackError is a sub-chain of Error).
+            // In release builds this assertion is stripped; a broken impl would produce
+            // truncated output (missing causes) rather than a panic, which is preferable
+            // to crashing inside a Display formatter.
+            debug_assert!(
+                current_stack.source().is_some(),
+                "StackError::stack_source() returned Some but Error::source() returned None \
+                 for type {}. This indicates an incorrect StackError implementation.",
+                current_stack.type_name()
+            );
+            write!(
                 f,
-                "  {index}| {}: {next}, at {}",
+                "\n  {index}| {}: {next}, at {}",
                 next.type_name(),
                 next.location()
             )?;
@@ -116,7 +173,7 @@ impl fmt::Display for StackReportFormatter<'_> {
         // Phase 2: Error chain (without location)
         let mut current_error = current_stack.source();
         while let Some(e) = current_error {
-            writeln!(f, "  {index}| {e}")?;
+            write!(f, "\n  {index}| {e}")?;
             index += 1;
             current_error = e.source();
         }

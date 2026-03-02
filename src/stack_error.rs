@@ -5,38 +5,102 @@ use core::error::Error;
 ///
 /// Types implementing this trait carry a `Location` at each level of the
 /// error chain, enabling `StackReport` to produce stack-trace-like output.
+///
+/// # Design note: no `Send + Sync` supertrait
+///
+/// This trait requires only `Error`, not `Send + Sync + 'static` (unlike
+/// anyhow/eyre). This aligns with snafu, which does not impose `Send + Sync`
+/// on error types. `BoxedStackError` adds `Send + Sync` bounds for the
+/// thread-safe trait object case.
+///
+/// # Design note: unsealed trait
+///
+/// This trait is intentionally unsealed — external crates may implement it
+/// for custom wrapper types (e.g., similar to `BoxedStackError`). Future
+/// method additions must provide default implementations to avoid breaking
+/// downstream impls.
+///
+/// # Deriving
+///
+/// Use `#[suzunari_error]` (recommended) or `#[derive(StackError)]` directly.
+/// Both resolve the location field via `#[stack(location)]` or by detecting a
+/// `Location`-typed field. Manual impl is only needed for wrapper types like
+/// `BoxedStackError`.
+///
+/// # Example
+///
+/// ```
+/// use suzunari_error::*;
+///
+/// #[suzunari_error]
+/// #[suzu(display("fetch failed for {url}"))]
+/// struct FetchError {
+///     url: String,
+///     source: std::io::Error,
+/// }
+///
+/// fn fetch(url: &str) -> Result<(), FetchError> {
+///     std::fs::read(url).context(FetchSnafu { url })?;
+///     Ok(())
+/// }
+///
+/// let err = fetch("/nonexistent").unwrap_err();
+///
+/// // StackError methods:
+/// assert!(err.location().file().ends_with(".rs"));
+/// assert_eq!(err.type_name(), "FetchError");
+/// assert!(err.stack_source().is_none()); // io::Error is not StackError
+/// assert_eq!(err.depth(), 1);            // 1 cause in the chain
+/// ```
 pub trait StackError: Error {
     /// Returns the location where this error was constructed.
+    #[must_use]
     fn location(&self) -> &Location;
 
-    /// Returns the error type name for display in stack traces.
+    /// Returns a human-readable type name for display in stack traces.
     ///
-    /// The derive macro generates this as a `&'static str` literal from the type name.
+    /// The derive macro generates this as a `&'static str` literal:
+    /// - Structs: `"StructName"`
+    /// - Enum variants: `"EnumName::VariantName"`
+    ///
+    /// Generic type parameters are not included. This is intended for display
+    /// purposes only — do not parse or match against it programmatically.
+    #[must_use]
     fn type_name(&self) -> &'static str;
 
     /// Returns the source error as a StackError, if available.
     ///
     /// This enables StackReport to traverse the error chain with
     /// location info. The derive macro generates this automatically
-    /// using Deref-based specialization.
+    /// using autoref specialization (see the `__private` module).
     ///
     /// # Contract
     /// If `stack_source()` returns `Some(s)`, then `Error::source()`
-    /// must also return `Some` pointing to the same error. The derive
-    /// macro upholds this automatically; manual impls must ensure
-    /// consistency.
+    /// must also return `Some(e)` where `e` and `s` refer to the same
+    /// underlying error value (i.e., `s` is a `&dyn StackError` view
+    /// of the `&dyn Error` returned by `source()`). The derive macro
+    /// upholds this automatically; manual impls must ensure consistency.
+    ///
+    /// Violating this contract causes `StackReport` to produce incomplete
+    /// output in release builds (the `debug_assert!` that checks this is
+    /// stripped). In debug builds, a panic will occur instead.
+    #[must_use]
     fn stack_source(&self) -> Option<&dyn StackError> {
         None
     }
 
     /// Returns the number of errors in the `Error::source()` chain (excluding self).
     ///
-    /// Counts the full chain via `Error::source()`, including both
-    /// `StackError` and non-`StackError` causes.
+    /// Traverses the full `Error::source()` chain (not `stack_source()`),
+    /// counting both `StackError` and non-`StackError` causes.
+    ///
+    /// Note: this count may differ from the number of lines in `StackReport`
+    /// output, which also shows the top-level error on the first line.
+    #[must_use]
     fn depth(&self) -> usize {
         // successors() can't be used here due to trait object lifetime constraints:
         // source() returns Option<&dyn Error> with a lifetime tied to &self,
-        // but successors requires the closure output lifetime to match its input.
+        // but `successors` requires the closure output lifetime to match its input.
         let mut count = 0;
         let mut current = self.source();
         while let Some(e) = current {
@@ -53,10 +117,11 @@ mod alloc_impls {
     use alloc::boxed::Box;
     use alloc::sync::Arc;
 
-    // Box<T> requires T: Sized here because Box<dyn StackError> needs explicit
-    // Error + StackError impls (std's blanket impl<T: Error> Error for Box<T>
-    // requires T: Sized). Arc doesn't need this because std provides
-    // impl<T: Error + ?Sized> Error for Arc<T>.
+    /// Delegates all methods to the inner `T`.
+    ///
+    /// Requires `T: Sized`; `Box<dyn StackError>` needs a separate impl
+    /// because `core` provides `impl Error for Box<T: Error + ?Sized>` but
+    /// we still need to manually route `StackError` methods.
     impl<T: StackError> StackError for Box<T> {
         fn location(&self) -> &Location {
             self.as_ref().location()
@@ -68,6 +133,7 @@ mod alloc_impls {
             self.as_ref().stack_source()
         }
     }
+    /// Delegates all methods to the inner `T` via `Arc::as_ref`.
     impl<T: ?Sized + StackError> StackError for Arc<T> {
         fn location(&self) -> &Location {
             self.as_ref().location()
@@ -80,11 +146,14 @@ mod alloc_impls {
         }
     }
 
+    /// Routes `Error::source` through the trait object.
     impl Error for Box<dyn StackError> {
         fn source(&self) -> Option<&(dyn Error + 'static)> {
             Error::source(Box::as_ref(self))
         }
     }
+
+    /// Delegates all methods through the `dyn StackError` trait object.
     impl StackError for Box<dyn StackError> {
         fn location(&self) -> &Location {
             self.as_ref().location()
@@ -97,11 +166,14 @@ mod alloc_impls {
         }
     }
 
+    /// Routes `Error::source` through the thread-safe trait object.
     impl Error for Box<dyn StackError + Send + Sync> {
         fn source(&self) -> Option<&(dyn Error + 'static)> {
             Error::source(Box::as_ref(self))
         }
     }
+
+    /// Delegates all methods through the `dyn StackError + Send + Sync` trait object.
     impl StackError for Box<dyn StackError + Send + Sync> {
         fn location(&self) -> &Location {
             self.as_ref().location()
@@ -118,7 +190,7 @@ mod alloc_impls {
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
     // Tests use raw #[derive(Snafu)] + manual impl to test StackError trait
-    // independently from proc-macro layer. .build() is snafu's standard test pattern.
+    // independently of proc-macro layer. .build() is snafu's standard test pattern.
     use super::*;
     use crate::StackReport;
     use alloc::boxed::Box;
@@ -215,7 +287,7 @@ mod tests {
         assert!(wrapper_error.location().file().ends_with("stack_error.rs"));
         assert_ne!(wrapper_error.location().line(), root_location);
 
-        let report = format!("{:?}", StackReport::from_error(wrapper_error));
+        let report = format!("{:?}", StackReport::from(wrapper_error));
         let file = file!();
         assert!(report.contains("Error: WrapperError: Wrapper error: Something failed"));
         assert!(report.contains(&format!(", at {file}:")));
@@ -257,38 +329,53 @@ mod tests {
     }
 
     #[test]
-    fn test_practical_error_handling() {
-        fn may_fail(input: i32) -> Result<i32, Box<dyn StackError + Send + Sync + 'static>> {
-            if input < 0 {
-                return Err(Box::new(
-                    SimpleSnafu {
-                        message: "Input must be non-negative",
-                    }
-                    .build(),
-                ));
-            }
-            Ok(input * 2)
+    fn test_depth_one() {
+        fn gen_root() -> Result<(), Box<dyn StackError + Send + Sync + 'static>> {
+            let root = SimpleSnafu { message: "root" }.build();
+            Err(Box::new(root))
         }
+        let wrapper = gen_root()
+            .context(WrapperSnafu { message: "wrapper" })
+            .unwrap_err();
+        // WrapperError has one source (SimpleError), so depth == 1
+        assert_eq!(wrapper.depth(), 1);
+    }
 
-        fn process(input: i32) -> Result<i32, Box<WrapperError>> {
-            let result = may_fail(input).context(WrapperSnafu {
-                message: "Processing failed",
-            })?;
-
-            Ok(result + 10)
+    #[test]
+    fn test_box_concrete_stack_error() {
+        // Box<T: Sized + StackError> blanket impl
+        let concrete = SimpleSnafu {
+            message: "boxed concrete",
         }
+        .build();
+        let original_line = concrete.location().line();
+        let boxed: Box<SimpleError> = Box::new(concrete);
 
-        assert_eq!(process(5).unwrap(), 20);
-
-        let err: Box<WrapperError> = process(-1).unwrap_err();
-        assert!(format!("{}", err).contains("Processing failed"));
-
-        let source = err.source().unwrap();
-        // Debug now uses standard derive(Debug), not stack trace format
-        assert!(format!("{source:?}").contains("Input must be non-negative"));
-
-        handle_stack_error(err);
+        assert_eq!(boxed.location().line(), original_line);
+        assert_eq!(boxed.type_name(), "SimpleError");
+        assert!(boxed.stack_source().is_none());
+        handle_stack_error(boxed);
     }
 
     fn handle_stack_error<T: StackError>(_: T) {}
+
+    // --- GAP-08: Box<dyn StackError> (non-Send-Sync) Error and StackError impls ---
+    #[test]
+    fn test_box_dyn_stack_error_non_send_sync() {
+        let concrete = SimpleSnafu {
+            message: "boxed non-send-sync",
+        }
+        .build();
+        let original_line = concrete.location().line();
+        let boxed: Box<dyn StackError> = Box::new(concrete);
+
+        // StackError methods should work
+        assert_eq!(boxed.location().line(), original_line);
+        assert_eq!(boxed.type_name(), "SimpleError");
+        assert!(boxed.stack_source().is_none());
+
+        // Error impl should work
+        let err: &dyn Error = &boxed;
+        assert!(format!("{err}").contains("boxed non-send-sync"));
+    }
 }

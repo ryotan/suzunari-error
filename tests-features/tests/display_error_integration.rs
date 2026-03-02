@@ -1,9 +1,9 @@
 //! Verifies that DisplayError works correctly with both snafu and suzunari-error.
+#![cfg(feature = "test-std")]
 
-use snafu::prelude::*;
 use suzunari_error::*;
 
-// A type that implements Debug + Display but NOT Error (simulates e.g. argon2::Error)
+// A type that implements Debug + Display but NOT Error (simulates e.g., argon2::Error)
 struct FakeLibError {
     message: &'static str,
 }
@@ -21,15 +21,31 @@ impl core::fmt::Debug for FakeLibError {
 
 // --- Pattern A: automatic conversion via source(from(...)) ---
 #[suzunari_error]
-#[snafu(display("operation failed"))]
+#[suzu(display("operation failed"))]
 struct AutoConvertError {
     #[snafu(source(from(FakeLibError, DisplayError::new)))]
     source: DisplayError<FakeLibError>,
 }
 
+// --- Pattern A2: automatic conversion via #[suzu(from)] ---
+#[suzunari_error]
+#[suzu(display("from convert op failed"))]
+struct FromConvertError {
+    #[suzu(from)]
+    source: FakeLibError,
+}
+
+// --- Pattern A3: #[suzu(from)] with already-wrapped DisplayError ---
+#[suzunari_error]
+#[suzu(display("from already wrapped"))]
+struct FromAlreadyWrappedError {
+    #[suzu(from)]
+    source: DisplayError<FakeLibError>,
+}
+
 // --- Pattern B: manual conversion via map_err ---
 #[suzunari_error]
-#[snafu(display("manual convert failed"))]
+#[suzu(display("manual convert failed"))]
 struct ManualConvertError {
     source: DisplayError<FakeLibError>,
 }
@@ -44,7 +60,7 @@ fn test_source_from_auto_convert() {
     }
     let err = fake_op().context(AutoConvertSnafu).unwrap_err();
 
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("operation failed"));
     assert!(report.contains("fake lib broke"));
 }
@@ -60,9 +76,36 @@ fn test_map_err_manual_convert() {
         .context(ManualConvertSnafu)
         .unwrap_err();
 
-    let report = format!("{:?}", StackReport::from_error(err));
+    let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("manual convert failed"));
     assert!(report.contains("manual"));
+}
+
+#[test]
+fn test_from_attr_auto_convert() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "from broke",
+        })
+    }
+    let err = fake_op().context(FromConvertSnafu).unwrap_err();
+
+    let report = format!("{:?}", StackReport::from(err));
+    assert!(report.contains("from convert op failed"));
+    assert!(report.contains("from broke"));
+}
+
+#[test]
+fn test_from_attr_already_wrapped() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "already wrapped",
+        })
+    }
+    let err = fake_op().context(FromAlreadyWrappedSnafu).unwrap_err();
+
+    let report = format!("{:?}", StackReport::from(err));
+    assert!(report.contains("from already wrapped"));
 }
 
 #[cfg(feature = "test-alloc")]
@@ -73,6 +116,6 @@ fn test_display_error_with_boxed_stack_error() {
     }
     let err = fake_op().context(AutoConvertSnafu).unwrap_err();
     let boxed: BoxedStackError = err.into();
-    let report = format!("{:?}", StackReport::from_error(boxed));
+    let report = format!("{:?}", StackReport::from(boxed));
     assert!(report.contains("operation failed"));
 }

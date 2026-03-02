@@ -1,9 +1,15 @@
 <component name="ProjectDictionaryState">
   <dictionary name="project">
     <words>
+      <w>Derefs</w>
+      <w>autoref</w>
       <w>clippy</w>
+      <w>newtype</w>
+      <w>supertrait</w>
+      <w>suzu</w>
       <w>suzunari</w>
       <w>tamanegi</w>
+      <w>thiserror</w>
     </words>
   </dictionary>
 </component>

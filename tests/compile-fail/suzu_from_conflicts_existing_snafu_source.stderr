@@ -1,0 +1,5 @@
+error: `from` conflicts with existing `#[snafu(source(...))]`
+ --> tests/compile-fail/suzu_from_conflicts_existing_snafu_source.rs:7:12
+  |
+7 |     #[suzu(from)]
+  |            ^^^^

@@ -1,6 +1,6 @@
 #![cfg(feature = "std")]
 // Tests use raw #[derive(Snafu)] + manual impl to test StackError trait
-// independently from proc-macro layer. .build() is snafu's standard test pattern.
+// independently of proc-macro layer. .build() is snafu's standard test pattern.
 
 use core::error::Error;
 use snafu::{ResultExt, Snafu};
@@ -90,6 +90,32 @@ fn test_chain_context() {
     assert!(normalized_path.ends_with("stack_error_test.rs"));
 }
 
+// Test StackSourceResolver autoref specialization directly.
+// When T: StackError, inherent resolve() returns Some(&dyn StackError).
+// When T does not implement StackError, Deref fallback returns None.
+#[test]
+fn test_stack_source_resolver_specialization() {
+    use suzunari_error::__private::StackSourceResolver;
+
+    // NestedError implements StackError → inherent resolve() wins
+    let nested: NestedError = std::fs::read("nonexistent")
+        .context(NestedSnafu)
+        .unwrap_err();
+    let resolver = StackSourceResolver(&nested);
+    assert!(
+        resolver.resolve().is_some(),
+        "StackError type should resolve to Some"
+    );
+
+    // std::io::Error does NOT implement StackError → Deref fallback wins
+    let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+    let resolver = StackSourceResolver(&io_err);
+    assert!(
+        resolver.resolve().is_none(),
+        "non-StackError type should resolve to None"
+    );
+}
+
 // Test error propagation through multiple functions
 fn function_c() -> Result<Vec<u8>, NestedError> {
     std::fs::read("not exist").context(NestedSnafu)
@@ -113,7 +139,7 @@ fn test_error_propagation() {
     let error = result.unwrap_err();
 
     let file = file!();
-    let report = format!("{:?}", StackReport::from_error(error));
+    let report = format!("{:?}", StackReport::from(error));
 
     // TestError::External's source is Box<dyn Error + Send + Sync>,
     // so stack_source() returns None. The rest of the chain is

@@ -1,5 +1,17 @@
 //! Internal helpers for derive macro code generation.
-//! Not public API — may change without notice.
+//!
+//! **Not public API. Do not use.** This module is `#[doc(hidden)]` and not
+//! covered by semver guarantees. It exists solely for generated code emitted
+//! by `#[derive(StackError)]`.
+//!
+//! Uses the **autoref specialization** technique to conditionally resolve
+//! `stack_source()` at compile time. When the source type implements
+//! `StackError`, the inherent `resolve()` method takes priority via autoref.
+//! Otherwise, `Deref` coercion kicks in, calling the fallback `resolve()` on
+//! `NotStackErrorFallback`, which returns `None`. This avoids requiring
+//! `StackError` bounds on source types in generated code.
+//!
+//! See: <https://github.com/dtolnay/case-studies/blob/master/autoref-specialization/README.md>
 
 use crate::StackError;
 
@@ -18,6 +30,9 @@ impl<'a, T: StackError> StackSourceResolver<'a, T> {
 pub struct NotStackErrorFallback;
 
 impl NotStackErrorFallback {
+    // 'static is required even though this always returns None: with elided
+    // lifetime, the return type would be tied to the temporary NotStackErrorFallback
+    // created via Deref in generated code, causing a borrow-checker error.
     pub fn resolve(&self) -> Option<&'static dyn StackError> {
         None
     }

@@ -1,0 +1,5 @@
+error: `from` does not accept arguments; use `#[suzu(from)]` as a bare keyword
+ --> tests/compile-fail/suzu_from_list_form.rs:7:12
+  |
+7 |     #[suzu(from(String, suzunari_error::DisplayError::new))]
+  |            ^^^^

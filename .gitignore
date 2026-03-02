@@ -60,6 +60,8 @@ _[sS]cratch*.*
 
 # Claude Code
 .claude/settings.local.json
+.claude/workflows
+.claude/worktrees
 
 # Added by cargo
 

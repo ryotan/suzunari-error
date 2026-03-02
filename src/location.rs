@@ -1,36 +1,61 @@
+use core::fmt::{Debug, Display, Formatter, Result};
+use core::ops::Deref;
+
 /// Source code location captured via `#[track_caller]`.
 ///
 /// A newtype wrapper around `core::panic::Location` that integrates with
 /// snafu's `GenerateImplicitData` for automatic capture at error construction sites.
+/// Implements `Copy`, `Eq`, and `Hash`. Derefs to `core::panic::Location` for
+/// access to `file()`, `line()`, and `column()`.
+///
+/// # Example
+///
+/// ```
+/// use suzunari_error::Location;
+///
+/// let loc = Location::current();
+/// assert!(loc.file().ends_with(".rs"));
+/// assert!(loc.line() > 0);
+/// ```
+///
+/// When using `#[suzunari_error]`, Location fields are automatically injected
+/// and populated — you rarely need to call `current()` directly.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Location(&'static core::panic::Location<'static>);
 
 impl Location {
     /// Returns the location of the immediate caller.
     ///
-    /// Captures file, line, and column of the call site via `#[track_caller]`.
+    /// Captures the file, line, and column of the call site via `#[track_caller]`.
+    #[must_use]
     #[track_caller]
     pub fn current() -> Self {
         Self(core::panic::Location::caller())
     }
 }
 
-impl core::ops::Deref for Location {
+// NOTE: Deref on a non-smart-pointer type deviates from C-DEREF guidelines.
+// Pragmatic for v0.1: gives ergonomic access to file()/line()/column().
+// Risk: methods added to core::panic::Location auto-appear on Location.
+// Revisit before v1.0 — consider replacing with explicit delegation methods.
+impl Deref for Location {
     type Target = core::panic::Location<'static>;
     fn deref(&self) -> &Self::Target {
         self.0
     }
 }
 
-impl core::fmt::Display for Location {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl Display for Location {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{}:{}:{}", self.file(), self.line(), self.column())
     }
 }
 
-impl core::fmt::Debug for Location {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{}:{}:{}", self.file(), self.line(), self.column())
+impl Debug for Location {
+    /// Delegates to `core::panic::Location`'s Debug for C-DEBUG compliance.
+    /// Produces struct-style output instead of the Display format `file:line:col`.
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        Debug::fmt(self.0, f)
     }
 }
 
@@ -89,28 +114,26 @@ mod tests {
     mod alloc_tests {
         use super::*;
         use alloc::format;
+        use alloc::string::ToString;
 
         #[test]
         fn test_debug_format() {
             let loc = Location::current();
-            assert_eq!(
-                format!("{:?}", loc),
-                format!("{}:{}:{}", loc.file(), loc.line(), loc.column())
-            );
+            let debug = format!("{:?}", loc);
+            let display = format!("{}", loc);
+            // Debug delegates to core::panic::Location's Debug (struct-style),
+            // while Display uses "file:line:col" format.
+            assert_ne!(debug, display);
+            // Verify Debug output contains the location info.
+            // file() is escaped via {:?} to match Debug's backslash escaping on Windows.
+            assert!(debug.contains(&format!("{:?}", loc.file())));
+            assert!(debug.contains(&loc.line().to_string()));
+            assert!(debug.contains(&loc.column().to_string()));
         }
 
         #[test]
-        fn test_method_consistency() {
+        fn test_debug_differs_across_call_sites() {
             let loc = Location::current();
-
-            let direct_format = format!("{}:{}:{}", loc.file(), loc.line(), loc.column());
-            let debug_format = format!("{:?}", loc);
-
-            assert_eq!(
-                direct_format, debug_format,
-                "Direct format and Debug format should match"
-            );
-
             fn get_another_location() -> Location {
                 Location::current()
             }

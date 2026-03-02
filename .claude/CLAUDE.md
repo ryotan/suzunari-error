@@ -63,14 +63,43 @@ A snafu-based error handling library with automatic location tracking. `#![no_st
 
 ### Macro Crate (`macro-impl/`)
 
-Provides 4 proc-macros:
+Provides 3 proc-macros:
 
-- **`#[suzunari_error]`** — The main entry point. Combines `#[suzunari_location]` + `#[derive(Debug, Snafu, StackError)]`. Use this by default
-- **`#[suzunari_location]`** — Auto-adds `location: Location` field with `#[snafu(implicit)]` to structs and each enum variant
+- **`#[suzunari_error]`** — The main entry point. Processes `#[suzu(...)]` attributes, resolves/injects location fields, and appends `#[derive(Debug, Snafu, StackError)]`. Use this by default
 - **`#[derive(StackError)]`** — Generates `StackError` impl and `From<T> for BoxedStackError` (when alloc enabled). Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
 - **`#[suzunari_error::report]`** — Transforms `fn main() -> Result<(), E>` into `fn main() -> StackReport<E>` for formatted error output on failure (std only)
 
+Key source files in `macro-impl/src/`:
+- `attribute.rs` — `#[suzunari_error]` entry point (location resolution, field injection, derive appending)
+- `suzu_attr.rs` — `#[suzu(...)]` processing (keyword separation, `from`/`location` effects, snafu passthrough)
+- `derive.rs` — `derive(StackError)` implementation
+- `report.rs` — `#[report]` implementation
+- `helper.rs` — Shared utilities (`lookup_location_field`, `find_location_field`, `find_source_field`, `combine_errors`, etc.)
+
 The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc")` controls whether `From<T> for BoxedStackError` impl is generated.
+
+### `#[suzu(...)]` Attribute
+
+`#[suzu(...)]` is a superset of `#[snafu(...)]` — all snafu keywords pass through as-is. Suzunari extensions:
+
+- **`from`** (field-level) — Wraps field type in `DisplayError<T>` and generates `#[snafu(source(from(T, DisplayError::new)))]`
+- **`location`** (field-level) — Marks a field as the location field. Converts to `#[stack(location)]` + `#[snafu(implicit)]`. Allows custom field names. Requires `Location` type
+
+### Field-Level Attributes
+
+Attribute ownership: each attribute is consumed by a specific macro.
+
+- **`#[suzu(location)]`** → consumed by `#[suzunari_error]`. Marks a field as the location field. Converted to `#[stack(location)]` + `#[snafu(implicit)]`. Requires `Location` type
+- **`#[stack(location)]`** → consumed by `derive(StackError)`. Tells the derive which field provides the location. Supports any field name
+- **`#[snafu(...)]`** → consumed by `derive(Snafu)`. Standard snafu attributes (`source`, `implicit`, `display`, etc.)
+
+### Location Resolution (by `#[suzunari_error]`)
+
+1. `#[suzu(location)]` → convert to `#[stack(location)]` + `#[snafu(implicit)]`; error if not `Location` type
+2. Count `#[stack(location)]` fields: 1 = OK, 2+ = error
+3. Count `Location`-typed fields: 1 = auto-mark with `#[stack(location)]`, 2+ = error
+4. Check for `location` name conflict (non-Location type) = error
+5. Otherwise: auto-inject `location: Location` with `#[stack(location)]` + `#[snafu(implicit)]`
 
 ### Feature Flags
 
@@ -103,6 +132,10 @@ The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc"
 3. **Noise-free** — No duplicated information; focus on essentials for debugging
 4. **Hierarchical** — Enum variants for categories, `source` chaining for the error trail
 5. **Performance-conscious** — Defer formatting until display; minimize allocations in error paths
+
+## Publication Scope
+
+This is a **personal library**, not targeting broad crates.io discoverability. Basic crates.io metadata (`name`, `description`, `version`, `license`, `repository`, `readme`) is present for publication. Advanced metadata such as `keywords`, `categories`, `documentation`, CI badges, and CHANGELOG are intentionally omitted. Focus code quality and API design reviews on the library itself, not on packaging/infrastructure.
 
 ## Toolchain
 

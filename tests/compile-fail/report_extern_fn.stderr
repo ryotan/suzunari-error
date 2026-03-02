@@ -1,0 +1,11 @@
+error: #[report] does not support extern functions
+  --> tests/compile-fail/report_extern_fn.rs:12:1
+   |
+12 | extern "C" fn main() -> Result<(), MyError> {
+   | ^^^^^^
+
+error[E0601]: `main` function not found in crate `$CRATE`
+  --> tests/compile-fail/report_extern_fn.rs:14:2
+   |
+14 | }
+   |  ^ consider adding a `main` function to `$DIR/tests/compile-fail/report_extern_fn.rs`
