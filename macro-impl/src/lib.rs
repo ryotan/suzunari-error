@@ -56,7 +56,7 @@ pub fn derive_stack_error(input: TokenStream) -> TokenStream {
 ///   generates `#[snafu(source(from(T, DisplayError::new)))]`.
 /// - **`location`** (field-level): Marks a field as the location field. Converts
 ///   to `#[stack(location)]` + `#[snafu(implicit)]`. Allows custom field names
-///   instead of the default `location`. Requires `Location` type.
+///   instead of the default `location`. Requires a ` Location ` type.
 #[proc_macro_attribute]
 pub fn suzunari_error(attr: TokenStream, item: TokenStream) -> TokenStream {
     let attr2: proc_macro2::TokenStream = attr.into();

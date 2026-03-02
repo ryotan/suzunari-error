@@ -3,7 +3,7 @@
 
 use suzunari_error::*;
 
-// A type that implements Debug + Display but NOT Error (simulates e.g. argon2::Error)
+// A type that implements Debug + Display but NOT Error (simulates e.g., argon2::Error)
 struct FakeLibError {
     message: &'static str,
 }

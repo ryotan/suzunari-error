@@ -24,7 +24,7 @@ fn failure_case() -> Result<(), TestReportError> {
 #[test]
 fn test_report_success() {
     let report: StackReport<TestReportError> = success_case();
-    // Display of success case is empty
+    // Display of a success case is empty
     assert_eq!(format!("{report}"), "");
 }
 

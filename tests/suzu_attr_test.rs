@@ -1,7 +1,9 @@
 #![cfg(feature = "std")]
 //! Integration tests for the `#[suzu(...)]` attribute.
 //! Tests verify `from`, `location`, and snafu passthrough behavior.
-//! .build() is snafu's standard test pattern for constructing errors in tests.
+//!
+//! `.build()` usage: These tests use `.build()` to construct errors at a known
+//! line number for location assertions. `.context()` would capture the wrong line.
 
 use suzunari_error::*;
 
@@ -254,7 +256,7 @@ fn test_from_and_location_on_different_fields() {
         })
     }
     let err = fake_op().context(CombinedFromLocationSnafu).unwrap_err();
-    // Verify both effects are applied: from wraps source, location is tracked
+    // Verify both effects are applied: `from` wraps source, `location` is tracked
     assert!(err.location().file().ends_with("suzu_attr_test.rs"));
     let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("combined from and location"));

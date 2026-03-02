@@ -1,6 +1,6 @@
 #![cfg(feature = "std")]
 // Tests use raw #[derive(Snafu)] + manual impl to test StackError trait
-// independently from proc-macro layer. .build() is snafu's standard test pattern.
+// independently of proc-macro layer. .build() is snafu's standard test pattern.
 
 use core::error::Error;
 use snafu::{ResultExt, Snafu};

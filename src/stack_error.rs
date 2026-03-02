@@ -74,9 +74,10 @@ pub trait StackError: Error {
     ///
     /// # Contract
     /// If `stack_source()` returns `Some(s)`, then `Error::source()`
-    /// must also return `Some` pointing to the same error. The derive
-    /// macro upholds this automatically; manual impls must ensure
-    /// consistency.
+    /// must also return `Some(e)` where `e` and `s` refer to the same
+    /// underlying error value (i.e., `s` is a `&dyn StackError` view
+    /// of the `&dyn Error` returned by `source()`). The derive macro
+    /// upholds this automatically; manual impls must ensure consistency.
     ///
     /// Violating this contract causes `StackReport` to produce incomplete
     /// output in release builds (the `debug_assert!` that checks this is
@@ -95,7 +96,7 @@ pub trait StackError: Error {
     fn depth(&self) -> usize {
         // successors() can't be used here due to trait object lifetime constraints:
         // source() returns Option<&dyn Error> with a lifetime tied to &self,
-        // but successors requires the closure output lifetime to match its input.
+        // but `successors` requires the closure output lifetime to match its input.
         let mut count = 0;
         let mut current = self.source();
         while let Some(e) = current {
@@ -177,7 +178,7 @@ mod alloc_impls {
 #[cfg(all(test, feature = "alloc"))]
 mod tests {
     // Tests use raw #[derive(Snafu)] + manual impl to test StackError trait
-    // independently from proc-macro layer. .build() is snafu's standard test pattern.
+    // independently of proc-macro layer. .build() is snafu's standard test pattern.
     use super::*;
     use crate::StackReport;
     use alloc::boxed::Box;

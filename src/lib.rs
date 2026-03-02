@@ -40,11 +40,11 @@
 //! Use `#[suzu(...)]` for all attributes under [`#[suzunari_error]`](macro@suzunari_error).
 //! It is a superset of `#[snafu(...)]` — standard snafu keywords (`display`, `source`,
 //! `visibility`, etc.) pass through as-is, plus suzunari extensions are available.
-//! `#[snafu(...)]` also works but `#[suzu(...)]` is preferred for consistency.
+//! `#[snafu(...)]` also works, but `#[suzu(...)]` is preferred for consistency.
 //!
 //! Suzunari extensions:
 //!
-//! - **`from`** (field-level) — wraps field type in [`DisplayError<T>`] and generates
+//! - **`from`** (field-level) — wraps a field type in [`DisplayError<T>`] and generates
 //!   `#[snafu(source(from(T, DisplayError::new)))]`
 //! - **`location`** (field-level) — marks a field as the location field with a custom name;
 //!   converts to `#[stack(location)]` + `#[snafu(implicit)]`

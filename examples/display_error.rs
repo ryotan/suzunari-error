@@ -20,7 +20,7 @@ impl std::fmt::Display for ExternalLibError {
 #[suzu(display("processing failed"))]
 struct ProcessError {
     #[suzu(from)]
-    source: ExternalLibError,
+    error: ExternalLibError,
 }
 
 fn call_external_lib() -> Result<(), ExternalLibError> {

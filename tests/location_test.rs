@@ -133,7 +133,7 @@ fn test_location_hash() {
     let loc = Location::current();
     let mut set = HashSet::new();
     set.insert(loc);
-    // Same location inserted again — set size should not change
+    // The same location inserted again — set size should not change
     set.insert(loc);
     assert_eq!(set.len(), 1);
 

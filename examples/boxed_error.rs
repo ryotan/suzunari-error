@@ -37,7 +37,8 @@ mod db {
 
     pub fn query() -> Result<String, DbError> {
         std::fs::read_to_string("/nonexistent/db").context(DbSnafu)?;
-        unreachable!()
+        // read_to_string on a nonexistent path always fails, so this is unreachable.
+        unreachable!("read_to_string should fail for /nonexistent/db")
     }
 }
 

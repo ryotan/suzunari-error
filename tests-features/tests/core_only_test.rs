@@ -10,7 +10,7 @@ fn test_location_core_only() {
     assert!(!loc.file().is_empty());
 }
 
-// StackReport is available in core-only tier (without Termination impl).
+// StackReport is available in the core-only tier (without Termination impl).
 // Uses raw #[derive(Snafu)] + manual StackError impl to test the trait
 // behavior independently from the proc-macro layer.
 #[derive(Debug, snafu::Snafu)]
