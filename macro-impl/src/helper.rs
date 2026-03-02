@@ -1,4 +1,4 @@
-use proc_macro2::{Ident, TokenStream, TokenTree};
+use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use quote::{format_ident, quote};
 use syn::ext::IdentExt;
 use syn::punctuated::Punctuated;
@@ -33,7 +33,7 @@ pub(crate) enum LocationLookup {
 /// Resolution order:
 /// 1. `#[stack(location)]` marker — highest priority, any field name
 /// 2. Single field of type `Location` — automatic fallback
-/// 3. Name conflict check (field named "location" with wrong type)
+/// 3. Name conflict check (field named "location" with the wrong type)
 ///
 /// `location_attr_hint` is used in ambiguity/conflict error messages to suggest
 /// the context-appropriate attribute (e.g., `"#[suzu(location)]"` for
@@ -43,46 +43,51 @@ pub(crate) fn lookup_location_field(
     location_attr_hint: &str,
 ) -> Result<LocationLookup, Error> {
     // 1. Check #[stack(location)] markers
-    let mut marked = Vec::new();
+    let mut marked: Vec<(usize, Span)> = Vec::new();
     for (i, field) in fields.named.iter().enumerate() {
-        if has_stack_location_attr(field)? {
-            marked.push(i);
+        if let Some(attr_span) = has_stack_location_attr(field)? {
+            marked.push((i, attr_span));
         }
     }
     match marked.len() {
         1 => {
             return Ok(LocationLookup::Found {
-                index: marked[0],
+                index: marked[0].0,
                 needs_stack_attr: false,
             });
         }
         2.. => {
-            return Err(Error::new(
-                fields.named[marked[1]].span(),
+            let mut err = Error::new(
+                marked[1].1,
                 "multiple #[stack(location)] fields; only one is allowed per struct/variant",
+            );
+            err.combine(Error::new(
+                marked[0].1,
+                "first occurrence of #[stack(location)] is here",
             ));
+            return Err(err);
         }
         0 => {}
     }
 
     // 2. Check Location-typed fields
-    let location_typed: Vec<usize> = fields
+    let location_typed: Vec<(usize, Span)> = fields
         .named
         .iter()
         .enumerate()
         .filter(|(_, f)| looks_like_location_type(&f.ty))
-        .map(|(i, _)| i)
+        .map(|(i, f)| (i, f.ty.span()))
         .collect();
     match location_typed.len() {
         1 => {
             return Ok(LocationLookup::Found {
-                index: location_typed[0],
+                index: location_typed[0].0,
                 needs_stack_attr: true,
             });
         }
         2.. => {
             let mut err = Error::new(
-                fields.named[location_typed[1]].span(),
+                location_typed[1].1,
                 format!(
                     "multiple fields with type name ending in `Location` found; \
                      use {location_attr_hint} to specify the correct one. \
@@ -91,7 +96,7 @@ pub(crate) fn lookup_location_field(
                 ),
             );
             err.combine(Error::new(
-                fields.named[location_typed[0]].span(),
+                location_typed[0].1,
                 "first Location-typed field found here",
             ));
             return Err(err);
@@ -99,7 +104,7 @@ pub(crate) fn lookup_location_field(
         0 => {}
     }
 
-    // 3. Name conflict: field named "location" with wrong type
+    // 3. Name conflict: field named "location" with the wrong type
     if let Some(field) = fields
         .named
         .iter()
@@ -143,13 +148,17 @@ pub(crate) fn find_location_field(fields: &FieldsNamed) -> Result<&Field, Error>
     }
 }
 
-/// Returns true if the field has `#[stack(location)]` attribute.
+/// Returns the span of the `#[stack(location)]` attribute if present.
+///
+/// Returns `Ok(Some(span))` if `#[stack(location)]` is found, `Ok(None)` if not.
+/// The span points to the `#[stack(...)]` attribute itself, enabling precise
+/// error messages when multiple fields have this marker.
 ///
 /// Unlike `is_source_field` (which defers parse errors to snafu), this function
 /// propagates parse errors because `#[stack(...)]` is consumed by our own
 /// `derive(StackError)` — no other macro will report the error.
-pub(crate) fn has_stack_location_attr(field: &Field) -> Result<bool, Error> {
-    let mut found = false;
+pub(crate) fn has_stack_location_attr(field: &Field) -> Result<Option<Span>, Error> {
+    let mut found: Option<Span> = None;
     for attr in field.attrs.iter().filter(|a| a.path().is_ident("stack")) {
         let Meta::List(meta_list) = &attr.meta else {
             // Reject bare #[stack] or #[stack = ...] — this crate owns
@@ -177,7 +186,22 @@ pub(crate) fn has_stack_location_attr(field: &Field) -> Result<bool, Error> {
                 "unknown #[stack(...)] argument; only `location` is supported",
             ));
         }
-        found = true;
+        // Reject duplicate `location` within the same #[stack(...)] attribute.
+        if nested.len() > 1 {
+            return Err(Error::new(
+                nested[1].span(),
+                "duplicate `location` in #[stack(...)]; specify it only once",
+            ));
+        }
+        if let Some(prev_span) = found {
+            let mut err = Error::new(
+                attr.span(),
+                "duplicate #[stack(location)] on the same field; specify it only once",
+            );
+            err.combine(Error::new(prev_span, "first occurrence of #[stack(location)] is here"));
+            return Err(err);
+        }
+        found = Some(attr.span());
     }
     Ok(found)
 }
@@ -251,7 +275,7 @@ fn is_source_field(field: &Field) -> bool {
             let Meta::List(meta_list) = &attr.meta else {
                 return None;
             };
-            // Structured Meta parsing handles all current snafu syntax including
+            // Structured Meta parsing handles all current snafu syntax, including
             // closure forms like source(from(T, |e| ...)): the closure lives inside
             // a parenthesized group which Meta::List stores as a raw TokenStream.
             let nested = meta_list
@@ -343,4 +367,52 @@ pub(crate) fn combine_errors(errors: Vec<Error>) -> Result<(), Error> {
         combined.combine(e);
     }
     Err(combined)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_snafu_tokens_contain_keyword_basic() {
+        let tokens: TokenStream = "source".parse().unwrap();
+        assert!(snafu_tokens_contain_keyword(&tokens, "source"));
+    }
+
+    #[test]
+    fn test_snafu_tokens_contain_keyword_comma_separated() {
+        let tokens: TokenStream = "display(\"msg\"), source".parse().unwrap();
+        assert!(snafu_tokens_contain_keyword(&tokens, "source"));
+    }
+
+    #[test]
+    fn test_snafu_tokens_contain_keyword_not_found() {
+        let tokens: TokenStream = "implicit".parse().unwrap();
+        assert!(!snafu_tokens_contain_keyword(&tokens, "source"));
+    }
+
+    /// L-T4: `display("source")` must not false-positive match `source`.
+    /// The keyword `source` inside a group (parentheses) is not top-level.
+    #[test]
+    fn test_snafu_tokens_display_source_no_false_positive() {
+        let tokens: TokenStream = "display(\"source\")".parse().unwrap();
+        assert!(
+            !snafu_tokens_contain_keyword(&tokens, "source"),
+            "display(\"source\") should not match top-level `source` keyword"
+        );
+    }
+
+    #[test]
+    fn test_snafu_tokens_source_with_args() {
+        // source(from(...)) — `source` is top-level, just followed by a group
+        let tokens: TokenStream = "source(from(T, f))".parse().unwrap();
+        assert!(snafu_tokens_contain_keyword(&tokens, "source"));
+    }
+
+    #[test]
+    fn test_snafu_tokens_keyword_inside_group_not_matched() {
+        // `source` appears only inside parentheses — should not match
+        let tokens: TokenStream = "wrapper(source)".parse().unwrap();
+        assert!(!snafu_tokens_contain_keyword(&tokens, "source"));
+    }
 }

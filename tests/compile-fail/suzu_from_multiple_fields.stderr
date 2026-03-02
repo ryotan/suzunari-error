@@ -4,7 +4,7 @@ error: multiple #[suzu(from)] fields; only one source field is allowed per struc
 24 |     #[suzu(from)]
    |     ^
 
-error: first #[suzu(from)] defined here
+error: first occurrence of #[suzu(from)] is here
   --> tests/compile-fail/suzu_from_multiple_fields.rs:22:5
    |
 22 |     #[suzu(from)]

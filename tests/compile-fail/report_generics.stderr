@@ -1,4 +1,4 @@
-error: #[report] does not support generic parameters
+error: #[report] does not support generic parameters.
  --> tests/compile-fail/report_generics.rs:9:8
   |
 9 | fn main<T>() -> Result<(), MyError> {

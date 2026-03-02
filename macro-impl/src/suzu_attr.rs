@@ -27,7 +27,7 @@ pub(crate) fn process_suzu_attrs(
     crate_path: &TokenStream,
 ) -> Result<(), Error> {
     // Type-level attrs are always passthrough-only, regardless of struct/enum.
-    process_non_field_attrs(&mut input.attrs, Level::NonField)?;
+    process_non_field_attrs(&mut input.attrs)?;
 
     match &mut input.data {
         Data::Struct(data_struct) => {
@@ -44,7 +44,7 @@ pub(crate) fn process_suzu_attrs(
             // problem at once, matching the pattern in derive.rs's generate_enum_impl.
             let mut errors = Vec::new();
             for variant in &mut data_enum.variants {
-                if let Err(e) = process_non_field_attrs(&mut variant.attrs, Level::NonField) {
+                if let Err(e) = process_non_field_attrs(&mut variant.attrs) {
                     errors.push(e);
                 }
                 match &mut variant.fields {
@@ -76,7 +76,7 @@ fn reject_suzu_on_non_named_fields(fields: &Fields) -> Result<(), Error> {
             if attr.path().is_ident("suzu") {
                 errors.push(Error::new(
                     attr.span(),
-                    "#[suzu(...)] is not supported on tuple or unit fields",
+                    "#[suzu(...)] is not supported on unnamed fields; use named fields instead",
                 ));
             }
         }
@@ -86,7 +86,8 @@ fn reject_suzu_on_non_named_fields(fields: &Fields) -> Result<(), Error> {
 
 /// Processes `#[suzu(...)]` on type/variant-level attributes.
 /// Only passthrough to `#[snafu(...)]` is allowed; `from`/`location` are errors.
-fn process_non_field_attrs(attrs: &mut Vec<Attribute>, level: Level) -> Result<(), Error> {
+fn process_non_field_attrs(attrs: &mut Vec<Attribute>) -> Result<(), Error> {
+    let level = Level::NonField;
     let mut new_attrs = Vec::new();
     let mut errors = Vec::new();
 
@@ -142,15 +143,23 @@ fn process_fields(
                     match result.effect {
                         SuzuEffect::From => {
                             if let Some(first_span) = first_from_span {
-                                let mut err = Error::new(
-                                    attr.span(),
-                                    "multiple #[suzu(from)] fields; only one source field is allowed per struct/variant",
-                                );
+                                // Distinguish same-field duplicate from cross-field duplicate:
+                                // current_from_span is set when this field already has `from`.
+                                let msg = if current_from_span.is_some() {
+                                    "duplicate #[suzu(from)] on the same field"
+                                } else {
+                                    "multiple #[suzu(from)] fields; only one source field is allowed per struct/variant"
+                                };
+                                let mut err = Error::new(attr.span(), msg);
                                 err.combine(Error::new(
                                     first_span,
-                                    "first #[suzu(from)] defined here",
+                                    "first occurrence of #[suzu(from)] is here",
                                 ));
                                 errors.push(err);
+                                // Clear current_from_span so the post-loop match skips
+                                // apply_from — applying it after a duplicate error would
+                                // produce spurious secondary errors.
+                                current_from_span = None;
                             } else {
                                 first_from_span = Some(attr.span());
                                 current_from_span = Some(attr.span());
@@ -161,15 +170,20 @@ fn process_fields(
                             // at the original #[suzu(location)] attr, not the generated
                             // #[stack(location)] (which has a call_site span).
                             if let Some(first_span) = first_location_span {
-                                let mut err = Error::new(
-                                    attr.span(),
-                                    "multiple #[suzu(location)] fields; only one is allowed per struct/variant",
-                                );
+                                let msg = if current_location_span.is_some() {
+                                    "duplicate #[suzu(location)] on the same field"
+                                } else {
+                                    "multiple #[suzu(location)] fields; only one is allowed per struct/variant"
+                                };
+                                let mut err = Error::new(attr.span(), msg);
                                 err.combine(Error::new(
                                     first_span,
-                                    "first #[suzu(location)] defined here",
+                                    "first occurrence of #[suzu(location)] is here",
                                 ));
                                 errors.push(err);
+                                // Clear current_location_span so the post-loop match
+                                // skips apply_location on this field.
+                                current_location_span = None;
                             } else {
                                 first_location_span = Some(attr.span());
                                 current_location_span = Some(attr.span());
@@ -182,9 +196,14 @@ fn process_fields(
             }
         }
 
-        // Apply from/location after the attrs loop so field is freely borrowable.
-        // Check cross-attribute conflict first — from and location on the same field
-        // is always invalid regardless of how they were specified.
+        // Apply from/location after the attrs loop so the field is freely borrowable.
+        //
+        // from+location conflict is checked in three places:
+        //   1. Within-attr: #[suzu(location, from)] — caught in process_single_suzu_attr
+        //   2. Within-attr: #[suzu(from, location)] — caught in process_single_suzu_attr
+        //   3. Cross-attr: #[suzu(from)] #[suzu(location)] — caught here
+        // (1) and (2) provide better spans (pointing to the conflicting keyword),
+        // while (3) catches the cross-attribute case that within-attr checks cannot see.
         match (current_from_span, current_location_span) {
             (Some(from_span), Some(loc_span)) => {
                 let mut err = Error::new(
@@ -272,7 +291,7 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
 
     for meta in &nested {
         if meta.path().is_ident("from") {
-            // `from` must be a bare keyword — reject list/namevalue forms
+            // `from` must be a bare keyword — reject list/name-value forms
             if !matches!(meta, Meta::Path(_)) {
                 return Err(Error::new(
                     meta.span(),
@@ -283,14 +302,15 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
                 return Err(Error::new(meta.span(), "`from` can only be used on fields"));
             }
             if matches!(effect, SuzuEffect::Location) {
+                // Within-attr conflict: #[suzu(location, from)] — point to the `from` keyword.
                 return Err(Error::new(
-                    attr.span(),
+                    meta.span(),
                     "`from` and `location` cannot be used on the same field",
                 ));
             }
             effect = SuzuEffect::From;
         } else if meta.path().is_ident("location") {
-            // `location` must be a bare keyword — reject list/namevalue forms
+            // `location` must be a bare keyword — reject list/name-value forms
             if !matches!(meta, Meta::Path(_)) {
                 return Err(Error::new(
                     meta.span(),
@@ -304,8 +324,9 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
                 ));
             }
             if matches!(effect, SuzuEffect::From) {
+                // Within-attr conflict: #[suzu(from, location)] — point to the `location` keyword.
                 return Err(Error::new(
-                    attr.span(),
+                    meta.span(),
                     "`from` and `location` cannot be used on the same field",
                 ));
             }
@@ -362,7 +383,7 @@ fn apply_from(
     }
 
     let original_type = match extract_display_error_inner(&field.ty) {
-        // Already DisplayError<T> — just extract inner type for source(from(...))
+        // Already DisplayError<T> — just extract the inner type for source(from(...))
         Some(inner) => inner.clone(),
         // Wrap the type: T → DisplayError<T>
         None => {
@@ -391,5 +412,56 @@ fn apply_location(attrs: &mut Vec<Attribute>) {
     if !has_snafu_keyword(attrs, "implicit") {
         attrs.push(parse_quote!(#[snafu(implicit)]));
     }
-    attrs.push(parse_quote!(#[stack(location)]));
+    // Guard against duplicate #[stack(location)] — can happen if the user
+    // writes both #[stack(location)] and #[suzu(location)] on the same field.
+    let already_has_stack_location = attrs.iter().any(|a| a.path().is_ident("stack"));
+    if !already_has_stack_location {
+        attrs.push(parse_quote!(#[stack(location)]));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Calling apply_location twice must not duplicate #[snafu(implicit)] or #[stack(location)].
+    #[test]
+    fn test_apply_location_is_idempotent() {
+        let mut attrs: Vec<Attribute> = Vec::new();
+        apply_location(&mut attrs);
+        assert_eq!(
+            attrs.len(),
+            2,
+            "first call should add implicit + stack(location)"
+        );
+
+        apply_location(&mut attrs);
+        assert_eq!(
+            attrs.len(),
+            2,
+            "second call should not duplicate any attributes"
+        );
+    }
+
+    /// apply_location must not add #[snafu(implicit)] if already present.
+    #[test]
+    fn test_apply_location_preserves_existing_implicit() {
+        let mut attrs: Vec<Attribute> = vec![parse_quote!(#[snafu(implicit)])];
+        apply_location(&mut attrs);
+        assert_eq!(attrs.len(), 2, "should add only #[stack(location)]");
+
+        let implicit_count = attrs.iter().filter(|a| a.path().is_ident("snafu")).count();
+        assert_eq!(implicit_count, 1, "should not duplicate #[snafu(implicit)]");
+    }
+
+    /// apply_location must not add #[stack(location)] if already present.
+    #[test]
+    fn test_apply_location_preserves_existing_stack_location() {
+        let mut attrs: Vec<Attribute> = vec![parse_quote!(#[stack(location)])];
+        apply_location(&mut attrs);
+        assert_eq!(attrs.len(), 2, "should add only #[snafu(implicit)]");
+
+        let stack_count = attrs.iter().filter(|a| a.path().is_ident("stack")).count();
+        assert_eq!(stack_count, 1, "should not duplicate #[stack(location)]");
+    }
 }

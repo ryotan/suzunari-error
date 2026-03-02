@@ -1,11 +1,11 @@
 error: multiple fields with type name ending in `Location` found; use #[suzu(location)] to specify the correct one. Note: detection uses the last path segment, so types like `geo::Location` also match.
- --> tests/compile-fail/suzu_multiple_location_types.rs:9:5
-  |
-9 |     #[snafu(implicit)]
-  |     ^
+  --> tests/compile-fail/suzu_multiple_location_types.rs:10:16
+   |
+10 |     other_loc: Location,
+   |                ^^^^^^^^
 
 error: first Location-typed field found here
- --> tests/compile-fail/suzu_multiple_location_types.rs:7:5
+ --> tests/compile-fail/suzu_multiple_location_types.rs:8:13
   |
-7 |     #[snafu(implicit)]
-  |     ^
+8 |     origin: Location,
+  |             ^^^^^^^^

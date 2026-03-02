@@ -4,7 +4,7 @@ error: multiple #[suzu(location)] fields; only one is allowed per struct/variant
 8 |     #[suzu(location)]
   |     ^
 
-error: first #[suzu(location)] defined here
+error: first occurrence of #[suzu(location)] is here
  --> tests/compile-fail/suzu_multiple_location.rs:6:5
   |
 6 |     #[suzu(location)]

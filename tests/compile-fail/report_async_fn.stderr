@@ -1,4 +1,4 @@
-error: #[report] does not support async functions; place it below the async runtime attribute
+error: #[report] does not support async functions. Place it below the async runtime attribute.
  --> tests/compile-fail/report_async_fn.rs:9:1
   |
 9 | async fn main() -> Result<(), MyError> {

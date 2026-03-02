@@ -1,4 +1,4 @@
-error: #[report] does not accept arguments
+error: #[report] does not accept arguments.
  --> tests/compile-fail/report_with_args.rs:8:26
   |
 8 | #[suzunari_error::report(something)]
