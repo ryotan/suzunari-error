@@ -11,7 +11,7 @@ use std::process::{ExitCode, Termination};
 /// Wraps `Result<(), E>` and provides formatted output via `Display` (and `Debug`, which
 /// delegates to `Display`). Used at error display boundaries such as `main()`.
 ///
-/// Create via `StackReport::from(error)`, `Result::<(), E>::into()`, or `E.into()`.
+/// Create via `StackReport::from(error)`, `Result::<(), E>::into()`, or `error.into()`.
 ///
 /// # Output Format
 ///
@@ -58,10 +58,17 @@ use std::process::{ExitCode, Termination};
 ///
 /// - Both `Display` and `Debug` produce an empty string for the `Ok` case.
 ///   This is intentional — in the `Termination` use case, success should be silent.
-/// - Error output always ends with a trailing newline. This matches the
-///   convention for terminal error output but may produce an extra blank
-///   line when used inside `format!()` or `eprintln!("{report}")`.
-///   Use `write!` to avoid the double newline: `write!(stderr(), "{report}")`.
+/// - **`Debug` delegates to `Display`** (same output). This intentionally
+///   deviates from the [C-DEBUG](https://rust-lang.github.io/api-guidelines/debuggability.html#c-debug)
+///   guideline because `Termination` calls `Debug::fmt` to produce the error
+///   output. Making `Debug` structural (e.g., `StackReport(Err(...))`) would
+///   render the terminal output useless. Since `StackReport` is a display
+///   boundary type (not a general-purpose data carrier), the human-readable
+///   format is appropriate for both traits.
+/// - `Display` output does **not** include a trailing newline. This matches
+///   the convention for `Display` implementations and avoids double newlines
+///   with `eprintln!("{report}")`. The `Termination` impl adds a trailing
+///   newline when writing to stderr.
 pub struct StackReport<E>(Result<(), E>);
 
 impl<E: StackError> From<Result<(), E>> for StackReport<E> {
@@ -99,8 +106,12 @@ impl<E: StackError> Termination for StackReport<E> {
             Err(e) => {
                 // Ignore write errors — stderr may be closed, and
                 // panicking here would mask the original error.
-                let _ =
-                    Write::write_fmt(&mut stderr(), format_args!("{}", StackReportFormatter(&e)));
+                // Trailing `\n` is added here because Display omits it
+                // (Display convention: no trailing newline).
+                let _ = Write::write_fmt(
+                    &mut stderr(),
+                    format_args!("{}\n", StackReportFormatter(&e)),
+                );
                 ExitCode::FAILURE
             }
         }
@@ -110,17 +121,12 @@ impl<E: StackError> Termination for StackReport<E> {
 /// Internal formatter that formats a StackError chain.
 struct StackReportFormatter<'a>(&'a dyn StackError);
 
-impl Debug for StackReportFormatter<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        Display::fmt(self, f)
-    }
-}
-
 impl Display for StackReportFormatter<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         let error = self.0;
 
-        // Top-level error with type name and location (no index)
+        // Top-level error with type name and location (no index).
+        // No trailing newline — Display convention.
         write!(
             f,
             "Error: {}: {error}, at {}",
@@ -132,10 +138,12 @@ impl Display for StackReportFormatter<'_> {
         // source() suffices: the StackError contract guarantees that
         // stack_source().is_some() implies source().is_some().
         if error.source().is_none() {
-            return writeln!(f);
+            return Ok(());
         }
 
-        writeln!(f, "\nCaused by (recent first):")?;
+        // Prefix each subsequent line with `\n` instead of appending trailing `\n`,
+        // so the overall output has no trailing newline.
+        write!(f, "\nCaused by (recent first):")?;
 
         let mut index = 1;
 
@@ -143,7 +151,7 @@ impl Display for StackReportFormatter<'_> {
         let mut current_stack: &dyn StackError = error;
         while let Some(next) = current_stack.stack_source() {
             // Invariant: stack_source() implies source() (StackError is a sub-chain of Error).
-            // In release builds this assert is stripped; a broken impl would produce
+            // In release builds this assertion is stripped; a broken impl would produce
             // truncated output (missing causes) rather than a panic, which is preferable
             // to crashing inside a Display formatter.
             debug_assert!(
@@ -152,9 +160,9 @@ impl Display for StackReportFormatter<'_> {
                  for type {}. This indicates an incorrect StackError implementation.",
                 current_stack.type_name()
             );
-            writeln!(
+            write!(
                 f,
-                "  {index}| {}: {next}, at {}",
+                "\n  {index}| {}: {next}, at {}",
                 next.type_name(),
                 next.location()
             )?;
@@ -165,7 +173,7 @@ impl Display for StackReportFormatter<'_> {
         // Phase 2: Error chain (without location)
         let mut current_error = current_stack.source();
         while let Some(e) = current_error {
-            writeln!(f, "  {index}| {e}")?;
+            write!(f, "\n  {index}| {e}")?;
             index += 1;
             current_error = e.source();
         }

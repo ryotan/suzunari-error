@@ -31,7 +31,7 @@ fn test_stack_trace_single() {
     let err = make_error().unwrap_err();
     assert_eq!(
         format!("{:?}", StackReport::from(err)),
-        format!("Error: ErrorStruct: ErrorStruct, at {file}:{ensure_line}:9\n")
+        format!("Error: ErrorStruct: ErrorStruct, at {file}:{ensure_line}:9")
     );
 }
 
@@ -153,7 +153,7 @@ fn test_validate() {
     assert_eq!(
         format!("{:?}", StackReport::from(err)),
         format!(
-            "Error: SomeError::ValidationFailed: 0 is an invalid value. Must be larger than 1, at {file}:{ensure_line}:9\n"
+            "Error: SomeError::ValidationFailed: 0 is an invalid value. Must be larger than 1, at {file}:{ensure_line}:9"
         )
     );
 }
@@ -168,7 +168,7 @@ struct CustomLocStruct {
     error_origin: Location,
 }
 
-/// Enum with custom-named location via #[suzu(location)].
+/// Enum with a custom-named location via #[suzu(location)].
 #[suzunari_error]
 enum CustomLocEnum {
     #[suzu(display("variant A"))]
@@ -184,7 +184,7 @@ enum CustomLocEnum {
     },
 }
 
-/// Struct with auto-detected Location field (no #[suzu(location)] needed).
+/// Struct with an auto-detected Location field (no #[suzu(location)] needed).
 #[suzunari_error]
 #[suzu(display("auto detect"))]
 struct AutoDetectLoc {
@@ -205,7 +205,7 @@ fn test_custom_location_struct() {
     assert!(line > 0);
     assert_eq!(
         format!("{:?}", StackReport::from(err)),
-        format!("Error: CustomLocStruct: custom location struct, at {file}:{line}:9\n")
+        format!("Error: CustomLocStruct: custom location struct, at {file}:{line}:9")
     );
 }
 
@@ -309,14 +309,15 @@ fn test_stack_source_and_error_source_are_consistent() {
     }
 }
 
-/// E-3: StackReport output should end with a trailing newline
+/// E-3: StackReport Display output should NOT end with a trailing newline.
+/// Trailing newline is added by the Termination impl when writing to stderr.
 #[test]
-fn test_report_ends_with_newline() {
+fn test_report_does_not_end_with_newline() {
     let err = retrieve_data().unwrap_err();
     let report = format!("{:?}", StackReport::from(err));
     assert!(
-        report.ends_with('\n'),
-        "StackReport output should end with a newline"
+        !report.ends_with('\n'),
+        "StackReport Display output should not end with a newline"
     );
 }
 
@@ -371,7 +372,7 @@ fn test_context_line_differs_from_ensure_line() {
     assert!(report.contains(&format!(
         "Error: RetrieveFailed: Failed to retrieve, at {file}:"
     )));
-    // The inner ensure! error should have a different line
+    // The inner `ensure!` error should have a different line
     assert!(report.contains(&format!(
         "1| SomeError::ValidationFailed: 0 is an invalid value. Must be larger than 1, at {file}:"
     )));
@@ -486,6 +487,7 @@ enum SourceFalseError {
 fn test_source_false_on_enum_variant() {
     let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
     // source(false) makes `source` a regular field, so it must be passed explicitly.
+    // .build() is needed because ensure!() doesn't work with source(false) fields.
     let err = SuppressedSnafu { source: io_err }.build();
     // source(false) suppresses source detection:
     // - Error::source() should return None
