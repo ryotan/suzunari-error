@@ -1,5 +1,6 @@
 use core::error::Error;
 use core::fmt::{Debug, Display, Formatter};
+use core::hash::{Hash, Hasher};
 
 /// Wrapper that converts a `Debug + Display` type (without `Error` impl) into
 /// a `core::error::Error`.
@@ -119,6 +120,20 @@ impl<E: Debug> Debug for DisplayError<E> {
     }
 }
 
+impl<E: PartialEq> PartialEq for DisplayError<E> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+
+impl<E: Eq> Eq for DisplayError<E> {}
+
+impl<E: Hash> Hash for DisplayError<E> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
+
 /// `source()` always returns `None` because the wrapped type does not
 /// implement `Error`, so there is no underlying source to delegate to.
 ///
@@ -191,6 +206,25 @@ mod tests {
         });
         let err: &dyn Error = &wrapped;
         assert!(err.source().is_none());
+    }
+
+    #[test]
+    fn test_partial_eq() {
+        let a = DisplayError::new(42);
+        let b = DisplayError::new(42);
+        let c = DisplayError::new(99);
+        assert_eq!(a, b);
+        assert_ne!(a, c);
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_hash() {
+        use core::hash::BuildHasher;
+        let hasher = std::collections::hash_map::RandomState::new();
+        let a = DisplayError::new(42);
+        let b = DisplayError::new(42);
+        assert_eq!(hasher.hash_one(&a), hasher.hash_one(&b));
     }
 
     #[cfg(feature = "alloc")]
