@@ -39,7 +39,8 @@ fn test_snafu_implicit_generation() {
     // Location's Debug now delegates to core::panic::Location's derive(Debug),
     // producing struct-style output instead of the Display format.
     let debug = format!("{error:?}");
-    assert!(debug.contains(&format!("file: \"{file}\"")));
+    // file!() is escaped via {:?} to match Debug's backslash escaping on Windows.
+    assert!(debug.contains(&format!("file: {:?}", file)));
     assert!(debug.contains(&format!("line: {line}")));
     assert!(debug.contains("col: 9"));
 }
@@ -79,9 +80,10 @@ fn test_manual_location_in_error() {
     assert_eq!(error.location.file(), expected_file);
     assert_eq!(error.location.line(), expected_line);
 
-    // Verify the location appears in the display format
+    // Verify the location appears in the display format.
+    // Display uses {:?} for Location, so backslashes are escaped on Windows.
     let display_str = format!("{}", error);
-    assert!(display_str.contains(expected_file));
+    assert!(display_str.contains(&format!("{:?}", expected_file)));
     assert!(display_str.contains(&expected_line.to_string()));
 }
 

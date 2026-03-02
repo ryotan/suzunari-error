@@ -120,12 +120,15 @@ mod tests {
         fn test_debug_format() {
             let loc = Location::current();
             let debug = format!("{:?}", loc);
-            // Debug delegates to core::panic::Location's Debug
-            assert!(debug.contains(loc.file()));
-            assert!(debug.contains(&loc.line().to_string()));
-            // Debug and Display produce different formats
             let display = format!("{}", loc);
+            // Debug delegates to core::panic::Location's Debug (struct-style),
+            // while Display uses "file:line:col" format.
             assert_ne!(debug, display);
+            // Verify Debug output contains the location info.
+            // file() is escaped via {:?} to match Debug's backslash escaping on Windows.
+            assert!(debug.contains(&format!("{:?}", loc.file())));
+            assert!(debug.contains(&loc.line().to_string()));
+            assert!(debug.contains(&loc.column().to_string()));
         }
 
         #[test]
