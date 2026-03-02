@@ -1,11 +1,11 @@
 error: multiple #[suzu(location)] fields; only one is allowed per struct/variant
- --> tests/compile-fail/suzu_multiple_location.rs:8:5
+ --> tests/compile-fail/suzu_multiple_location.rs:8:12
   |
 8 |     #[suzu(location)]
-  |     ^
+  |            ^^^^^^^^
 
 error: first occurrence of #[suzu(location)] is here
- --> tests/compile-fail/suzu_multiple_location.rs:6:5
+ --> tests/compile-fail/suzu_multiple_location.rs:6:12
   |
 6 |     #[suzu(location)]
-  |     ^
+  |            ^^^^^^^^

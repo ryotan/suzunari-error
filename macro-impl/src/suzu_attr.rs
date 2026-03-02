@@ -141,7 +141,7 @@ fn process_fields(
                         new_attrs.push(snafu_attr);
                     }
                     match result.effect {
-                        SuzuEffect::From => {
+                        SuzuEffect::From(keyword_span) => {
                             if let Some(first_span) = first_from_span {
                                 // Distinguish same-field duplicate from cross-field duplicate:
                                 // current_from_span is set when this field already has `from`.
@@ -150,7 +150,7 @@ fn process_fields(
                                 } else {
                                     "multiple #[suzu(from)] fields; only one source field is allowed per struct/variant"
                                 };
-                                let mut err = Error::new(attr.span(), msg);
+                                let mut err = Error::new(keyword_span, msg);
                                 err.combine(Error::new(
                                     first_span,
                                     "first occurrence of #[suzu(from)] is here",
@@ -161,11 +161,11 @@ fn process_fields(
                                 // produce spurious secondary errors.
                                 current_from_span = None;
                             } else {
-                                first_from_span = Some(attr.span());
-                                current_from_span = Some(attr.span());
+                                first_from_span = Some(keyword_span);
+                                current_from_span = Some(keyword_span);
                             }
                         }
-                        SuzuEffect::Location => {
+                        SuzuEffect::Location(keyword_span) => {
                             // Detect duplicate #[suzu(location)] early so error points
                             // at the original #[suzu(location)] attr, not the generated
                             // #[stack(location)] (which has a call_site span).
@@ -175,7 +175,7 @@ fn process_fields(
                                 } else {
                                     "multiple #[suzu(location)] fields; only one is allowed per struct/variant"
                                 };
-                                let mut err = Error::new(attr.span(), msg);
+                                let mut err = Error::new(keyword_span, msg);
                                 err.combine(Error::new(
                                     first_span,
                                     "first occurrence of #[suzu(location)] is here",
@@ -185,8 +185,8 @@ fn process_fields(
                                 // skips apply_location on this field.
                                 current_location_span = None;
                             } else {
-                                first_location_span = Some(attr.span());
-                                current_location_span = Some(attr.span());
+                                first_location_span = Some(keyword_span);
+                                current_location_span = Some(keyword_span);
                             }
                         }
                         SuzuEffect::PassthroughOnly => {}
@@ -247,14 +247,15 @@ enum Level {
 /// What suzunari-specific effect a single `#[suzu(...)]` attribute requests.
 ///
 /// `from` and `location` are mutually exclusive; passthrough-only or empty
-/// effects carry no suzunari semantics.
+/// effects carry no suzunari semantics. Each variant carries the keyword's
+/// span for precise error messages in cross-field duplicate detection.
 enum SuzuEffect {
     /// No suzunari keyword — all tokens passed through to snafu.
     PassthroughOnly,
     /// `from` keyword found — wraps field type in `DisplayError<T>`.
-    From,
+    From(Span),
     /// `location` keyword found — marks field as the location field.
-    Location,
+    Location(Span),
 }
 
 struct SingleAttrResult {
@@ -301,14 +302,14 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
             if matches!(level, Level::NonField) {
                 return Err(Error::new(meta.span(), "`from` can only be used on fields"));
             }
-            if matches!(effect, SuzuEffect::Location) {
+            if matches!(effect, SuzuEffect::Location(_)) {
                 // Within-attr conflict: #[suzu(location, from)] — point to the `from` keyword.
                 return Err(Error::new(
                     meta.span(),
                     "`from` and `location` cannot be used on the same field",
                 ));
             }
-            effect = SuzuEffect::From;
+            effect = SuzuEffect::From(meta.span());
         } else if meta.path().is_ident("location") {
             // `location` must be a bare keyword — reject list/name-value forms
             if !matches!(meta, Meta::Path(_)) {
@@ -323,14 +324,14 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
                     "`location` can only be used on fields",
                 ));
             }
-            if matches!(effect, SuzuEffect::From) {
+            if matches!(effect, SuzuEffect::From(_)) {
                 // Within-attr conflict: #[suzu(from, location)] — point to the `location` keyword.
                 return Err(Error::new(
                     meta.span(),
                     "`from` and `location` cannot be used on the same field",
                 ));
             }
-            effect = SuzuEffect::Location;
+            effect = SuzuEffect::Location(meta.span());
         } else {
             if meta.path().is_ident("source") {
                 has_source_in_passthrough = true;
@@ -340,7 +341,7 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
     }
 
     // Conflict: from + source(...) in the same #[suzu(...)]
-    if matches!(effect, SuzuEffect::From) && has_source_in_passthrough {
+    if matches!(effect, SuzuEffect::From(_)) && has_source_in_passthrough {
         return Err(Error::new(
             attr.span(),
             "`from` conflicts with `source(...)`: `from` generates `source(from(...))` automatically",

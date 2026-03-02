@@ -1,11 +1,11 @@
 error: duplicate #[suzu(from)] on the same field
- --> tests/compile-fail/suzu_from_duplicate.rs:7:5
+ --> tests/compile-fail/suzu_from_duplicate.rs:7:12
   |
 7 |     #[suzu(from)]
-  |     ^
+  |            ^^^^
 
 error: first occurrence of #[suzu(from)] is here
- --> tests/compile-fail/suzu_from_duplicate.rs:6:5
+ --> tests/compile-fail/suzu_from_duplicate.rs:6:12
   |
 6 |     #[suzu(from)]
-  |     ^
+  |            ^^^^
