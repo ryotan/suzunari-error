@@ -198,7 +198,10 @@ pub(crate) fn has_stack_location_attr(field: &Field) -> Result<Option<Span>, Err
                 attr.span(),
                 "duplicate #[stack(location)] on the same field; specify it only once",
             );
-            err.combine(Error::new(prev_span, "first occurrence of #[stack(location)] is here"));
+            err.combine(Error::new(
+                prev_span,
+                "first occurrence of #[stack(location)] is here",
+            ));
             return Err(err);
         }
         found = Some(attr.span());

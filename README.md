@@ -53,6 +53,8 @@ fn read_external() -> Result<(), AppError> {
 }
 ```
 
+> **Snafu selector types:** `#[suzunari_error]` (via snafu) generates context selector types named `<VariantOrType>Snafu` — e.g., `ReadTimeoutSnafu` for the `ReadTimeout` variant, `RetrieveFailedSnafu` for the `RetrieveFailed` struct. These selectors are used with `.context()` to attach error context at each call site. See the [snafu user guide](https://docs.rs/snafu/latest/snafu/guide/index.html) for details.
+
 ### `StackReport` — Formatted error chain output
 
 Use `StackReport` at error display boundaries to produce stack-trace-like output:

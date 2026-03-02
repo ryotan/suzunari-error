@@ -69,6 +69,13 @@ Provides 3 proc-macros:
 - **`#[derive(StackError)]`** — Generates `StackError` impl and `From<T> for BoxedStackError` (when alloc enabled). Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
 - **`#[suzunari_error::report]`** — Transforms `fn main() -> Result<(), E>` into `fn main() -> StackReport<E>` for formatted error output on failure (std only)
 
+Key source files in `macro-impl/src/`:
+- `attribute.rs` — `#[suzunari_error]` entry point (location resolution, field injection, derive appending)
+- `suzu_attr.rs` — `#[suzu(...)]` processing (keyword separation, `from`/`location` effects, snafu passthrough)
+- `derive.rs` — `derive(StackError)` implementation
+- `report.rs` — `#[report]` implementation
+- `helper.rs` — Shared utilities (`lookup_location_field`, `find_location_field`, `find_source_field`, `combine_errors`, etc.)
+
 The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc")` controls whether `From<T> for BoxedStackError` impl is generated.
 
 ### `#[suzu(...)]` Attribute
