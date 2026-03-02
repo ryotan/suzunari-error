@@ -54,6 +54,7 @@ use core::error::Error;
 /// ```
 pub trait StackError: Error {
     /// Returns the location where this error was constructed.
+    #[must_use]
     fn location(&self) -> &Location;
 
     /// Returns a human-readable type name for display in stack traces.
@@ -64,6 +65,7 @@ pub trait StackError: Error {
     ///
     /// Generic type parameters are not included. This is intended for display
     /// purposes only — do not parse or match against it programmatically.
+    #[must_use]
     fn type_name(&self) -> &'static str;
 
     /// Returns the source error as a StackError, if available.
@@ -82,6 +84,7 @@ pub trait StackError: Error {
     /// Violating this contract causes `StackReport` to produce incomplete
     /// output in release builds (the `debug_assert!` that checks this is
     /// stripped). In debug builds, a panic will occur instead.
+    #[must_use]
     fn stack_source(&self) -> Option<&dyn StackError> {
         None
     }
@@ -93,6 +96,7 @@ pub trait StackError: Error {
     ///
     /// Note: this count may differ from the number of lines in `StackReport`
     /// output, which also shows the top-level error on the first line.
+    #[must_use]
     fn depth(&self) -> usize {
         // successors() can't be used here due to trait object lifetime constraints:
         // source() returns Option<&dyn Error> with a lifetime tied to &self,
@@ -113,10 +117,11 @@ mod alloc_impls {
     use alloc::boxed::Box;
     use alloc::sync::Arc;
 
-    // This impl requires T: Sized (implicit bound). Box<dyn StackError> is NOT
-    // covered here — it needs separate Error + StackError impls below because
-    // although core provides impl<T: Error + ?Sized> Error for Box<T>, we still
-    // need to manually impl StackError for the unsized trait object.
+    /// Delegates all methods to the inner `T`.
+    ///
+    /// Requires `T: Sized`; `Box<dyn StackError>` needs a separate impl
+    /// because `core` provides `impl Error for Box<T: Error + ?Sized>` but
+    /// we still need to manually route `StackError` methods.
     impl<T: StackError> StackError for Box<T> {
         fn location(&self) -> &Location {
             self.as_ref().location()
@@ -128,6 +133,7 @@ mod alloc_impls {
             self.as_ref().stack_source()
         }
     }
+    /// Delegates all methods to the inner `T` via `Arc::as_ref`.
     impl<T: ?Sized + StackError> StackError for Arc<T> {
         fn location(&self) -> &Location {
             self.as_ref().location()
@@ -140,11 +146,14 @@ mod alloc_impls {
         }
     }
 
+    /// Routes `Error::source` through the trait object.
     impl Error for Box<dyn StackError> {
         fn source(&self) -> Option<&(dyn Error + 'static)> {
             Error::source(Box::as_ref(self))
         }
     }
+
+    /// Delegates all methods through the `dyn StackError` trait object.
     impl StackError for Box<dyn StackError> {
         fn location(&self) -> &Location {
             self.as_ref().location()
@@ -157,11 +166,14 @@ mod alloc_impls {
         }
     }
 
+    /// Routes `Error::source` through the thread-safe trait object.
     impl Error for Box<dyn StackError + Send + Sync> {
         fn source(&self) -> Option<&(dyn Error + 'static)> {
             Error::source(Box::as_ref(self))
         }
     }
+
+    /// Delegates all methods through the `dyn StackError + Send + Sync` trait object.
     impl StackError for Box<dyn StackError + Send + Sync> {
         fn location(&self) -> &Location {
             self.as_ref().location()
