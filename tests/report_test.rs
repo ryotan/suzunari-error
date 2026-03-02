@@ -84,17 +84,15 @@ fn test_report_with_question_mark_propagation() {
 
 #[test]
 fn test_report_termination_success() {
-    use std::process::Termination;
+    use std::process::{ExitCode, Termination};
     let report: StackReport<TestReportError> = success_case();
-    // Termination::report() should not panic on success
-    let _ = report.report();
+    assert_eq!(report.report(), ExitCode::SUCCESS);
 }
 
 #[test]
 fn test_report_termination_failure() {
-    use std::process::Termination;
+    use std::process::{ExitCode, Termination};
     let report: StackReport<TestReportError> = failure_case();
-    // Termination::report() should not panic on failure
-    // (it writes to stderr and returns FAILURE)
-    let _ = report.report();
+    // Writes to stderr and returns FAILURE
+    assert_eq!(report.report(), ExitCode::FAILURE);
 }

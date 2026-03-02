@@ -521,3 +521,43 @@ fn test_report_with_params() {
     let output = format!("{result}");
     assert!(output.contains("ReportTestError"));
 }
+
+// --- All-unit-variant enum ---
+
+#[suzunari_error]
+enum AllUnitEnum {
+    Alpha,
+    Beta,
+    Gamma,
+}
+
+#[test]
+fn test_all_unit_variant_enum() {
+    fn make_alpha() -> Result<(), AllUnitEnum> {
+        ensure!(false, AlphaSnafu);
+        Ok(())
+    }
+    fn make_beta() -> Result<(), AllUnitEnum> {
+        ensure!(false, BetaSnafu);
+        Ok(())
+    }
+    fn make_gamma() -> Result<(), AllUnitEnum> {
+        ensure!(false, GammaSnafu);
+        Ok(())
+    }
+
+    let alpha = make_alpha().unwrap_err();
+    assert_eq!(alpha.type_name(), "AllUnitEnum::Alpha");
+    assert!(alpha.location().file().ends_with("integration_test.rs"));
+    assert_eq!(alpha.depth(), 0);
+
+    let beta = make_beta().unwrap_err();
+    assert_eq!(beta.type_name(), "AllUnitEnum::Beta");
+
+    let gamma = make_gamma().unwrap_err();
+    assert_eq!(gamma.type_name(), "AllUnitEnum::Gamma");
+
+    // All variants have distinct type_names
+    assert_ne!(alpha.type_name(), beta.type_name());
+    assert_ne!(beta.type_name(), gamma.type_name());
+}
