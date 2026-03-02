@@ -383,7 +383,8 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
 }
 
 /// Applies `from` to a field: wraps type in `DisplayError<T>` and generates
-/// `#[snafu(source(from(T, DisplayError::new)))]`.
+/// `#[snafu(source(from(T, __wrap)))]` where `__wrap` uses autoref specialization
+/// to resolve `get_source` delegation at compile time.
 ///
 /// # Preconditions
 ///
@@ -454,7 +455,7 @@ fn apply_from(
 
 /// Checks whether `ty` references any of the given generic type parameters.
 fn type_uses_generic_params(ty: &syn::Type, params: &HashSet<Ident>) -> bool {
-    use syn::{GenericArgument, PathArguments, Type};
+    use syn::{GenericArgument, PathArguments, ReturnType, Type};
 
     match ty {
         Type::Path(type_path) => type_path.path.segments.iter().any(|seg| {
@@ -464,11 +465,25 @@ fn type_uses_generic_params(ty: &syn::Type, params: &HashSet<Ident>) -> bool {
                         GenericArgument::Type(inner) => type_uses_generic_params(inner, params),
                         _ => false,
                     }),
-                    _ => false,
+                    PathArguments::Parenthesized(paren) => {
+                        paren
+                            .inputs
+                            .iter()
+                            .any(|t| type_uses_generic_params(t, params))
+                            || matches!(&paren.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
+                    }
+                    PathArguments::None => false,
                 }
         }),
         Type::Reference(type_ref) => type_uses_generic_params(&type_ref.elem, params),
-        // Conservatively reject other type forms (tuples, arrays, etc.)
+        Type::Tuple(type_tuple) => type_tuple
+            .elems
+            .iter()
+            .any(|t| type_uses_generic_params(t, params)),
+        Type::Array(type_array) => type_uses_generic_params(&type_array.elem, params),
+        Type::Slice(type_slice) => type_uses_generic_params(&type_slice.elem, params),
+        Type::Paren(type_paren) => type_uses_generic_params(&type_paren.elem, params),
+        // Conservatively reject unknown type forms when generics exist.
         _ => !params.is_empty(),
     }
 }
