@@ -23,8 +23,8 @@ use std::process::{ExitCode, Termination};
 /// ```
 ///
 /// The first line shows the top-level error with type name and location.
-/// StackError sources (with location) are numbered in phase 1, then
-/// plain `Error::source()` chain entries (without location) follow.
+/// StackError sources (with location) are listed first with numbering,
+/// then plain `Error::source()` chain entries (without location) follow.
 ///
 /// With the `std` feature, implements [`Termination`] for use as the
 /// return type of `main()`. The [`#[suzunari_error::report]`](crate::report) macro

@@ -1,4 +1,4 @@
-error: #[report] does not support where clauses.
+error: #[report] does not support where clauses
   --> tests/compile-fail/report_where_clause.rs:13:1
    |
 13 | where

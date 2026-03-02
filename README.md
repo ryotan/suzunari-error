@@ -212,7 +212,7 @@ Standard Rust error approaches have a tradeoff between traceability and ergonomi
 
 | Approach | Per-level location | Auto-capture | Type-safe chain | `no_std` |
 |----------|:-:|:-:|:-:|:-:|
-| `thiserror` | - | - | Yes | Limited |
+| `thiserror` | - | - | Yes | Yes |
 | `anyhow`/`eyre` | Single backtrace | Yes | - | - |
 | `snafu` alone | Manual | Manual | Yes | Yes |
 | **suzunari-error** | **Automatic** | **Yes** | **Yes** | **Yes (3 tiers)** |

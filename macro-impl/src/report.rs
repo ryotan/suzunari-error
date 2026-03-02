@@ -9,7 +9,7 @@ pub(crate) fn report_impl(attr: TokenStream, stream: TokenStream) -> Result<Toke
     if !attr.is_empty() {
         return Err(Error::new(
             attr.span(),
-            "#[report] does not accept arguments.",
+            "#[report] does not accept arguments",
         ));
     }
 
@@ -19,25 +19,25 @@ pub(crate) fn report_impl(attr: TokenStream, stream: TokenStream) -> Result<Toke
     if input.sig.asyncness.is_some() {
         return Err(Error::new(
             input.sig.asyncness.span(),
-            "#[report] does not support async functions. Place it below the async runtime attribute.",
+            "#[report] does not support async functions; place it below the async runtime attribute",
         ));
     }
     if input.sig.unsafety.is_some() {
         return Err(Error::new(
             input.sig.unsafety.span(),
-            "#[report] does not support unsafe functions.",
+            "#[report] does not support unsafe functions",
         ));
     }
     if input.sig.abi.is_some() {
         return Err(Error::new(
             input.sig.abi.span(),
-            "#[report] does not support extern functions.",
+            "#[report] does not support extern functions",
         ));
     }
     if input.sig.constness.is_some() {
         return Err(Error::new(
             input.sig.constness.span(),
-            "#[report] does not support const functions.",
+            "#[report] does not support const functions",
         ));
     }
 
@@ -45,13 +45,13 @@ pub(crate) fn report_impl(attr: TokenStream, stream: TokenStream) -> Result<Toke
     if !input.sig.generics.params.is_empty() {
         return Err(Error::new(
             input.sig.generics.span(),
-            "#[report] does not support generic parameters.",
+            "#[report] does not support generic parameters",
         ));
     }
     if input.sig.generics.where_clause.is_some() {
         return Err(Error::new(
             input.sig.generics.where_clause.span(),
-            "#[report] does not support where clauses.",
+            "#[report] does not support where clauses",
         ));
     }
 

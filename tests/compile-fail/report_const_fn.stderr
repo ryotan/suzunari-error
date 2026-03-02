@@ -1,4 +1,4 @@
-error: #[report] does not support const functions.
+error: #[report] does not support const functions
  --> tests/compile-fail/report_const_fn.rs:9:1
   |
 9 | const fn main() -> Result<(), MyError> {
