@@ -1,0 +1,11 @@
+error: #[report] requires exactly 2 type arguments (Result<(), E>), found 1
+  --> tests/compile-fail/report_result_wrong_arity.rs:10:20
+   |
+10 | fn main() -> Result<()> {
+   |                    ^
+
+error[E0601]: `main` function not found in crate `$CRATE`
+  --> tests/compile-fail/report_result_wrong_arity.rs:12:2
+   |
+12 | }
+   |  ^ consider adding a `main` function to `$DIR/tests/compile-fail/report_result_wrong_arity.rs`
