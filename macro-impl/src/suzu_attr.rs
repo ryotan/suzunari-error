@@ -8,10 +8,11 @@ use crate::helper::{
     combine_errors, extract_display_error_inner, has_snafu_keyword, looks_like_location_type,
 };
 use proc_macro2::{Span, TokenStream};
+use std::collections::HashSet;
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, Meta, Token};
+use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, GenericParam, Ident, Meta, Token};
 
 /// Processes all `#[suzu(...)]` attributes on `input`, consuming them.
 ///
@@ -29,10 +30,22 @@ pub(crate) fn process_suzu_attrs(
     // Type-level attrs are always passthrough-only, regardless of struct/enum.
     process_non_field_attrs(&mut input.attrs)?;
 
+    let generic_type_params: HashSet<Ident> = input
+        .generics
+        .params
+        .iter()
+        .filter_map(|p| match p {
+            GenericParam::Type(tp) => Some(tp.ident.clone()),
+            _ => None,
+        })
+        .collect();
+
     match &mut input.data {
         Data::Struct(data_struct) => {
             match &mut data_struct.fields {
-                Fields::Named(fields) => process_fields(&mut fields.named, crate_path)?,
+                Fields::Named(fields) => {
+                    process_fields(&mut fields.named, crate_path, &generic_type_params)?
+                }
                 // Tuple structs / unit structs have no named fields to process.
                 // Reject any stray #[suzu(...)] on their fields.
                 fields => reject_suzu_on_non_named_fields(fields)?,
@@ -49,7 +62,9 @@ pub(crate) fn process_suzu_attrs(
                 }
                 match &mut variant.fields {
                     Fields::Named(fields) => {
-                        if let Err(e) = process_fields(&mut fields.named, crate_path) {
+                        if let Err(e) =
+                            process_fields(&mut fields.named, crate_path, &generic_type_params)
+                        {
                             errors.push(e);
                         }
                     }
@@ -114,6 +129,7 @@ fn process_non_field_attrs(attrs: &mut Vec<Attribute>) -> Result<(), Error> {
 fn process_fields(
     fields: &mut Punctuated<Field, Token![,]>,
     crate_path: &TokenStream,
+    generic_type_params: &HashSet<Ident>,
 ) -> Result<(), Error> {
     let mut errors = Vec::new();
     // Track first occurrence spans to detect cross-field duplicates.
@@ -213,7 +229,13 @@ fn process_fields(
                 err.combine(Error::new(loc_span, "`location` defined here"));
                 errors.push(err);
             }
-            (Some(from_span), None) => match apply_from(field, &new_attrs, crate_path, from_span) {
+            (Some(from_span), None) => match apply_from(
+                field,
+                &new_attrs,
+                crate_path,
+                from_span,
+                generic_type_params,
+            ) {
                 Ok(snafu_source_attr) => new_attrs.push(snafu_source_attr),
                 Err(e) => errors.push(e),
             },
@@ -374,12 +396,26 @@ fn apply_from(
     existing_attrs: &[Attribute],
     crate_path: &TokenStream,
     from_span: Span,
+    generic_type_params: &HashSet<Ident>,
 ) -> Result<Attribute, Error> {
     // Check for conflict with existing #[snafu(source(...))]
     if has_snafu_keyword(existing_attrs, "source") {
         return Err(Error::new(
             from_span,
             "`from` conflicts with existing `#[snafu(source(...))]`",
+        ));
+    }
+
+    // Reject #[suzu(from)] on fields whose type involves generic type parameters.
+    // The autoref specialization trick requires a concrete type at compile time
+    // to resolve whether `source()` should delegate to the inner type. Generic
+    // parameters prevent this. Users should implement `From` manually instead.
+    if type_uses_generic_params(&field.ty, generic_type_params) {
+        return Err(Error::new(
+            from_span,
+            "`from` cannot be used on fields with generic type parameters; \
+             use `#[suzu(source(from(T, DisplayError::new)))]` with an explicit \
+             `DisplayError<T>` field type, or implement `From` manually",
         ));
     }
 
@@ -394,9 +430,47 @@ fn apply_from(
         }
     };
 
+    // Generate a block expression that defines a local wrapping function and
+    // returns it. Inside the local function, the concrete `original_type` is
+    // known, so Deref-based autoref specialization correctly resolves
+    // `get_source_fn()`: inherent method wins when `original_type: Error`,
+    // otherwise Deref falls back to `DisplayErrorSourceFallback`.
+    //
+    // Using a local function (instead of an inline closure) is necessary
+    // because closures inside snafu attributes inherit proc-macro token hygiene,
+    // which can prevent Deref fallback from being discovered during method
+    // resolution.
     Ok(parse_quote!(
-        #[snafu(source(from(#original_type, #crate_path::DisplayError::new)))]
+        #[snafu(source(from(#original_type, {
+            fn __wrap(__source: #original_type) -> #crate_path::DisplayError<#original_type> {
+                let __get_source: fn(&#original_type) -> Option<&(dyn core::error::Error + 'static)>
+                    = #crate_path::__private::DisplayErrorSourceResolver(&__source).get_source_fn();
+                #crate_path::DisplayError::with_get_source(__source, __get_source)
+            }
+            __wrap
+        })))]
     ))
+}
+
+/// Checks whether `ty` references any of the given generic type parameters.
+fn type_uses_generic_params(ty: &syn::Type, params: &HashSet<Ident>) -> bool {
+    use syn::{GenericArgument, PathArguments, Type};
+
+    match ty {
+        Type::Path(type_path) => type_path.path.segments.iter().any(|seg| {
+            params.contains(&seg.ident)
+                || match &seg.arguments {
+                    PathArguments::AngleBracketed(args) => args.args.iter().any(|arg| match arg {
+                        GenericArgument::Type(inner) => type_uses_generic_params(inner, params),
+                        _ => false,
+                    }),
+                    _ => false,
+                }
+        }),
+        Type::Reference(type_ref) => type_uses_generic_params(&type_ref.elem, params),
+        // Conservatively reject other type forms (tuples, arrays, etc.)
+        _ => !params.is_empty(),
+    }
 }
 
 /// Applies `location` to a field: adds `#[snafu(implicit)]` + `#[stack(location)]`.

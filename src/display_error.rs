@@ -53,12 +53,15 @@ use core::hash::{Hash, Hasher};
 /// }
 /// ```
 ///
-/// ## Caveats
+/// ## Source chain preservation
 ///
-/// `DisplayError` is intended for types that do **not** implement `Error`.
-/// Wrapping a type that already implements `Error` will lose its original
-/// `source()` chain, because `DisplayError`'s `Error` impl always returns
-/// `None` from `source()`.
+/// When constructed via `#[suzu(from)]`, `DisplayError` automatically detects
+/// whether the wrapped type implements `Error` at compile time (using autoref
+/// specialization). If it does, `source()` delegates to the inner type's
+/// `source()`. If not, `source()` returns `None`.
+///
+/// When constructed manually via [`DisplayError::new()`], `source()` always
+/// returns `None`. Use `#[suzu(from)]` for automatic source chain preservation.
 ///
 /// ## Pattern C: `map_err` — direct wrapping without snafu context
 ///
@@ -83,14 +86,38 @@ use core::hash::{Hash, Hasher};
 ///     Ok(())
 /// }
 /// ```
-#[derive(Clone)]
-pub struct DisplayError<E>(E);
+pub struct DisplayError<E> {
+    inner: E,
+    get_source: fn(&E) -> Option<&(dyn core::error::Error + 'static)>,
+}
 
 impl<E: Debug + Display> DisplayError<E> {
     /// Wraps `error` in a `DisplayError`, making it usable as a `source` field.
+    ///
+    /// `source()` will always return `None`. For automatic source chain
+    /// preservation, use `#[suzu(from)]` instead.
     #[must_use]
     pub fn new(error: E) -> Self {
-        Self(error)
+        Self {
+            inner: error,
+            get_source: |_| None,
+        }
+    }
+
+    /// Creates a `DisplayError` with a custom `get_source` resolver.
+    ///
+    /// Used by macro-generated code with autoref specialization to resolve
+    /// `source()` delegation at compile time.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn with_get_source(
+        error: E,
+        get_source: fn(&E) -> Option<&(dyn core::error::Error + 'static)>,
+    ) -> Self {
+        Self {
+            inner: error,
+            get_source,
+        }
     }
 }
 
@@ -98,31 +125,42 @@ impl<E> DisplayError<E> {
     /// Returns a reference to the wrapped value.
     #[must_use]
     pub fn inner(&self) -> &E {
-        &self.0
+        &self.inner
     }
 
     /// Unwraps and returns the inner value.
     #[must_use]
     pub fn into_inner(self) -> E {
-        self.0
+        self.inner
+    }
+}
+
+impl<E: Clone> Clone for DisplayError<E> {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            get_source: self.get_source,
+        }
     }
 }
 
 impl<E: Display> Display for DisplayError<E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        Display::fmt(&self.0, f)
+        Display::fmt(&self.inner, f)
     }
 }
 
 impl<E: Debug> Debug for DisplayError<E> {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        Debug::fmt(&self.0, f)
+        Debug::fmt(&self.inner, f)
     }
 }
 
+// PartialEq, Eq, Hash intentionally ignore `get_source` — it is an
+// implementation detail for source chain delegation, not part of the value.
 impl<E: PartialEq> PartialEq for DisplayError<E> {
     fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+        self.inner == other.inner
     }
 }
 
@@ -130,16 +168,21 @@ impl<E: Eq> Eq for DisplayError<E> {}
 
 impl<E: Hash> Hash for DisplayError<E> {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
+        self.inner.hash(state);
     }
 }
 
-/// `source()` always returns `None` because the wrapped type does not
-/// implement `Error`, so there is no underlying source to delegate to.
+/// Delegates `source()` to the stored `get_source` function pointer.
 ///
-/// **Warning:** Wrapping a type that already implements `Error` will lose its
-/// original source chain. This type is intended only for non-`Error` types.
-impl<E: Debug + Display> Error for DisplayError<E> {}
+/// When constructed via `#[suzu(from)]` (macro-generated code), this
+/// automatically delegates to the inner type's `source()` if it implements
+/// `Error`, or returns `None` otherwise. When constructed via `new()`,
+/// always returns `None`.
+impl<E: Debug + Display> Error for DisplayError<E> {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        (self.get_source)(&self.inner)
+    }
+}
 
 // No From impl — intentionally omitted to prevent implicit .into() conversions.
 
@@ -209,6 +252,16 @@ mod tests {
     }
 
     #[test]
+    fn test_with_get_source_none_for_non_error() {
+        let wrapped = DisplayError::with_get_source(
+            FakeLibError { message: "no error impl" },
+            |_| None,
+        );
+        let err: &dyn Error = &wrapped;
+        assert!(err.source().is_none());
+    }
+
+    #[test]
     fn test_partial_eq() {
         let a = DisplayError::new(42);
         let b = DisplayError::new(42);
@@ -230,6 +283,37 @@ mod tests {
     #[cfg(feature = "alloc")]
     mod alloc_tests {
         use super::*;
+
+        #[test]
+        fn test_with_get_source_delegates_to_inner() {
+            #[derive(Debug)]
+            struct InnerError;
+            impl Display for InnerError {
+                fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+                    f.write_str("inner")
+                }
+            }
+            impl Error for InnerError {}
+
+            #[derive(Debug)]
+            struct OuterError(InnerError);
+            impl Display for OuterError {
+                fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+                    f.write_str("outer")
+                }
+            }
+            impl Error for OuterError {
+                fn source(&self) -> Option<&(dyn Error + 'static)> {
+                    Some(&self.0)
+                }
+            }
+
+            let wrapped =
+                DisplayError::with_get_source(OuterError(InnerError), |e| e.source());
+            let err: &dyn Error = &wrapped;
+            let source = err.source().expect("source should delegate");
+            assert_eq!(alloc::format!("{source}"), "inner");
+        }
 
         #[test]
         fn test_display_delegates() {

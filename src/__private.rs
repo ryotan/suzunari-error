@@ -2,18 +2,22 @@
 //!
 //! **Not public API. Do not use.** This module is `#[doc(hidden)]` and not
 //! covered by semver guarantees. It exists solely for generated code emitted
-//! by `#[derive(StackError)]`.
+//! by `#[derive(StackError)]` and `#[suzunari_error]`.
 //!
 //! Uses the **autoref specialization** technique to conditionally resolve
-//! `stack_source()` at compile time. When the source type implements
-//! `StackError`, the inherent `resolve()` method takes priority via autoref.
-//! Otherwise, `Deref` coercion kicks in, calling the fallback `resolve()` on
-//! `NotStackErrorFallback`, which returns `None`. This avoids requiring
-//! `StackError` bounds on source types in generated code.
+//! trait-dependent behavior at compile time. When a source type implements
+//! the target trait, the inherent method takes priority via autoref.
+//! Otherwise, `Deref` coercion kicks in, calling the fallback method.
+//! This avoids requiring trait bounds on source types in generated code.
 //!
 //! See: <https://github.com/dtolnay/case-studies/blob/master/autoref-specialization/README.md>
 
 use crate::StackError;
+use core::error::Error;
+
+// ---------------------------------------------------------------------------
+// StackSourceResolver — resolves StackError::stack_source()
+// ---------------------------------------------------------------------------
 
 /// Wraps a reference and resolves to the inherent `resolve()` method
 /// when `T: StackError`, or falls back via `Deref` → `NotStackErrorFallback`
@@ -42,5 +46,47 @@ impl<T: ?Sized> core::ops::Deref for StackSourceResolver<'_, T> {
     type Target = NotStackErrorFallback;
     fn deref(&self) -> &NotStackErrorFallback {
         &NotStackErrorFallback
+    }
+}
+
+// ---------------------------------------------------------------------------
+// DisplayErrorSourceResolver — resolves get_source fn for DisplayError
+// ---------------------------------------------------------------------------
+
+/// Resolves the `get_source` function pointer for [`DisplayError`](crate::DisplayError).
+///
+/// Uses the same Deref-based autoref specialization as `StackSourceResolver`.
+/// When `T: Error + 'static`, the inherent `get_source_fn()` takes priority.
+/// Otherwise, Deref falls back to `DisplayErrorSourceFallback`.
+///
+/// The fallback's `get_source_fn` has a method-level generic `<T>`, so callers
+/// must provide an explicit type annotation for inference to succeed:
+/// ```ignore
+/// let __get_source: fn(&OriginalType) -> Option<&(dyn Error + 'static)>
+///     = DisplayErrorSourceResolver(&val).get_source_fn();
+/// ```
+pub struct DisplayErrorSourceResolver<'a, T>(pub &'a T);
+
+impl<T: Error + 'static> DisplayErrorSourceResolver<'_, T> {
+    pub fn get_source_fn(&self) -> fn(&T) -> Option<&(dyn Error + 'static)> {
+        |e| e.source()
+    }
+}
+
+/// Fallback target via Deref. Returns a `get_source` fn that always yields `None`.
+pub struct DisplayErrorSourceFallback;
+
+impl DisplayErrorSourceFallback {
+    // The generic `<T>` here requires callers to provide a type annotation
+    // so the compiler can infer which `T` to use.
+    pub fn get_source_fn<T>(&self) -> fn(&T) -> Option<&(dyn Error + 'static)> {
+        |_| None
+    }
+}
+
+impl<T> core::ops::Deref for DisplayErrorSourceResolver<'_, T> {
+    type Target = DisplayErrorSourceFallback;
+    fn deref(&self) -> &DisplayErrorSourceFallback {
+        &DisplayErrorSourceFallback
     }
 }
