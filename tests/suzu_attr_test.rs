@@ -100,7 +100,12 @@ fn test_from_already_display_error() {
     }
     let err = fake_op().context(AlreadyWrappedSnafu).unwrap_err();
     let report = format!("{:?}", StackReport::from(err));
-    assert!(report.contains("already wrapped"));
+    let lines: Vec<&str> = report.lines().collect();
+    // AlreadyWrappedError -> DisplayError<FakeLibError> (no source chain)
+    assert!(lines[0].starts_with("Error: AlreadyWrappedError: already wrapped, at "));
+    assert_eq!(lines[1], "Caused by (recent first):");
+    assert_eq!(lines[2], "  1| already wrapped");
+    assert_eq!(lines.len(), 3);
 }
 
 // --- from: non-source-named field ---
@@ -297,12 +302,19 @@ fn test_stack_report_with_from_chain() {
     }
 
     let err = outer().unwrap_err();
-    // Should have depth 2: OuterError -> FromEnumError::HashFailed -> DisplayError
+    // OuterError -> FromEnumError::HashFailed -> DisplayError<FakeLibError>
     assert_eq!(err.depth(), 2);
     let report = format!("{:?}", StackReport::from(err));
-    assert!(report.contains("outer error"));
-    assert!(report.contains("hashing failed"));
-    assert!(report.contains("hash fail"));
+    let lines: Vec<&str> = report.lines().collect();
+    // Line 0: top-level error with type name and location
+    assert!(lines[0].starts_with("Error: OuterError: outer error, at "));
+    // Line 1: "Caused by" header
+    assert_eq!(lines[1], "Caused by (recent first):");
+    // Line 2: StackError cause with index, type name, message, and location
+    assert!(lines[2].starts_with("  1| FromEnumError::HashFailed: hashing failed, at "));
+    // Line 3: plain Error cause (DisplayError wrapping FakeLibError, no location)
+    assert_eq!(lines[3], "  2| hash fail");
+    assert_eq!(lines.len(), 4);
 }
 
 // --- from: source chain preservation for Error-implementing types ---
@@ -353,6 +365,16 @@ fn test_from_preserves_source_chain_for_error_types() {
         .source()
         .expect("DisplayError should delegate to RealOuter::source()");
     assert_eq!(format!("{inner}"), "real inner");
+    // Verify StackReport output hierarchy:
+    // SourceChainError -> DisplayError<RealOuter> -> RealInner
+    let report = format!("{:?}", StackReport::from(err));
+    let lines: Vec<&str> = report.lines().collect();
+    assert!(lines[0].starts_with("Error: SourceChainError: wrapped with source chain, at "));
+    assert_eq!(lines[1], "Caused by (recent first):");
+    // DisplayError delegates source() to RealOuter, which has RealInner as source
+    assert_eq!(lines[2], "  1| real outer");
+    assert_eq!(lines[3], "  2| real inner");
+    assert_eq!(lines.len(), 4);
 }
 
 #[test]
