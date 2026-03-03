@@ -390,8 +390,8 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
 ///
 /// - `existing_attrs` must contain all attributes that will be set on this field
 ///   (i.e., `field.attrs` is not yet populated).
-/// - No `#[snafu(source(...))]` should be present in `existing_attrs` (caller
-///   should check for conflicts beforehand or let this function report it).
+/// - No `#[snafu(source(...))]` should be present in `existing_attrs`. This
+///   function enforces this constraint and returns an error if violated.
 fn apply_from(
     field: &mut Field,
     existing_attrs: &[Attribute],
@@ -456,24 +456,62 @@ fn apply_from(
 fn type_uses_generic_params(ty: &syn::Type, params: &HashSet<Ident>) -> bool {
     use syn::{GenericArgument, PathArguments, ReturnType, Type};
 
+    /// Checks angle-bracketed args (e.g., `<T, Item = U>`) for generic params.
+    fn angle_bracketed_uses(
+        args: &syn::AngleBracketedGenericArguments,
+        params: &HashSet<Ident>,
+    ) -> bool {
+        args.args.iter().any(|arg| match arg {
+            GenericArgument::Type(inner) => type_uses_generic_params(inner, params),
+            GenericArgument::AssocType(assoc) => type_uses_generic_params(&assoc.ty, params),
+            _ => false,
+        })
+    }
+
+    /// Checks path arguments (angle-bracketed or parenthesized) for generic params.
+    fn path_args_uses(args: &PathArguments, params: &HashSet<Ident>) -> bool {
+        match args {
+            PathArguments::AngleBracketed(args) => angle_bracketed_uses(args, params),
+            PathArguments::Parenthesized(paren) => {
+                paren
+                    .inputs
+                    .iter()
+                    .any(|t| type_uses_generic_params(t, params))
+                    || matches!(&paren.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
+            }
+            PathArguments::None => false,
+        }
+    }
+
+    /// Checks trait bounds for generic params in their path arguments.
+    fn bounds_use(
+        bounds: &syn::punctuated::Punctuated<syn::TypeParamBound, Token![+]>,
+        params: &HashSet<Ident>,
+    ) -> bool {
+        bounds.iter().any(|bound| match bound {
+            syn::TypeParamBound::Trait(trait_bound) => trait_bound
+                .path
+                .segments
+                .iter()
+                .any(|seg| path_args_uses(&seg.arguments, params)),
+            _ => false,
+        })
+    }
+
     match ty {
-        Type::Path(type_path) => type_path.path.segments.iter().any(|seg| {
-            params.contains(&seg.ident)
-                || match &seg.arguments {
-                    PathArguments::AngleBracketed(args) => args.args.iter().any(|arg| match arg {
-                        GenericArgument::Type(inner) => type_uses_generic_params(inner, params),
-                        _ => false,
-                    }),
-                    PathArguments::Parenthesized(paren) => {
-                        paren
-                            .inputs
-                            .iter()
-                            .any(|t| type_uses_generic_params(t, params))
-                            || matches!(&paren.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
-                    }
-                    PathArguments::None => false,
+        Type::Path(type_path) => {
+            // Check qself for qualified paths like `<T as Trait>::Assoc`
+            if let Some(qself) = &type_path.qself {
+                if type_uses_generic_params(&qself.ty, params) {
+                    return true;
                 }
-        }),
+            }
+            type_path
+                .path
+                .segments
+                .iter()
+                .any(|seg| params.contains(&seg.ident) || path_args_uses(&seg.arguments, params))
+        }
         Type::Reference(type_ref) => type_uses_generic_params(&type_ref.elem, params),
         Type::Tuple(type_tuple) => type_tuple
             .elems
@@ -482,33 +520,8 @@ fn type_uses_generic_params(ty: &syn::Type, params: &HashSet<Ident>) -> bool {
         Type::Array(type_array) => type_uses_generic_params(&type_array.elem, params),
         Type::Slice(type_slice) => type_uses_generic_params(&type_slice.elem, params),
         Type::Paren(type_paren) => type_uses_generic_params(&type_paren.elem, params),
-        Type::TraitObject(type_trait_object) => {
-            type_trait_object.bounds.iter().any(|bound| match bound {
-                syn::TypeParamBound::Trait(trait_bound) => trait_bound
-                    .path
-                    .segments
-                    .iter()
-                    .any(|seg| match &seg.arguments {
-                        PathArguments::AngleBracketed(args) => {
-                            args.args.iter().any(|arg| match arg {
-                                GenericArgument::Type(inner) => {
-                                    type_uses_generic_params(inner, params)
-                                }
-                                _ => false,
-                            })
-                        }
-                        PathArguments::Parenthesized(paren) => {
-                            paren
-                                .inputs
-                                .iter()
-                                .any(|t| type_uses_generic_params(t, params))
-                                || matches!(&paren.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
-                        }
-                        PathArguments::None => false,
-                    }),
-                _ => false,
-            })
-        }
+        Type::Group(type_group) => type_uses_generic_params(&type_group.elem, params),
+        Type::TraitObject(type_trait_object) => bounds_use(&type_trait_object.bounds, params),
         Type::BareFn(type_bare_fn) => {
             type_bare_fn
                 .inputs
@@ -517,33 +530,7 @@ fn type_uses_generic_params(ty: &syn::Type, params: &HashSet<Ident>) -> bool {
                 || matches!(&type_bare_fn.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
         }
         Type::Ptr(type_ptr) => type_uses_generic_params(&type_ptr.elem, params),
-        Type::ImplTrait(type_impl_trait) => {
-            type_impl_trait.bounds.iter().any(|bound| match bound {
-                syn::TypeParamBound::Trait(trait_bound) => trait_bound
-                    .path
-                    .segments
-                    .iter()
-                    .any(|seg| match &seg.arguments {
-                        PathArguments::AngleBracketed(args) => {
-                            args.args.iter().any(|arg| match arg {
-                                GenericArgument::Type(inner) => {
-                                    type_uses_generic_params(inner, params)
-                                }
-                                _ => false,
-                            })
-                        }
-                        PathArguments::Parenthesized(paren) => {
-                            paren
-                                .inputs
-                                .iter()
-                                .any(|t| type_uses_generic_params(t, params))
-                                || matches!(&paren.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
-                        }
-                        PathArguments::None => false,
-                    }),
-                _ => false,
-            })
-        }
+        Type::ImplTrait(type_impl_trait) => bounds_use(&type_impl_trait.bounds, params),
         // Type::Never, Type::Infer, Type::Macro, Type::Verbatim, etc.
         // These either cannot reference generic params or are opaque to analysis.
         _ => false,
@@ -566,6 +553,9 @@ fn apply_location(attrs: &mut Vec<Attribute>) {
     }
     // Guard against duplicate #[stack(location)] — can happen if the user
     // writes both #[stack(location)] and #[suzu(location)] on the same field.
+    // Currently #[stack(...)] only accepts `location`, so checking the path
+    // alone is sufficient. If #[stack] gains other arguments in the future,
+    // this must be narrowed to check for the `location` argument specifically.
     let already_has_stack_location = attrs.iter().any(|a| a.path().is_ident("stack"));
     if !already_has_stack_location {
         attrs.push(parse_quote!(#[stack(location)]));
