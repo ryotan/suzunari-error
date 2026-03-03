@@ -19,10 +19,10 @@ impl core::fmt::Debug for FakeLibError {
 }
 // ^ Intentionally does NOT implement Error!
 
-// --- Pattern A: automatic conversion via source(from(...)) ---
+// --- Pattern B: manual conversion via source(from(...)) ---
 #[suzunari_error]
 #[suzu(display("operation failed"))]
-struct AutoConvertError {
+struct ManualSourceFromError {
     #[snafu(source(from(FakeLibError, DisplayError::new)))]
     source: DisplayError<FakeLibError>,
 }
@@ -51,14 +51,14 @@ struct ManualConvertError {
 }
 
 #[test]
-fn test_source_from_auto_convert() {
-    // FakeLibError → DisplayError conversion is auto-applied via source(from(...))
+fn test_source_from_manual_convert() {
+    // FakeLibError → DisplayError conversion is applied via manual source(from(...))
     fn fake_op() -> Result<(), FakeLibError> {
         Err(FakeLibError {
             message: "fake lib broke",
         })
     }
-    let err = fake_op().context(AutoConvertSnafu).unwrap_err();
+    let err = fake_op().context(ManualSourceFromSnafu).unwrap_err();
 
     let report = format!("{:?}", StackReport::from(err));
     assert!(report.contains("operation failed"));
@@ -172,13 +172,17 @@ fn test_from_returns_none_source_for_non_error_types() {
     );
 }
 
+// BoxedStackError requires alloc. This test lives in the test-std file (not
+// alloc_tier_test.rs) because it reuses ManualSourceFromError defined above.
+// The test-std feature implies test-alloc, so the gate is always true here;
+// the annotation documents the dependency rather than gating execution.
 #[cfg(feature = "test-alloc")]
 #[test]
 fn test_display_error_with_boxed_stack_error() {
     fn fake_op() -> Result<(), FakeLibError> {
         Err(FakeLibError { message: "boxed" })
     }
-    let err = fake_op().context(AutoConvertSnafu).unwrap_err();
+    let err = fake_op().context(ManualSourceFromSnafu).unwrap_err();
     let boxed: BoxedStackError = err.into();
     let report = format!("{:?}", StackReport::from(boxed));
     assert!(report.contains("operation failed"));
