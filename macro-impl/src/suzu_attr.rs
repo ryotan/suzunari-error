@@ -415,8 +415,7 @@ fn apply_from(
         return Err(Error::new(
             from_span,
             "`from` cannot be used on fields with generic type parameters; \
-             use `#[suzu(source(from(T, DisplayError::new)))]` with an explicit \
-             `DisplayError<T>` field type, or implement `From` manually",
+             implement `From` manually instead",
         ));
     }
 
@@ -483,8 +482,71 @@ fn type_uses_generic_params(ty: &syn::Type, params: &HashSet<Ident>) -> bool {
         Type::Array(type_array) => type_uses_generic_params(&type_array.elem, params),
         Type::Slice(type_slice) => type_uses_generic_params(&type_slice.elem, params),
         Type::Paren(type_paren) => type_uses_generic_params(&type_paren.elem, params),
-        // Conservatively reject unknown type forms when generics exist.
-        _ => !params.is_empty(),
+        Type::TraitObject(type_trait_object) => {
+            type_trait_object.bounds.iter().any(|bound| match bound {
+                syn::TypeParamBound::Trait(trait_bound) => trait_bound
+                    .path
+                    .segments
+                    .iter()
+                    .any(|seg| match &seg.arguments {
+                        PathArguments::AngleBracketed(args) => {
+                            args.args.iter().any(|arg| match arg {
+                                GenericArgument::Type(inner) => {
+                                    type_uses_generic_params(inner, params)
+                                }
+                                _ => false,
+                            })
+                        }
+                        PathArguments::Parenthesized(paren) => {
+                            paren
+                                .inputs
+                                .iter()
+                                .any(|t| type_uses_generic_params(t, params))
+                                || matches!(&paren.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
+                        }
+                        PathArguments::None => false,
+                    }),
+                _ => false,
+            })
+        }
+        Type::BareFn(type_bare_fn) => {
+            type_bare_fn
+                .inputs
+                .iter()
+                .any(|arg| type_uses_generic_params(&arg.ty, params))
+                || matches!(&type_bare_fn.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
+        }
+        Type::Ptr(type_ptr) => type_uses_generic_params(&type_ptr.elem, params),
+        Type::ImplTrait(type_impl_trait) => {
+            type_impl_trait.bounds.iter().any(|bound| match bound {
+                syn::TypeParamBound::Trait(trait_bound) => trait_bound
+                    .path
+                    .segments
+                    .iter()
+                    .any(|seg| match &seg.arguments {
+                        PathArguments::AngleBracketed(args) => {
+                            args.args.iter().any(|arg| match arg {
+                                GenericArgument::Type(inner) => {
+                                    type_uses_generic_params(inner, params)
+                                }
+                                _ => false,
+                            })
+                        }
+                        PathArguments::Parenthesized(paren) => {
+                            paren
+                                .inputs
+                                .iter()
+                                .any(|t| type_uses_generic_params(t, params))
+                                || matches!(&paren.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
+                        }
+                        PathArguments::None => false,
+                    }),
+                _ => false,
+            })
+        }
+        // Type::Never, Type::Infer, Type::Macro, Type::Verbatim, etc.
+        // These either cannot reference generic params or are opaque to analysis.
+        _ => false,
     }
 }
 

@@ -108,6 +108,70 @@ fn test_from_attr_already_wrapped() {
     assert!(report.contains("from already wrapped"));
 }
 
+// --- Source chain delegation via #[suzu(from)] ---
+
+// A type that implements Error (source chain should be preserved)
+#[derive(Debug)]
+struct RealInner;
+impl core::fmt::Display for RealInner {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("real inner")
+    }
+}
+impl std::error::Error for RealInner {}
+
+#[derive(Debug)]
+struct RealOuter(RealInner);
+impl core::fmt::Display for RealOuter {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("real outer")
+    }
+}
+impl std::error::Error for RealOuter {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+#[suzunari_error]
+#[suzu(display("source chain test"))]
+struct SourceChainError {
+    #[suzu(from)]
+    source: RealOuter,
+}
+
+#[test]
+fn test_from_preserves_source_chain_for_error_types() {
+    fn real_op() -> Result<(), RealOuter> {
+        Err(RealOuter(RealInner))
+    }
+    let err = real_op().context(SourceChainSnafu).unwrap_err();
+    // DisplayError should delegate source() to RealOuter::source()
+    use std::error::Error;
+    let display_err = err.source().expect("should have source (DisplayError)");
+    let inner = display_err
+        .source()
+        .expect("DisplayError should delegate to RealOuter::source()");
+    assert_eq!(format!("{inner}"), "real inner");
+}
+
+#[test]
+fn test_from_returns_none_source_for_non_error_types() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "no Error impl",
+        })
+    }
+    let err = fake_op().context(FromConvertSnafu).unwrap_err();
+    // FakeLibError doesn't implement Error, so DisplayError::source() → None.
+    use std::error::Error;
+    let display_err = err.source().expect("should have source (DisplayError)");
+    assert!(
+        display_err.source().is_none(),
+        "non-Error type should have None source"
+    );
+}
+
 #[cfg(feature = "test-alloc")]
 #[test]
 fn test_display_error_with_boxed_stack_error() {

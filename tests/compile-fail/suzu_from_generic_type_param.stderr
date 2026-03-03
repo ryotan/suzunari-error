@@ -1,4 +1,4 @@
-error: `from` cannot be used on fields with generic type parameters; use `#[suzu(source(from(T, DisplayError::new)))]` with an explicit `DisplayError<T>` field type, or implement `From` manually
+error: `from` cannot be used on fields with generic type parameters; implement `From` manually instead
  --> tests/compile-fail/suzu_from_generic_type_param.rs:6:12
   |
 6 |     #[suzu(from)]

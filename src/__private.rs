@@ -68,6 +68,7 @@ impl<T: ?Sized> core::ops::Deref for StackSourceResolver<'_, T> {
 pub struct DisplayErrorSourceResolver<'a, T>(pub &'a T);
 
 impl<T: Error + 'static> DisplayErrorSourceResolver<'_, T> {
+    #[must_use]
     pub fn get_source_fn(&self) -> fn(&T) -> Option<&(dyn Error + 'static)> {
         |e| e.source()
     }
@@ -79,6 +80,7 @@ pub struct DisplayErrorSourceFallback;
 impl DisplayErrorSourceFallback {
     // The generic `<T>` here requires callers to provide a type annotation
     // so the compiler can infer which `T` to use.
+    #[must_use]
     pub fn get_source_fn<T>(&self) -> fn(&T) -> Option<&(dyn Error + 'static)> {
         |_| None
     }

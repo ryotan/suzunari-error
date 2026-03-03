@@ -53,7 +53,8 @@ pub fn derive_stack_error(input: TokenStream) -> TokenStream {
 /// passed through as-is. Additionally:
 ///
 /// - **`from`** (field-level): Wraps the field type in `DisplayError<T>` and
-///   generates `#[snafu(source(from(T, DisplayError::new)))]`.
+///   generates a `source(from(...))` conversion that automatically preserves the
+///   `Error::source()` chain when the wrapped type implements `Error`.
 /// - **`location`** (field-level): Marks a field as the location field. Converts
 ///   to `#[stack(location)]` + `#[snafu(implicit)]`. Allows custom field names
 ///   instead of the default `location`. Requires a ` Location ` type.

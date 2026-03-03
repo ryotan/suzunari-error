@@ -82,7 +82,7 @@ The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc"
 
 `#[suzu(...)]` is a superset of `#[snafu(...)]` — all snafu keywords pass through as-is. Suzunari extensions:
 
-- **`from`** (field-level) — Wraps field type in `DisplayError<T>` and generates `#[snafu(source(from(T, DisplayError::new)))]`
+- **`from`** (field-level) — Wraps field type in `DisplayError<T>` and generates a `source(from(...))` conversion that automatically preserves the `Error::source()` chain when the wrapped type implements `Error`
 - **`location`** (field-level) — Marks a field as the location field. Converts to `#[stack(location)]` + `#[snafu(implicit)]`. Allows custom field names. Requires `Location` type
 
 ### Field-Level Attributes

@@ -107,7 +107,8 @@ impl<E: Debug + Display> DisplayError<E> {
     /// Creates a `DisplayError` with a custom `get_source` resolver.
     ///
     /// Used by macro-generated code with autoref specialization to resolve
-    /// `source()` delegation at compile time.
+    /// `source()` delegation at compile time. This method is `pub` (rather than
+    /// crate-private) because generated code in downstream crates must call it.
     #[doc(hidden)]
     #[must_use]
     pub fn with_get_source(
@@ -254,7 +255,9 @@ mod tests {
     #[test]
     fn test_with_get_source_none_for_non_error() {
         let wrapped = DisplayError::with_get_source(
-            FakeLibError { message: "no error impl" },
+            FakeLibError {
+                message: "no error impl",
+            },
             |_| None,
         );
         let err: &dyn Error = &wrapped;
@@ -308,8 +311,7 @@ mod tests {
                 }
             }
 
-            let wrapped =
-                DisplayError::with_get_source(OuterError(InnerError), |e| e.source());
+            let wrapped = DisplayError::with_get_source(OuterError(InnerError), |e| e.source());
             let err: &dyn Error = &wrapped;
             let source = err.source().expect("source should delegate");
             assert_eq!(alloc::format!("{source}"), "inner");
