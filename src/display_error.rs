@@ -104,11 +104,10 @@ impl<E: Debug + Display> DisplayError<E> {
         }
     }
 
-    /// Creates a `DisplayError` with a custom `get_source` resolver.
+    /// **Internal**: Creates a `DisplayError` with an explicit `get_source` resolver.
     ///
-    /// Used by macro-generated code with autoref specialization to resolve
-    /// `source()` delegation at compile time. This method is `pub` (rather than
-    /// crate-private) because generated code in downstream crates must call it.
+    /// Called exclusively by `#[suzunari_error]` macro-generated code. Not covered
+    /// by semver guarantees. Use [`DisplayError::new`] instead.
     #[doc(hidden)]
     #[must_use]
     pub fn with_get_source(
@@ -273,14 +272,28 @@ mod tests {
         assert_ne!(a, c);
     }
 
-    #[cfg(feature = "std")]
     #[test]
     fn test_hash() {
-        use core::hash::BuildHasher;
-        let hasher = std::collections::hash_map::RandomState::new();
+        // Simple deterministic hasher that does not require std.
+        struct SimpleHasher(u64);
+        impl Hasher for SimpleHasher {
+            fn finish(&self) -> u64 {
+                self.0
+            }
+            fn write(&mut self, bytes: &[u8]) {
+                for &b in bytes {
+                    self.0 = self.0.wrapping_mul(31).wrapping_add(b as u64);
+                }
+            }
+        }
+        fn hash_one<T: Hash>(val: &T) -> u64 {
+            let mut h = SimpleHasher(0);
+            val.hash(&mut h);
+            h.finish()
+        }
         let a = DisplayError::new(42);
         let b = DisplayError::new(42);
-        assert_eq!(hasher.hash_one(&a), hasher.hash_one(&b));
+        assert_eq!(hash_one(&a), hash_one(&b));
     }
 
     #[cfg(feature = "alloc")]

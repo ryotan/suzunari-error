@@ -22,7 +22,7 @@
 //! # Key Types
 //!
 //! - [`Location`] — Captures call-site file/line/column via `#[track_caller]`
-//! - [`StackError`] — Extends `Error` with `location()`, `type_name()`, and `stack_source()`
+//! - [`StackError`] — Extends `Error` with `location()`, `type_name()`, `stack_source()`, and `depth()`
 //! - [`StackReport`] — Formats a `StackError` chain for display with location info
 //! - [`BoxedStackError`] — Type-erased `StackError` wrapper (requires `alloc`)
 //! - [`DisplayError`] — Adapter for `Debug + Display` types that don't implement `Error`
