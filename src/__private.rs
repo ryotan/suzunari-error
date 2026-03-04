@@ -13,7 +13,9 @@
 //! See: <https://github.com/dtolnay/case-studies/blob/master/autoref-specialization/README.md>
 
 use crate::StackError;
+use crate::display_error::DisplayError;
 use core::error::Error;
+use core::fmt::{Debug, Display};
 
 // ---------------------------------------------------------------------------
 // StackSourceResolver — resolves StackError::stack_source()
@@ -25,6 +27,7 @@ use core::error::Error;
 pub struct StackSourceResolver<'a, T: ?Sized>(pub &'a T);
 
 impl<'a, T: StackError> StackSourceResolver<'a, T> {
+    #[must_use]
     pub fn resolve(&self) -> Option<&'a dyn StackError> {
         Some(self.0)
     }
@@ -37,6 +40,7 @@ impl NotStackErrorFallback {
     // 'static is required even though this always returns None: with elided
     // lifetime, the return type would be tied to the temporary NotStackErrorFallback
     // created via Deref in generated code, causing a borrow-checker error.
+    #[must_use]
     pub fn resolve(&self) -> Option<&'static dyn StackError> {
         None
     }
@@ -47,6 +51,22 @@ impl<T: ?Sized> core::ops::Deref for StackSourceResolver<'_, T> {
     fn deref(&self) -> &NotStackErrorFallback {
         &NotStackErrorFallback
     }
+}
+
+// ---------------------------------------------------------------------------
+// DisplayError construction helper for macro-generated code
+// ---------------------------------------------------------------------------
+
+/// Creates a [`DisplayError`] with an explicit `get_source` resolver.
+///
+/// Called exclusively by `#[suzunari_error]` macro-generated code.
+/// Use [`DisplayError::new`] in application code.
+#[must_use]
+pub fn display_error_with_get_source<E: Debug + Display>(
+    error: E,
+    get_source: fn(&E) -> Option<&(dyn Error + 'static)>,
+) -> DisplayError<E> {
+    DisplayError::with_get_source(error, get_source)
 }
 
 // ---------------------------------------------------------------------------

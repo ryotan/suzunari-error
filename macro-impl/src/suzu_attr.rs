@@ -21,7 +21,9 @@ use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, GenericParam, Iden
 ///
 /// After this call, `#[suzu(location)]` fields have `#[stack(location)]` +
 /// `#[snafu(implicit)]`, and `#[suzu(from)]` fields have their type wrapped in
-/// `DisplayError<T>` with `#[snafu(source(from(...)))]`.
+/// `DisplayError<T>` with a `#[snafu(source(from(...)))]` attribute that uses a
+/// local `__wrap` function to resolve source chain delegation at compile time via
+/// autoref specialization.
 ///
 pub(crate) fn process_suzu_attrs(
     input: &mut DeriveInput,
@@ -410,12 +412,13 @@ fn apply_from(
     // Reject #[suzu(from)] on fields whose type involves generic type parameters.
     // The autoref specialization trick requires a concrete type at compile time
     // to resolve whether `source()` should delegate to the inner type. Generic
-    // parameters prevent this. Users should implement `From` manually instead.
+    // parameters prevent this. Use a concrete type or #[snafu(source(from(...)))]
+    // with a concrete type instead.
     if type_uses_generic_params(&field.ty, generic_type_params) {
         return Err(Error::new(
             from_span,
             "`from` cannot be used on fields with generic type parameters; \
-             implement `From` manually instead",
+             use a concrete type or `#[snafu(source(from(ConcreteType, DisplayError::new)))]` instead",
         ));
     }
 
@@ -445,7 +448,7 @@ fn apply_from(
             fn __wrap(__source: #original_type) -> #crate_path::DisplayError<#original_type> {
                 let __get_source: fn(&#original_type) -> Option<&(dyn core::error::Error + 'static)>
                     = #crate_path::__private::DisplayErrorSourceResolver(&__source).get_source_fn();
-                #crate_path::DisplayError::with_get_source(__source, __get_source)
+                #crate_path::__private::display_error_with_get_source(__source, __get_source)
             }
             __wrap
         })))]
@@ -463,7 +466,13 @@ fn type_uses_generic_params(ty: &syn::Type, params: &HashSet<Ident>) -> bool {
     ) -> bool {
         args.args.iter().any(|arg| match arg {
             GenericArgument::Type(inner) => type_uses_generic_params(inner, params),
-            GenericArgument::AssocType(assoc) => type_uses_generic_params(&assoc.ty, params),
+            GenericArgument::AssocType(assoc) => {
+                type_uses_generic_params(&assoc.ty, params)
+                    || assoc
+                        .generics
+                        .as_ref()
+                        .is_some_and(|g| angle_bracketed_uses(g, params))
+            }
             _ => false,
         })
     }

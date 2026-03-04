@@ -19,7 +19,7 @@ impl core::fmt::Debug for FakeLibError {
 }
 // ^ Intentionally does NOT implement Error!
 
-// --- Pattern B: manual conversion via source(from(...)) ---
+// --- Pattern B: manual source(from(...)) ---
 #[suzunari_error]
 #[suzu(display("operation failed"))]
 struct ManualSourceFromError {
@@ -27,7 +27,7 @@ struct ManualSourceFromError {
     source: DisplayError<FakeLibError>,
 }
 
-// --- Pattern A2: automatic conversion via #[suzu(from)] ---
+// --- Pattern A: automatic conversion via #[suzu(from)] ---
 #[suzunari_error]
 #[suzu(display("from convert op failed"))]
 struct FromConvertError {
@@ -35,7 +35,7 @@ struct FromConvertError {
     source: FakeLibError,
 }
 
-// --- Pattern A3: #[suzu(from)] with already-wrapped DisplayError ---
+// --- Pattern A (already-wrapped): #[suzu(from)] with DisplayError<T> field ---
 #[suzunari_error]
 #[suzu(display("from already wrapped"))]
 struct FromAlreadyWrappedError {
@@ -43,7 +43,7 @@ struct FromAlreadyWrappedError {
     source: DisplayError<FakeLibError>,
 }
 
-// --- Pattern B: manual conversion via map_err ---
+// --- Pattern C: manual wrapping via map_err ---
 #[suzunari_error]
 #[suzu(display("manual convert failed"))]
 struct ManualConvertError {
@@ -110,7 +110,10 @@ fn test_from_attr_already_wrapped() {
 
 // --- Source chain delegation via #[suzu(from)] ---
 
-// A type that implements Error (source chain should be preserved)
+// RealInner/RealOuter intentionally use manual impl Error (not #[suzunari_error])
+// to simulate external library errors — exactly the scenario #[suzu(from)] is
+// designed to handle. Using #[suzunari_error] would make them StackErrors rather
+// than plain Error types, defeating the purpose of the source chain test.
 #[derive(Debug)]
 struct RealInner;
 impl core::fmt::Display for RealInner {
@@ -172,11 +175,7 @@ fn test_from_returns_none_source_for_non_error_types() {
     );
 }
 
-// BoxedStackError requires alloc. This test lives in the test-std file (not
-// alloc_tier_test.rs) because it reuses ManualSourceFromError defined above.
-// The test-std feature implies test-alloc, so the gate is always true here;
-// the annotation documents the dependency rather than gating execution.
-#[cfg(feature = "test-alloc")]
+// Uses BoxedStackError (requires alloc, implied by test-std).
 #[test]
 fn test_display_error_with_boxed_stack_error() {
     fn fake_op() -> Result<(), FakeLibError> {

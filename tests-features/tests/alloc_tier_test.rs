@@ -62,7 +62,10 @@ fn test_boxed_stack_error_as_source() {
 
 // --- Source chain delegation via #[suzu(from)] ---
 
-// A type that implements Error (source chain should be preserved)
+// RealInner/RealOuter intentionally use manual impl Error (not #[suzunari_error])
+// to simulate external library errors — exactly the scenario #[suzu(from)] is
+// designed to handle. Using #[suzunari_error] would make them StackErrors rather
+// than plain Error types, defeating the purpose of the source chain test.
 #[derive(Debug)]
 struct RealInner;
 impl core::fmt::Display for RealInner {

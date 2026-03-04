@@ -34,6 +34,12 @@ use core::hash::{Hash, Hasher};
 ///
 /// ## Pattern B: Manual `source(from(...))` — explicit control
 ///
+/// Uses `#[snafu(source(from(...)))]` directly with `DisplayError::new`.
+/// Note: `DisplayError::new` always returns `None` from `source()`, so this
+/// pattern does not preserve the source chain even if `LibError` implements
+/// `Error`. Use Pattern A (`#[suzu(from)]`) for automatic source chain
+/// preservation.
+///
 /// ```
 /// use suzunari_error::*;
 ///
@@ -48,7 +54,7 @@ use core::hash::{Hash, Hasher};
 /// #[suzunari_error]
 /// #[suzu(display("operation failed"))]
 /// struct AppError {
-///     #[suzu(source(from(LibError, DisplayError::new)))]
+///     #[snafu(source(from(LibError, DisplayError::new)))]
 ///     source: DisplayError<LibError>,
 /// }
 /// ```
@@ -104,13 +110,9 @@ impl<E: Debug + Display> DisplayError<E> {
         }
     }
 
-    /// **Internal**: Creates a `DisplayError` with an explicit `get_source` resolver.
-    ///
-    /// Called exclusively by `#[suzunari_error]` macro-generated code. Not covered
-    /// by semver guarantees. Use [`DisplayError::new`] instead.
-    #[doc(hidden)]
-    #[must_use]
-    pub fn with_get_source(
+    /// Internal constructor with an explicit `get_source` resolver.
+    /// Use [`DisplayError::new`] in application code.
+    pub(crate) fn with_get_source(
         error: E,
         get_source: fn(&E) -> Option<&(dyn core::error::Error + 'static)>,
     ) -> Self {
@@ -135,6 +137,8 @@ impl<E> DisplayError<E> {
     }
 }
 
+/// Clones the inner `E` value and copies the `get_source` function pointer,
+/// preserving source chain delegation behavior in the clone.
 impl<E: Clone> Clone for DisplayError<E> {
     fn clone(&self) -> Self {
         Self {
@@ -156,8 +160,10 @@ impl<E: Debug> Debug for DisplayError<E> {
     }
 }
 
-// PartialEq, Eq, Hash intentionally ignore `get_source` — it is an
-// implementation detail for source chain delegation, not part of the value.
+/// Compares only the inner `E` value. Two `DisplayError<E>` instances are
+/// considered equal if their inner values are equal, regardless of how they
+/// were constructed. The `get_source` function pointer is an implementation
+/// detail for source chain delegation and is not part of the value identity.
 impl<E: PartialEq> PartialEq for DisplayError<E> {
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner
@@ -327,6 +333,39 @@ mod tests {
             let wrapped = DisplayError::with_get_source(OuterError(InnerError), |e| e.source());
             let err: &dyn Error = &wrapped;
             let source = err.source().expect("source should delegate");
+            assert_eq!(alloc::format!("{source}"), "inner");
+        }
+
+        #[test]
+        fn test_clone_preserves_source_delegation() {
+            #[derive(Clone, Debug)]
+            struct InnerError;
+            impl Display for InnerError {
+                fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+                    f.write_str("inner")
+                }
+            }
+            impl Error for InnerError {}
+
+            #[derive(Clone, Debug)]
+            struct OuterError(InnerError);
+            impl Display for OuterError {
+                fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+                    f.write_str("outer")
+                }
+            }
+            impl Error for OuterError {
+                fn source(&self) -> Option<&(dyn Error + 'static)> {
+                    Some(&self.0)
+                }
+            }
+
+            let original = DisplayError::with_get_source(OuterError(InnerError), |e| e.source());
+            let cloned = original.clone();
+            let err: &dyn Error = &cloned;
+            let source = err
+                .source()
+                .expect("clone should preserve source delegation");
             assert_eq!(alloc::format!("{source}"), "inner");
         }
 

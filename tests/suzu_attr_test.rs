@@ -108,6 +108,31 @@ fn test_from_already_display_error() {
     assert_eq!(lines.len(), 3);
 }
 
+// --- from: already DisplayError<T> where T: Error (source chain preserved) ---
+// When the field is already DisplayError<T> and T implements Error, #[suzu(from)]
+// should still set up source chain delegation through autoref specialization.
+
+#[suzunari_error]
+#[suzu(display("already wrapped with chain"))]
+struct AlreadyWrappedWithChainError {
+    #[suzu(from)]
+    source: DisplayError<RealOuter>,
+}
+
+#[test]
+fn test_from_already_display_error_with_error_inner_preserves_chain() {
+    fn real_op() -> Result<(), RealOuter> {
+        Err(RealOuter(RealInner))
+    }
+    let err = real_op().context(AlreadyWrappedWithChainSnafu).unwrap_err();
+    use std::error::Error;
+    let display_err = err.source().expect("should have source (DisplayError)");
+    let inner = display_err
+        .source()
+        .expect("DisplayError should delegate to RealOuter::source()");
+    assert_eq!(format!("{inner}"), "real inner");
+}
+
 // --- from: non-source-named field ---
 // #[suzu(from)] generates #[snafu(source(from(...)))] which implicitly marks
 // the field as a source, so it works regardless of field name.
@@ -321,6 +346,11 @@ fn test_stack_report_with_from_chain() {
 // When the inner type implements Error, #[suzu(from)] should preserve the
 // source chain via autoref specialization. DisplayError::source() delegates
 // to the inner Error::source().
+//
+// RealInner/RealOuter intentionally use manual impl Error (not #[suzunari_error])
+// to simulate external library errors — exactly the scenario #[suzu(from)] is
+// designed to handle. Using #[suzunari_error] would make them StackErrors rather
+// than plain Error types, defeating the purpose of the source chain test.
 
 #[derive(Debug)]
 struct RealInner;

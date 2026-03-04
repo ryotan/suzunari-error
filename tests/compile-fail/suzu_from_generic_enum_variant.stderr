@@ -1,5 +1,5 @@
 error: `from` cannot be used on fields with generic type parameters; use a concrete type or `#[snafu(source(from(ConcreteType, DisplayError::new)))]` instead
- --> tests/compile-fail/suzu_from_generic_type_param.rs:6:12
+ --> tests/compile-fail/suzu_from_generic_enum_variant.rs:7:16
   |
-6 |     #[suzu(from)]
-  |            ^^^^
+7 |         #[suzu(from)]
+  |                ^^^^
