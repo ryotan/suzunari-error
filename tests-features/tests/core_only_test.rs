@@ -82,3 +82,64 @@ fn test_display_error_new_and_into_inner() {
     let inner = wrapped.into_inner();
     assert_eq!(inner, "test");
 }
+
+// --- Source chain delegation via #[suzu(from)] in core-only tier ---
+
+// RealInner/RealOuter intentionally use manual impl Error (not #[suzunari_error])
+// to simulate external library errors — exactly the scenario #[suzu(from)] is
+// designed to handle. Using #[suzunari_error] would make them StackErrors rather
+// than plain Error types, defeating the purpose of the source chain test.
+#[derive(Debug)]
+struct RealInner;
+impl core::fmt::Display for RealInner {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("real inner")
+    }
+}
+impl core::error::Error for RealInner {}
+
+#[derive(Debug)]
+struct RealOuter(RealInner);
+impl core::fmt::Display for RealOuter {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("real outer")
+    }
+}
+impl core::error::Error for RealOuter {
+    fn source(&self) -> Option<&(dyn core::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+#[suzunari_error]
+#[suzu(display("source chain core"))]
+struct SourceChainCoreError {
+    #[suzu(from)]
+    source: RealOuter,
+}
+
+#[test]
+fn test_from_preserves_source_chain_core_only() {
+    fn real_op() -> Result<(), RealOuter> {
+        Err(RealOuter(RealInner))
+    }
+    let err = real_op().context(SourceChainCoreSnafu).unwrap_err();
+    use core::error::Error;
+    let display_err = err.source().expect("should have source (DisplayError)");
+    let inner = display_err
+        .source()
+        .expect("DisplayError should delegate to RealOuter::source()");
+    // No alloc::format! in core-only, use StackBuf for verification
+    use core::fmt::Write;
+    let mut buf = StackBuf::new();
+    write!(buf, "{inner}").unwrap();
+    assert_eq!(buf.as_str(), "real inner");
+}
+
+#[test]
+fn test_from_returns_none_source_core_only() {
+    // DisplayError::new() always returns None from source(), even in core-only tier.
+    let wrapped = DisplayError::new("not an error");
+    let err: &dyn core::error::Error = &wrapped;
+    assert!(err.source().is_none());
+}

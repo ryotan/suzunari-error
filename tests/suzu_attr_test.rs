@@ -100,7 +100,37 @@ fn test_from_already_display_error() {
     }
     let err = fake_op().context(AlreadyWrappedSnafu).unwrap_err();
     let report = format!("{:?}", StackReport::from(err));
-    assert!(report.contains("already wrapped"));
+    let lines: Vec<&str> = report.lines().collect();
+    // AlreadyWrappedError -> DisplayError<FakeLibError> (no source chain)
+    assert!(lines[0].starts_with("Error: AlreadyWrappedError: already wrapped, at "));
+    assert_eq!(lines[1], "Caused by (recent first):");
+    assert_eq!(lines[2], "  1| already wrapped");
+    assert_eq!(lines.len(), 3);
+}
+
+// --- from: already DisplayError<T> where T: Error (source chain preserved) ---
+// When the field is already DisplayError<T> and T implements Error, #[suzu(from)]
+// should still set up source chain delegation through autoref specialization.
+
+#[suzunari_error]
+#[suzu(display("already wrapped with chain"))]
+struct AlreadyWrappedWithChainError {
+    #[suzu(from)]
+    source: DisplayError<RealOuter>,
+}
+
+#[test]
+fn test_from_already_display_error_with_error_inner_preserves_chain() {
+    fn real_op() -> Result<(), RealOuter> {
+        Err(RealOuter(RealInner))
+    }
+    let err = real_op().context(AlreadyWrappedWithChainSnafu).unwrap_err();
+    use std::error::Error;
+    let display_err = err.source().expect("should have source (DisplayError)");
+    let inner = display_err
+        .source()
+        .expect("DisplayError should delegate to RealOuter::source()");
+    assert_eq!(format!("{inner}"), "real inner");
 }
 
 // --- from: non-source-named field ---
@@ -126,25 +156,8 @@ fn test_from_non_source_named_field() {
 }
 
 // --- from: generic type parameter ---
-
-#[suzunari_error]
-#[suzu(display("generic from error"))]
-struct GenericFromError<E: core::fmt::Debug + core::fmt::Display + 'static> {
-    #[suzu(from)]
-    source: E,
-}
-
-#[test]
-fn test_from_with_generic_type() {
-    fn fake_op() -> Result<(), FakeLibError> {
-        Err(FakeLibError { message: "generic" })
-    }
-    // snafu erases generic params in context selectors
-    let err = fake_op().context(GenericFromSnafu).unwrap_err();
-    let report = format!("{:?}", StackReport::from(err));
-    assert!(report.contains("generic from error"));
-    assert!(report.contains("generic"));
-}
+// #[suzu(from)] on generic type params is now rejected at compile time.
+// See tests/compile-fail/suzu_from_generic_type_param.rs
 
 // --- location: explicit #[suzu(location)] ---
 
@@ -314,12 +327,101 @@ fn test_stack_report_with_from_chain() {
     }
 
     let err = outer().unwrap_err();
-    // Should have depth 2: OuterError -> FromEnumError::HashFailed -> DisplayError
+    // OuterError -> FromEnumError::HashFailed -> DisplayError<FakeLibError>
     assert_eq!(err.depth(), 2);
     let report = format!("{:?}", StackReport::from(err));
-    assert!(report.contains("outer error"));
-    assert!(report.contains("hashing failed"));
-    assert!(report.contains("hash fail"));
+    let lines: Vec<&str> = report.lines().collect();
+    // Line 0: top-level error with type name and location
+    assert!(lines[0].starts_with("Error: OuterError: outer error, at "));
+    // Line 1: "Caused by" header
+    assert_eq!(lines[1], "Caused by (recent first):");
+    // Line 2: StackError cause with index, type name, message, and location
+    assert!(lines[2].starts_with("  1| FromEnumError::HashFailed: hashing failed, at "));
+    // Line 3: plain Error cause (DisplayError wrapping FakeLibError, no location)
+    assert_eq!(lines[3], "  2| hash fail");
+    assert_eq!(lines.len(), 4);
+}
+
+// --- from: source chain preservation for Error-implementing types ---
+// When the inner type implements Error, #[suzu(from)] should preserve the
+// source chain via autoref specialization. DisplayError::source() delegates
+// to the inner Error::source().
+//
+// RealInner/RealOuter intentionally use manual impl Error (not #[suzunari_error])
+// to simulate external library errors — exactly the scenario #[suzu(from)] is
+// designed to handle. Using #[suzunari_error] would make them StackErrors rather
+// than plain Error types, defeating the purpose of the source chain test.
+
+#[derive(Debug)]
+struct RealInner;
+impl core::fmt::Display for RealInner {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("real inner")
+    }
+}
+impl std::error::Error for RealInner {}
+
+#[derive(Debug)]
+struct RealOuter(RealInner);
+impl core::fmt::Display for RealOuter {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("real outer")
+    }
+}
+impl std::error::Error for RealOuter {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.0)
+    }
+}
+
+#[suzunari_error]
+#[suzu(display("wrapped with source chain"))]
+struct SourceChainError {
+    #[suzu(from)]
+    source: RealOuter,
+}
+
+#[test]
+fn test_from_preserves_source_chain_for_error_types() {
+    fn real_op() -> Result<(), RealOuter> {
+        Err(RealOuter(RealInner))
+    }
+    let err = real_op().context(SourceChainSnafu).unwrap_err();
+    // The DisplayError should delegate source() to RealOuter::source(),
+    // which returns RealInner.
+    use std::error::Error;
+    let display_err = err.source().expect("should have source (DisplayError)");
+    let inner = display_err
+        .source()
+        .expect("DisplayError should delegate to RealOuter::source()");
+    assert_eq!(format!("{inner}"), "real inner");
+    // Verify StackReport output hierarchy:
+    // SourceChainError -> DisplayError<RealOuter> -> RealInner
+    let report = format!("{:?}", StackReport::from(err));
+    let lines: Vec<&str> = report.lines().collect();
+    assert!(lines[0].starts_with("Error: SourceChainError: wrapped with source chain, at "));
+    assert_eq!(lines[1], "Caused by (recent first):");
+    // DisplayError delegates source() to RealOuter, which has RealInner as source
+    assert_eq!(lines[2], "  1| real outer");
+    assert_eq!(lines[3], "  2| real inner");
+    assert_eq!(lines.len(), 4);
+}
+
+#[test]
+fn test_from_returns_none_source_for_non_error_types() {
+    fn fake_op() -> Result<(), FakeLibError> {
+        Err(FakeLibError {
+            message: "no Error impl",
+        })
+    }
+    let err = fake_op().context(HashFailedSnafu).unwrap_err();
+    // FakeLibError doesn't implement Error, so DisplayError::source() → None.
+    use std::error::Error;
+    let display_err = err.source().expect("should have source (DisplayError)");
+    assert!(
+        display_err.source().is_none(),
+        "non-Error type should have None source"
+    );
 }
 
 // --- GAP-10: closure syntax in source(from(...)) ---
