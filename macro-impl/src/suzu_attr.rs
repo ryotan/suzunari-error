@@ -8,10 +8,11 @@ use crate::helper::{
     combine_errors, extract_display_error_inner, has_snafu_keyword, looks_like_location_type,
 };
 use proc_macro2::{Span, TokenStream};
+use std::collections::HashSet;
 use syn::parse_quote;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, Meta, Token};
+use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, GenericParam, Ident, Meta, Token};
 
 /// Processes all `#[suzu(...)]` attributes on `input`, consuming them.
 ///
@@ -20,7 +21,9 @@ use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, Meta, Token};
 ///
 /// After this call, `#[suzu(location)]` fields have `#[stack(location)]` +
 /// `#[snafu(implicit)]`, and `#[suzu(from)]` fields have their type wrapped in
-/// `DisplayError<T>` with `#[snafu(source(from(...)))]`.
+/// `DisplayError<T>` with a `#[snafu(source(from(...)))]` attribute that uses a
+/// local `__wrap` function to resolve source chain delegation at compile time via
+/// autoref specialization.
 ///
 pub(crate) fn process_suzu_attrs(
     input: &mut DeriveInput,
@@ -29,10 +32,22 @@ pub(crate) fn process_suzu_attrs(
     // Type-level attrs are always passthrough-only, regardless of struct/enum.
     process_non_field_attrs(&mut input.attrs)?;
 
+    let generic_type_params: HashSet<Ident> = input
+        .generics
+        .params
+        .iter()
+        .filter_map(|p| match p {
+            GenericParam::Type(tp) => Some(tp.ident.clone()),
+            _ => None,
+        })
+        .collect();
+
     match &mut input.data {
         Data::Struct(data_struct) => {
             match &mut data_struct.fields {
-                Fields::Named(fields) => process_fields(&mut fields.named, crate_path)?,
+                Fields::Named(fields) => {
+                    process_fields(&mut fields.named, crate_path, &generic_type_params)?
+                }
                 // Tuple structs / unit structs have no named fields to process.
                 // Reject any stray #[suzu(...)] on their fields.
                 fields => reject_suzu_on_non_named_fields(fields)?,
@@ -49,7 +64,9 @@ pub(crate) fn process_suzu_attrs(
                 }
                 match &mut variant.fields {
                     Fields::Named(fields) => {
-                        if let Err(e) = process_fields(&mut fields.named, crate_path) {
+                        if let Err(e) =
+                            process_fields(&mut fields.named, crate_path, &generic_type_params)
+                        {
                             errors.push(e);
                         }
                     }
@@ -114,6 +131,7 @@ fn process_non_field_attrs(attrs: &mut Vec<Attribute>) -> Result<(), Error> {
 fn process_fields(
     fields: &mut Punctuated<Field, Token![,]>,
     crate_path: &TokenStream,
+    generic_type_params: &HashSet<Ident>,
 ) -> Result<(), Error> {
     let mut errors = Vec::new();
     // Track first occurrence spans to detect cross-field duplicates.
@@ -213,7 +231,13 @@ fn process_fields(
                 err.combine(Error::new(loc_span, "`location` defined here"));
                 errors.push(err);
             }
-            (Some(from_span), None) => match apply_from(field, &new_attrs, crate_path, from_span) {
+            (Some(from_span), None) => match apply_from(
+                field,
+                &new_attrs,
+                crate_path,
+                from_span,
+                generic_type_params,
+            ) {
                 Ok(snafu_source_attr) => new_attrs.push(snafu_source_attr),
                 Err(e) => errors.push(e),
             },
@@ -361,25 +385,39 @@ fn process_single_suzu_attr(attr: &Attribute, level: Level) -> Result<SingleAttr
 }
 
 /// Applies `from` to a field: wraps type in `DisplayError<T>` and generates
-/// `#[snafu(source(from(T, DisplayError::new)))]`.
+/// `#[snafu(source(from(T, __wrap)))]` where `__wrap` uses autoref specialization
+/// to resolve `get_source` delegation at compile time.
 ///
 /// # Preconditions
 ///
 /// - `existing_attrs` must contain all attributes that will be set on this field
 ///   (i.e., `field.attrs` is not yet populated).
-/// - No `#[snafu(source(...))]` should be present in `existing_attrs` (caller
-///   should check for conflicts beforehand or let this function report it).
+/// - No `#[snafu(source(...))]` should be present in `existing_attrs`. This
+///   function enforces this constraint and returns an error if violated.
 fn apply_from(
     field: &mut Field,
     existing_attrs: &[Attribute],
     crate_path: &TokenStream,
     from_span: Span,
+    generic_type_params: &HashSet<Ident>,
 ) -> Result<Attribute, Error> {
     // Check for conflict with existing #[snafu(source(...))]
     if has_snafu_keyword(existing_attrs, "source") {
         return Err(Error::new(
             from_span,
             "`from` conflicts with existing `#[snafu(source(...))]`",
+        ));
+    }
+
+    // Reject #[suzu(from)] on fields whose type involves generic type parameters.
+    // The autoref specialization trick requires a concrete type at compile time
+    // to resolve whether `source()` should delegate to the inner type. Generic
+    // parameters prevent this. Use a concrete type or #[snafu(source(from(...)))]
+    // with a concrete type instead.
+    if type_uses_generic_params(&field.ty, generic_type_params) {
+        return Err(Error::new(
+            from_span,
+            "`from` cannot be used on fields with generic type parameters; use a concrete type instead",
         ));
     }
 
@@ -394,9 +432,123 @@ fn apply_from(
         }
     };
 
+    // Generate a block expression that defines a local wrapping function and
+    // returns it. Inside the local function, the concrete `original_type` is
+    // known, so Deref-based autoref specialization correctly resolves
+    // `get_source_fn()`: inherent method wins when `original_type: Error`,
+    // otherwise Deref falls back to `DisplayErrorSourceFallback`.
+    //
+    // Using a local function (instead of an inline closure) is necessary so
+    // that the return type of `__get_source` is fully concrete at the point
+    // of the `get_source_fn()` call. The compiler must choose between the
+    // inherent `DisplayErrorSourceResolver<T: Error>::get_source_fn` impl and
+    // the `DisplayErrorSourceFallback::get_source_fn` fallback reached via
+    // Deref. That choice requires the type of `__get_source` (specifically
+    // the `T` in `fn(&T) -> ...`) to be resolved. A local function's explicit
+    // parameter and return types guarantee this; a closure without matching
+    // explicit annotations would leave `T` under-constrained for method
+    // resolution.
     Ok(parse_quote!(
-        #[snafu(source(from(#original_type, #crate_path::DisplayError::new)))]
+        #[snafu(source(from(#original_type, {
+            fn __wrap(__source: #original_type) -> #crate_path::DisplayError<#original_type> {
+                let __get_source: fn(&#original_type) -> Option<&(dyn ::core::error::Error + 'static)>
+                    = #crate_path::__private::DisplayErrorSourceResolver(&__source).get_source_fn();
+                #crate_path::__private::display_error_with_get_source(__source, __get_source)
+            }
+            __wrap
+        })))]
     ))
+}
+
+/// Checks whether `ty` references any of the given generic type parameters.
+fn type_uses_generic_params(ty: &syn::Type, params: &HashSet<Ident>) -> bool {
+    use syn::{GenericArgument, PathArguments, ReturnType, Type};
+
+    /// Checks angle-bracketed args (e.g., `<T, Item = U>`) for generic params.
+    fn angle_bracketed_uses(
+        args: &syn::AngleBracketedGenericArguments,
+        params: &HashSet<Ident>,
+    ) -> bool {
+        args.args.iter().any(|arg| match arg {
+            GenericArgument::Type(inner) => type_uses_generic_params(inner, params),
+            GenericArgument::AssocType(assoc) => {
+                type_uses_generic_params(&assoc.ty, params)
+                    || assoc
+                        .generics
+                        .as_ref()
+                        .is_some_and(|g| angle_bracketed_uses(g, params))
+            }
+            _ => false,
+        })
+    }
+
+    /// Checks path arguments (angle-bracketed or parenthesized) for generic params.
+    fn path_args_uses(args: &PathArguments, params: &HashSet<Ident>) -> bool {
+        match args {
+            PathArguments::AngleBracketed(args) => angle_bracketed_uses(args, params),
+            PathArguments::Parenthesized(paren) => {
+                paren
+                    .inputs
+                    .iter()
+                    .any(|t| type_uses_generic_params(t, params))
+                    || matches!(&paren.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
+            }
+            PathArguments::None => false,
+        }
+    }
+
+    /// Checks trait bounds for generic params in their path arguments.
+    fn bounds_use(
+        bounds: &syn::punctuated::Punctuated<syn::TypeParamBound, Token![+]>,
+        params: &HashSet<Ident>,
+    ) -> bool {
+        bounds.iter().any(|bound| match bound {
+            syn::TypeParamBound::Trait(trait_bound) => trait_bound
+                .path
+                .segments
+                .iter()
+                .any(|seg| path_args_uses(&seg.arguments, params)),
+            _ => false,
+        })
+    }
+
+    match ty {
+        Type::Path(type_path) => {
+            // Check qself for qualified paths like `<T as Trait>::Assoc`
+            if let Some(qself) = &type_path.qself {
+                if type_uses_generic_params(&qself.ty, params) {
+                    return true;
+                }
+            }
+            type_path
+                .path
+                .segments
+                .iter()
+                .any(|seg| params.contains(&seg.ident) || path_args_uses(&seg.arguments, params))
+        }
+        Type::Reference(type_ref) => type_uses_generic_params(&type_ref.elem, params),
+        Type::Tuple(type_tuple) => type_tuple
+            .elems
+            .iter()
+            .any(|t| type_uses_generic_params(t, params)),
+        Type::Array(type_array) => type_uses_generic_params(&type_array.elem, params),
+        Type::Slice(type_slice) => type_uses_generic_params(&type_slice.elem, params),
+        Type::Paren(type_paren) => type_uses_generic_params(&type_paren.elem, params),
+        Type::Group(type_group) => type_uses_generic_params(&type_group.elem, params),
+        Type::TraitObject(type_trait_object) => bounds_use(&type_trait_object.bounds, params),
+        Type::BareFn(type_bare_fn) => {
+            type_bare_fn
+                .inputs
+                .iter()
+                .any(|arg| type_uses_generic_params(&arg.ty, params))
+                || matches!(&type_bare_fn.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
+        }
+        Type::Ptr(type_ptr) => type_uses_generic_params(&type_ptr.elem, params),
+        Type::ImplTrait(type_impl_trait) => bounds_use(&type_impl_trait.bounds, params),
+        // Type::Never, Type::Infer, Type::Macro, Type::Verbatim, etc.
+        // These either cannot reference generic params or are opaque to analysis.
+        _ => false,
+    }
 }
 
 /// Applies `location` to a field: adds `#[snafu(implicit)]` + `#[stack(location)]`.
@@ -415,6 +567,9 @@ fn apply_location(attrs: &mut Vec<Attribute>) {
     }
     // Guard against duplicate #[stack(location)] — can happen if the user
     // writes both #[stack(location)] and #[suzu(location)] on the same field.
+    // Currently #[stack(...)] only accepts `location`, so checking the path
+    // alone is sufficient. If #[stack] gains other arguments in the future,
+    // this must be narrowed to check for the `location` argument specifically.
     let already_has_stack_location = attrs.iter().any(|a| a.path().is_ident("stack"));
     if !already_has_stack_location {
         attrs.push(parse_quote!(#[stack(location)]));

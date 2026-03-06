@@ -22,7 +22,7 @@
 //! # Key Types
 //!
 //! - [`Location`] — Captures call-site file/line/column via `#[track_caller]`
-//! - [`StackError`] — Extends `Error` with `location()`, `type_name()`, and `stack_source()`
+//! - [`StackError`] — Extends `Error` with `location()`, `type_name()`, `stack_source()`, and `depth()`
 //! - [`StackReport`] — Formats a `StackError` chain for display with location info
 //! - [`BoxedStackError`] — Type-erased `StackError` wrapper (requires `alloc`)
 //! - [`DisplayError`] — Adapter for `Debug + Display` types that don't implement `Error`
@@ -45,7 +45,8 @@
 //! Suzunari extensions:
 //!
 //! - **`from`** (field-level) — wraps a field type in [`DisplayError<T>`] and generates
-//!   `#[snafu(source(from(T, DisplayError::new)))]`
+//!   a `source(from(...))` conversion that automatically preserves the `Error::source()`
+//!   chain when the wrapped type implements `Error`
 //! - **`location`** (field-level) — marks a field as the location field with a custom name;
 //!   converts to `#[stack(location)]` + `#[snafu(implicit)]`
 //!
