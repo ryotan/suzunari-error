@@ -11,11 +11,11 @@ error[E0277]: the trait bound `String: GenerateImplicitData` is not satisfied
   |                 ^^^^^^^^^^^^ the trait `GenerateImplicitData` is not implemented for `String`
   |
   = help: the following other types implement trait `GenerateImplicitData`:
+            &'static std::panic::Location<'static>
             Arc<T>
             Backtrace
             Box<T>
             Option<Backtrace>
             Rc<T>
-            snafu::Location
             suzunari_error::Location
   = note: this error originates in the derive macro `snafu::Snafu` (in Nightly builds, run with -Z macro-backtrace for more info)

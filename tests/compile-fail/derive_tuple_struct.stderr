@@ -1,8 +1,8 @@
 error: Can only derive `Snafu` for tuple structs with exactly one field
- --> tests/compile-fail/derive_tuple_struct.rs:5:1
+ --> tests/compile-fail/derive_tuple_struct.rs:5:31
   |
 5 | pub struct TupleError(String, Location);
-  | ^^^
+  |                               ^^^^^^^^
 
 error: StackError can only be derived for structs with named fields
  --> tests/compile-fail/derive_tuple_struct.rs:5:22
