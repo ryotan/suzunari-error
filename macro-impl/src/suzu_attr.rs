@@ -417,8 +417,7 @@ fn apply_from(
     if type_uses_generic_params(&field.ty, generic_type_params) {
         return Err(Error::new(
             from_span,
-            "`from` cannot be used on fields with generic type parameters; \
-             use a concrete type or `#[snafu(source(from(ConcreteType, DisplayError::new)))]` instead",
+            "`from` cannot be used on fields with generic type parameters; use a concrete type instead",
         ));
     }
 
@@ -439,14 +438,20 @@ fn apply_from(
     // `get_source_fn()`: inherent method wins when `original_type: Error`,
     // otherwise Deref falls back to `DisplayErrorSourceFallback`.
     //
-    // Using a local function (instead of an inline closure) is necessary
-    // because closures inside snafu attributes inherit proc-macro token hygiene,
-    // which can prevent Deref fallback from being discovered during method
+    // Using a local function (instead of an inline closure) is necessary so
+    // that the return type of `__get_source` is fully concrete at the point
+    // of the `get_source_fn()` call. The compiler must choose between the
+    // inherent `DisplayErrorSourceResolver<T: Error>::get_source_fn` impl and
+    // the `DisplayErrorSourceFallback::get_source_fn` fallback reached via
+    // Deref. That choice requires the type of `__get_source` (specifically
+    // the `T` in `fn(&T) -> ...`) to be resolved. A local function's explicit
+    // parameter and return types guarantee this; a closure without matching
+    // explicit annotations would leave `T` under-constrained for method
     // resolution.
     Ok(parse_quote!(
         #[snafu(source(from(#original_type, {
             fn __wrap(__source: #original_type) -> #crate_path::DisplayError<#original_type> {
-                let __get_source: fn(&#original_type) -> Option<&(dyn core::error::Error + 'static)>
+                let __get_source: fn(&#original_type) -> Option<&(dyn ::core::error::Error + 'static)>
                     = #crate_path::__private::DisplayErrorSourceResolver(&__source).get_source_fn();
                 #crate_path::__private::display_error_with_get_source(__source, __get_source)
             }

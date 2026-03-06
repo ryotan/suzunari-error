@@ -1,4 +1,4 @@
-error: `from` cannot be used on fields with generic type parameters; use a concrete type or `#[snafu(source(from(ConcreteType, DisplayError::new)))]` instead
+error: `from` cannot be used on fields with generic type parameters; use a concrete type instead
  --> tests/compile-fail/suzu_from_generic_type_param.rs:6:12
   |
 6 |     #[suzu(from)]

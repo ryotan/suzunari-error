@@ -32,17 +32,22 @@ use core::hash::{Hash, Hasher};
 /// }
 /// ```
 ///
+/// **Note:** `#[suzu(from)]` requires the field type to be a concrete type.
+/// Fields whose type contains a generic type parameter of the enclosing struct
+/// or enum are rejected at compile time.
+///
 /// ## Pattern B: Manual `source(from(...))` — explicit control
 ///
 /// Uses `#[snafu(source(from(...)))]` directly with `DisplayError::new`.
 /// Note: `DisplayError::new` always returns `None` from `source()`, so this
-/// pattern does not preserve the source chain even if `LibError` implements
-/// `Error`. Use Pattern A (`#[suzu(from)]`) for automatic source chain
+/// pattern does not preserve the source chain **even if `LibError` implements
+/// `Error`**. Use Pattern A (`#[suzu(from)]`) for automatic source chain
 /// preservation.
 ///
 /// ```
 /// use suzunari_error::*;
 ///
+/// // A third-party type that implements Error.
 /// #[derive(Debug)]
 /// struct LibError(String);
 /// impl std::fmt::Display for LibError {
@@ -50,6 +55,8 @@ use core::hash::{Hash, Hasher};
 ///         f.write_str(&self.0)
 ///     }
 /// }
+/// // LibError implements Error, but DisplayError::new does not preserve its source chain.
+/// impl std::error::Error for LibError {}
 ///
 /// #[suzunari_error]
 /// #[suzu(display("operation failed"))]

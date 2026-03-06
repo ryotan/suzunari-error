@@ -124,6 +124,7 @@ Attribute ownership: each attribute is consumed by a specific macro.
 - **Always propagate errors with `?` and `.context()`** (`snafu::ResultExt`). Use `ensure!()` for validation checks. Do NOT use `unwrap()`, `expect()`, `.build()`, or `.fail()` in production code.
 - **Test code**: `unwrap()` is acceptable. But prefer `.context()` propagation even in tests when it improves clarity.
 - **Exception for trait-level unit tests**: Tests that verify `StackError` trait behavior independently from the proc-macro layer may use raw `#[derive(Snafu)]` + manual `impl StackError` + `.build()`. These tests must include a comment explaining the reason (e.g., testing the trait without macro coupling).
+- **Exception for location assertion tests**: Tests that assert on specific captured `Location` values (file, line) may use `.build()` to construct errors at a known line number. `.context()` would capture the location inside a helper, making the expected line unknowable. These tests must include a comment explaining the reason.
 
 ## Error Design Principles
 
