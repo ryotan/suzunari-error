@@ -1,0 +1,19 @@
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  addLabels: [
+    'dependencies',
+  ],
+  commitMessagePrefix: '⬆️: ',
+  extends: [
+    'config:recommended',
+    ':preserveSemverRanges',
+    'helpers:pinGitHubActionDigests',
+  ],
+  timezone: 'Asia/Tokyo',
+  lockFileMaintenance: {
+    enabled: true,
+    schedule: [
+      'before 20:00 on saturday',
+    ],
+  },
+}
