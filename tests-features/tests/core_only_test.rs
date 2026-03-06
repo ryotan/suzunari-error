@@ -4,7 +4,7 @@ use suzunari_error::*;
 
 #[test]
 fn test_location_core_only() {
-    let loc = Location::current();
+    let loc = core::panic::Location::caller();
     assert!(loc.line() > 0);
     assert!(loc.column() > 0);
     assert!(!loc.file().is_empty());
@@ -21,8 +21,8 @@ struct CoreTestError {
 }
 
 impl StackError for CoreTestError {
-    fn location(&self) -> &Location {
-        &self.location
+    fn location(&self) -> Location {
+        self.location
     }
     fn type_name(&self) -> &'static str {
         "CoreTestError"
@@ -65,7 +65,7 @@ fn test_stack_report_core_only() {
     use core::fmt::Write;
 
     let error = CoreTestError {
-        location: Location::current(),
+        location: core::panic::Location::caller(),
     };
     let report = StackReport::from(error);
 

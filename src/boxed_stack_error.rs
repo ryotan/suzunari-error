@@ -93,7 +93,7 @@ impl Error for BoxedStackError {
 }
 
 impl StackError for BoxedStackError {
-    fn location(&self) -> &Location {
+    fn location(&self) -> Location {
         self.inner.location()
     }
     fn type_name(&self) -> &'static str {
@@ -135,8 +135,8 @@ mod tests {
     }
 
     impl StackError for TestError {
-        fn location(&self) -> &Location {
-            &self.location
+        fn location(&self) -> Location {
+            self.location
         }
         fn type_name(&self) -> &'static str {
             "TestError"
@@ -199,8 +199,8 @@ mod tests {
         location: Location,
     }
     impl StackError for WrapperTestError {
-        fn location(&self) -> &Location {
-            &self.location
+        fn location(&self) -> Location {
+            self.location
         }
         fn type_name(&self) -> &'static str {
             "WrapperTestError"

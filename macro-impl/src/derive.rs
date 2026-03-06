@@ -66,8 +66,8 @@ fn generate_struct_impl(
 
     Ok(quote! {
         impl #impl_generics #crate_path::StackError for #name #ty_generics #where_clause {
-            fn location(&self) -> &#crate_path::Location {
-                &self.#loc_name
+            fn location(&self) -> #crate_path::Location {
+                self.#loc_name
             }
             fn type_name(&self) -> &'static str {
                 #type_name_str
@@ -169,7 +169,7 @@ fn generate_enum_impl(
 
     Ok(quote! {
         impl #impl_generics #crate_path::StackError for #name #ty_generics #where_clause {
-            fn location(&self) -> &#crate_path::Location {
+            fn location(&self) -> #crate_path::Location {
                 match self {
                     #(#location_match_arms)*
                 }

@@ -37,7 +37,7 @@ enum TestError {
 }
 
 impl StackError for TestError {
-    fn location(&self) -> &Location {
+    fn location(&self) -> Location {
         match self {
             TestError::External { location, .. } => location,
             TestError::Internal { location, .. } => location,
@@ -63,8 +63,8 @@ impl StackError for TestError {
 }
 
 impl StackError for NestedError {
-    fn location(&self) -> &Location {
-        &self.location
+    fn location(&self) -> Location {
+        self.location
     }
     fn type_name(&self) -> &'static str {
         "NestedError"
