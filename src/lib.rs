@@ -54,7 +54,8 @@
 //!
 //! - **Location type detection** uses the last path segment name (`Location`), not the
 //!   full path. A user-defined `my_module::Location` type may trigger false auto-detection.
-//!   Use `#[suzu(location)]` or `#[stack(location)]` to disambiguate.
+//!   Writing the expanded type (`&'static core::panic::Location<'static>`) directly also
+//!   bypasses auto-detection. Use `#[suzu(location)]` or `#[stack(location)]` to disambiguate.
 //! - **Crate renaming** (`my_error = { package = "suzunari-error" }`) is not supported.
 //!   The generated code always references `::suzunari_error`. This matches the approach
 //!   used by snafu and thiserror.

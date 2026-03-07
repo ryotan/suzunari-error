@@ -36,8 +36,8 @@ fn test_snafu_implicit_generation() {
     let file = file!();
     let line = line!() - 7; // 7 lines above is where SomeSnafu is used
     assert_eq!(format!("{error}"), "SomeError");
-    // Location's Debug now delegates to core::panic::Location's derive(Debug),
-    // producing struct-style output instead of the Display format.
+    // Location is a type alias for &'static core::panic::Location<'static>, so Debug
+    // produces struct-style output via core::panic::Location's own derive(Debug).
     let debug = format!("{error:?}");
     // file!() is escaped via {:?} to match Debug's backslash escaping on Windows.
     assert!(debug.contains(&format!("file: {:?}", file)));
@@ -75,7 +75,7 @@ fn test_manual_location_in_error() {
 
     // Verify the location in the error
     let expected_file = file!();
-    let expected_line = line!() - 8; // 8 lines above is where Location::current() was called
+    let expected_line = line!() - 8; // 8 lines above is where core::panic::Location::caller() was called
 
     assert_eq!(error.location.file(), expected_file);
     assert_eq!(error.location.line(), expected_line);
@@ -157,7 +157,7 @@ fn test_location_copy() {
 #[test]
 fn test_location_clone() {
     let loc = core::panic::Location::caller();
-    // Intentionally using clone() on a Copy type to verify Clone impl works.
+    // Intentionally using clone() on a Copy type to verify the Location alias supports Clone.
     #[allow(clippy::clone_on_copy)]
     let cloned: Location = Clone::clone(&loc);
     assert_eq!(loc, cloned);
