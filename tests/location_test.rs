@@ -36,8 +36,8 @@ fn test_snafu_implicit_generation() {
     let file = file!();
     let line = line!() - 7; // 7 lines above is where SomeSnafu is used
     assert_eq!(format!("{error}"), "SomeError");
-    // Location's Debug now delegates to core::panic::Location's derive(Debug),
-    // producing struct-style output instead of the Display format.
+    // Location is a type alias for &'static core::panic::Location<'static>, so Debug
+    // produces struct-style output via core::panic::Location's own derive(Debug).
     let debug = format!("{error:?}");
     // file!() is escaped via {:?} to match Debug's backslash escaping on Windows.
     assert!(debug.contains(&format!("file: {:?}", file)));
@@ -67,7 +67,7 @@ fn test_manual_location_in_error() {
     fn create_error() -> CustomError {
         CustomError {
             message: "Something went wrong".to_string(),
-            location: Location::current(),
+            location: core::panic::Location::caller(),
         }
     }
 
@@ -75,7 +75,7 @@ fn test_manual_location_in_error() {
 
     // Verify the location in the error
     let expected_file = file!();
-    let expected_line = line!() - 8; // 8 lines above is where Location::current() was called
+    let expected_line = line!() - 8; // 8 lines above is where core::panic::Location::caller() was called
 
     assert_eq!(error.location.file(), expected_file);
     assert_eq!(error.location.line(), expected_line);
@@ -94,7 +94,7 @@ fn test_manual_location_in_error() {
 /// 2. The file path is valid and exists
 #[test]
 fn test_location_file_path() {
-    let loc = Location::current();
+    let loc = core::panic::Location::caller();
     let file_path = loc.file();
 
     // Test that the file path can be converted to a Path
@@ -117,22 +117,22 @@ fn test_location_file_path() {
 #[test]
 fn test_location_eq_same_site() {
     // Copy of the same Location should be equal
-    let a = Location::current();
+    let a = core::panic::Location::caller();
     let b = a;
     assert_eq!(a, b);
 }
 
 #[test]
 fn test_location_ne_different_site() {
-    let a = Location::current();
-    let b = Location::current();
+    let a = core::panic::Location::caller();
+    let b = core::panic::Location::caller();
     // Different lines → not equal
     assert_ne!(a, b);
 }
 
 #[test]
 fn test_location_hash() {
-    let loc = Location::current();
+    let loc = core::panic::Location::caller();
     let mut set = HashSet::new();
     set.insert(loc);
     // The same location inserted again — set size should not change
@@ -140,14 +140,14 @@ fn test_location_hash() {
     assert_eq!(set.len(), 1);
 
     // Different location should increase set size
-    let loc2 = Location::current();
+    let loc2 = core::panic::Location::caller();
     set.insert(loc2);
     assert_eq!(set.len(), 2);
 }
 
 #[test]
 fn test_location_copy() {
-    let loc = Location::current();
+    let loc = core::panic::Location::caller();
     let copied = loc; // Copy
     // Both should be usable (not moved)
     assert_eq!(loc.line(), copied.line());
@@ -156,9 +156,9 @@ fn test_location_copy() {
 
 #[test]
 fn test_location_clone() {
-    let loc = Location::current();
-    // Intentionally using clone() on a Copy type to verify Clone impl works.
+    let loc = core::panic::Location::caller();
+    // Intentionally using clone() on a Copy type to verify the Location alias supports Clone.
     #[allow(clippy::clone_on_copy)]
-    let cloned = loc.clone();
+    let cloned: Location = Clone::clone(&loc);
     assert_eq!(loc, cloned);
 }

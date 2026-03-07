@@ -55,7 +55,7 @@ use core::error::Error;
 pub trait StackError: Error {
     /// Returns the location where this error was constructed.
     #[must_use]
-    fn location(&self) -> &Location;
+    fn location(&self) -> Location;
 
     /// Returns a human-readable type name for display in stack traces.
     ///
@@ -123,7 +123,7 @@ mod alloc_impls {
     /// because `core` provides `impl Error for Box<T: Error + ?Sized>` but
     /// we still need to manually route `StackError` methods.
     impl<T: StackError> StackError for Box<T> {
-        fn location(&self) -> &Location {
+        fn location(&self) -> Location {
             self.as_ref().location()
         }
         fn type_name(&self) -> &'static str {
@@ -135,7 +135,7 @@ mod alloc_impls {
     }
     /// Delegates all methods to the inner `T` via `Arc::as_ref`.
     impl<T: ?Sized + StackError> StackError for Arc<T> {
-        fn location(&self) -> &Location {
+        fn location(&self) -> Location {
             self.as_ref().location()
         }
         fn type_name(&self) -> &'static str {
@@ -155,7 +155,7 @@ mod alloc_impls {
 
     /// Delegates all methods through the `dyn StackError` trait object.
     impl StackError for Box<dyn StackError> {
-        fn location(&self) -> &Location {
+        fn location(&self) -> Location {
             self.as_ref().location()
         }
         fn type_name(&self) -> &'static str {
@@ -175,7 +175,7 @@ mod alloc_impls {
 
     /// Delegates all methods through the `dyn StackError + Send + Sync` trait object.
     impl StackError for Box<dyn StackError + Send + Sync> {
-        fn location(&self) -> &Location {
+        fn location(&self) -> Location {
             self.as_ref().location()
         }
         fn type_name(&self) -> &'static str {
@@ -207,8 +207,8 @@ mod tests {
         location: Location,
     }
     impl StackError for SimpleError {
-        fn location(&self) -> &Location {
-            &self.location
+        fn location(&self) -> Location {
+            self.location
         }
         fn type_name(&self) -> &'static str {
             "SimpleError"
@@ -224,8 +224,8 @@ mod tests {
         location: Location,
     }
     impl StackError for WrapperError {
-        fn location(&self) -> &Location {
-            &self.location
+        fn location(&self) -> Location {
+            self.location
         }
         fn type_name(&self) -> &'static str {
             "WrapperError"

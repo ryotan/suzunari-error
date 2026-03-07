@@ -53,7 +53,7 @@ fn test_report_from_result_ok() {
 fn test_report_from_result_err() {
     let result: Result<(), TestReportError> = Err(TestReportError {
         message: "direct".to_string(),
-        location: Location::current(),
+        location: core::panic::Location::caller(),
     });
     let report = StackReport::from(result);
     let output = format!("{report}");
