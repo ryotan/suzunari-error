@@ -103,7 +103,7 @@ fn test_stack_error_enum_derive() {
 fn test_manual_location_enum() {
     let error = TestErrorEnumWithLocation::Variant3 {
         message: "Test error".to_string(),
-        location: Location::current(),
+        location: core::panic::Location::caller(),
     };
 
     let file = file!();
@@ -116,7 +116,7 @@ fn test_manual_location_enum() {
 
     let error = TestErrorEnumWithLocation::Variant4 {
         context: "Test context".to_string(),
-        location: Location::current(),
+        location: core::panic::Location::caller(),
     };
 
     let file = file!();
@@ -168,7 +168,7 @@ fn test_generic_enum() {
 fn test_chain_context() {
     let error = TestError {
         message: "Root error".to_string(),
-        location: Location::current(),
+        location: core::panic::Location::caller(),
     };
 
     let file = file!();
