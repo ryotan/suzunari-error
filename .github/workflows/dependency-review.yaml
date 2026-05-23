@@ -1,10 +1,8 @@
 name: 'Dependency Review'
 
-# Block PRs that introduce dependencies with a moderate-or-higher
-# severity advisory. This repository is public, so we can use
-# `actions/dependency-review-action` (free without GHAS, includes
-# license checks). Private repos in the same organisation fall back to
-# `osv-scanner-action` because dependency-review requires GHAS there.
+# Block PRs that introduce dependencies with a moderate-or-higher severity advisory. This repository is public,
+# so `actions/dependency-review-action` is available without GitHub Advanced Security and it adds license-policy
+# checks on top of the vulnerability scan.
 on:
   pull_request:
     branches:

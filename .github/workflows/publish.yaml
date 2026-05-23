@@ -6,8 +6,8 @@ on:
       - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
 
-# Default-deny token permissions; the publish job below grants the extra
-# scope it needs (id-token: write for crates.io OIDC).
+# Default-deny token permissions; the publish job below grants the extra scope it needs (id-token: write for
+# crates.io OIDC).
 permissions:
   contents: read
 
@@ -22,9 +22,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden Runner
-        # Monitor and (in audit mode) report unexpected egress and process
-        # activity on the runner during publish. Switch `egress-policy`
-        # to `block` after baselining (expected: crates.io, GitHub OIDC).
+        # Monitor and (in audit mode) report unexpected egress and process activity on the runner during
+        # publish. Switch `egress-policy` to `block` after baselining (expected: crates.io, GitHub OIDC).
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
