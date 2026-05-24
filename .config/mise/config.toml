@@ -35,10 +35,14 @@ disable_backends = [
 
 # mise.lock enforcement:
 #   lockfile → write checksums + provenance to mise.lock
-#   locked   → fail install when an entry is missing (no silent resolve)
+#   locked   → kept false because `mise lock` is disabled in --locked mode, which prevents Renovate from
+#              regenerating mise.lock when it bumps a tool version (Mend hosted Renovate cannot pass
+#              `MISE_LOCKED=false` — that env name is not in its allowedEnv allowlist). Renovate's own 7-day
+#              `minimumReleaseAge` remains the primary supply-chain defense; `paranoid` continues to verify
+#              provenance on every install.
 #   paranoid → re-verify SLSA / GitHub attestations on every install
 lockfile = true
-locked = true
+locked = false
 paranoid = true
 
 [tools]
