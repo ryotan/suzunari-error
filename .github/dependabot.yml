@@ -1,0 +1,50 @@
+version: 2
+
+# Dependabot here is configured for security-update PRs only. Renovate (see .github/renovate.json5) owns the regular
+# version-bump flow with its 7-day cooldown. The relevant knobs:
+#   - open-pull-requests-limit: 0
+#       Silences version-update PRs while still allowing security-update PRs (the limit does not apply to those —
+#       they are event-driven by GHSA advisory publication).
+#   - commit-message.prefix: "🔒️(deps)"
+#       Dependabot auto-appends ": " after the closing `)` so the resulting subject is, e.g.,
+#       `🔒️(deps): Bump foo from 1.0.0 to 1.0.1`. The emoji is the GitMoji choice for security fixes; the
+#       prefix distinguishes these from Renovate's `⬆️(deps):` version bumps.
+#   - schedule.interval: "weekly"
+#       Required by schema but no-op for security-only mode (PR creation is event-driven).
+#   - labels
+#       Surface PRs on the dashboard. Review-request routing is handled by .github/CODEOWNERS, not the deprecated
+#       `reviewers` key (GitHub removed it on 2025-05-20).
+
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: "🔒️(deps)"
+    labels:
+      - "dependencies"
+      - "security"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: "🔒️(deps)"
+    labels:
+      - "dependencies"
+      - "security"
+
+  - package-ecosystem: "rust-toolchain"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: "🔒️(deps)"
+    labels:
+      - "dependencies"
+      - "security"

@@ -1,19 +1,59 @@
 {
-  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
   addLabels: [
     'dependencies',
   ],
-  commitMessagePrefix: '⬆️: ',
+  commitMessagePrefix: '⬆️(deps): ',
   extends: [
     'config:recommended',
     ':preserveSemverRanges',
-    'helpers:pinGitHubActionDigests',
+    // Note: NOT using 'helpers:pinGitHubActionDigests'. It only sets `pinDigests: true` for action depTypes,
+    // but it also opts us into perpetual digest-only update PRs that can never satisfy `minimumReleaseAge`
+    // (the new SHA is always freshly committed). Both pieces are reproduced inline in `packageRules` below.
   ],
   timezone: 'Asia/Tokyo',
+  // Mitigate supply-chain attacks by only considering versions that have been released for at least 1 week.
+  minimumReleaseAge: '7 days',
+  // Suppress branch/PR creation while a version is still inside the minimumReleaseAge window.
+  //   cf. https://docs.renovatebot.com/key-concepts/minimum-release-age/#recommended-settings
+  internalChecksFilter: 'strict',
+  // Use the OSV database (osv.dev) for vulnerability alerts in addition to the GitHub Advisory Database.
+  osvVulnerabilityAlerts: true,
+  // Auto-create a migration PR when the Renovate config syntax becomes outdated.
+  configMigration: true,
   lockFileMaintenance: {
     enabled: true,
     schedule: [
       'before 20:00 on saturday',
     ],
   },
+  vulnerabilityAlerts: {
+    // Bypass minimumReleaseAge for security alerts (CVEs) so they are applied immediately.
+    minimumReleaseAge: '0 days',
+  },
+  packageRules: [
+    {
+      // Pin GitHub Action references to immutable SHAs on first sight. Inlined from
+      // `helpers:pinGitHubActionDigests` to colocate with the digest-only suppression rule below.
+      matchDepTypes: [
+        'action',
+      ],
+      pinDigests: true,
+    },
+    {
+      // Suppress digest-only update PRs. Every new digest commit is, by definition, freshly published, so it
+      // can never satisfy the global `minimumReleaseAge` window — the PR perpetually sits in pending and gets
+      // superseded by the next digest before it ages out. The defenses we still have:
+      //   - The SHA pin itself (deps are immutable between bumps)
+      //   - Real version bumps (major/minor/patch) still flow and are subject to the normal 7-day cooldown
+      //   - CVE-tracked issues bypass cooldown via `vulnerabilityAlerts`
+      matchDepTypes: [
+        'action',
+      ],
+      matchUpdateTypes: [
+        'digest',
+      ],
+      enabled: false,
+    },
+  ],
 }

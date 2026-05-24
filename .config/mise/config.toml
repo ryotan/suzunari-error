@@ -1,6 +1,46 @@
 [settings]
 auto_install = false
 
+# Mitigate supply-chain attacks: only resolve tool versions that have been released for at least 7 days. Mirrors
+# `minimumReleaseAge` in `.github/renovate.json5`. Pinned versions in [tools] below bypass this filter (they are
+# exact pins, not fuzzy queries); the setting primarily affects `mise upgrade` / `mise latest` /
+# `mise use --fuzzy` resolution.
+minimum_release_age = "7d"
+
+# Block backends that are unsafe to use or that mise.lock cannot meaningfully verify. The unblocked backends —
+# core, aqua, github, gitlab, forgejo — all record per-platform checksum + provenance.
+#   - asdf, vfox       : execute arbitrary plugin code (bash/Lua) at install
+#   - ubi              : deprecated upstream in favour of the github backend
+#   - cargo/npm/pipx/gem/go/dotnet/conda/spm
+#                      : mise.lock records "version only" for these — no SHA, no provenance. If you need such a
+#                        tool, prefer a github/aqua entry that ships a verified binary; if none exists, install it
+#                        directly with the ecosystem's own tooling instead of pretending mise is verifying it.
+#   - http, s3         : raw-URL installs we have no current use for
+# mise has no positive `enable_backends` switch, hence the long denylist.
+disable_backends = [
+  "asdf",
+  "vfox",
+  "ubi",
+  "cargo",
+  "npm",
+  "pipx",
+  "gem",
+  "go",
+  "dotnet",
+  "conda",
+  "spm",
+  "http",
+  "s3",
+]
+
+# mise.lock enforcement:
+#   lockfile → write checksums + provenance to mise.lock
+#   locked   → fail install when an entry is missing (no silent resolve)
+#   paranoid → re-verify SLSA / GitHub attestations on every install
+lockfile = true
+locked = true
+paranoid = true
+
 [tools]
 act = "0.2.88"
 age = "1.3.1"

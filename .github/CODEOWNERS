@@ -1,0 +1,4 @@
+# Every path in this repo is owned by @ryotan, so every PR — human, Renovate, or Dependabot — auto-requests review
+# from ryotan. This replaces the deprecated `reviewers` key in `.github/dependabot.yml` (removed by GitHub on
+# 2025-05-20) and also covers the Renovate flow with the same routing.
+* @ryotan
