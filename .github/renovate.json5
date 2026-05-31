@@ -55,5 +55,19 @@
       ],
       enabled: false,
     },
+    {
+      // Disable scheduled lockFileMaintenance for cargo. The maintenance step delegates to `cargo update`,
+      // which has no native release-age filter, so the weekly run would silently pull in transitive versions
+      // that are still inside the 7-day `minimumReleaseAge` window. Direct dependency bumps still flow through
+      // Renovate's regular PRs (which respect cooldown) and refresh Cargo.lock as part of that work; CVE-tracked
+      // transitives bypass cooldown via `vulnerabilityAlerts`. The trade-off is slower transitive refresh,
+      // which we accept in exchange for keeping the cooldown invariant.
+      matchManagers: [
+        'cargo',
+      ],
+      lockFileMaintenance: {
+        enabled: false,
+      },
+    },
   ],
 }
