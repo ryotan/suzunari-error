@@ -66,10 +66,3 @@ _[sS]cratch*.*
 # Added by cargo
 
 /target
-
-# Mise lockfile — untracked while Renovate's mise artifact updater runs `mise lock` without setting
-# `MISE_TRUSTED_CONFIG_PATHS` or `MISE_LOCKED`, which makes every Renovate dep PR fail the artifact step
-# with "Config files ... are not trusted". Mend hosted Renovate exposes no way to inject those env vars
-# from the user side, so the project-side workaround is to stop tracking the lockfile. Re-track (and drop
-# this entry) once that upstream behaviour changes.
-mise.lock

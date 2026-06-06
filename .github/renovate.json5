@@ -5,11 +5,12 @@
   ],
   commitMessagePrefix: '⬆️(deps): ',
   extends: [
-    'config:recommended',
-    ':preserveSemverRanges',
-    // Note: NOT using 'helpers:pinGitHubActionDigests'. It only sets `pinDigests: true` for action depTypes,
-    // but it also opts us into perpetual digest-only update PRs that can never satisfy `minimumReleaseAge`
-    // (the new SHA is always freshly committed). Both pieces are reproduced inline in `packageRules` below.
+    // `config:best-practices` bundles config:recommended + helpers:pinGitHubActionDigests + docker:pinDigests
+    // + :configMigration + :pinDevDependencies + security:minimumReleaseAgeNpm + :maintainLockFilesWeekly
+    // + abandonments:recommended. The `:pinAllExceptPeerDependencies` preset escalates pinning from
+    // best-practices' devDeps-only default to "everything except `peerDependencies` and `engines`".
+    'config:best-practices',
+    ':pinAllExceptPeerDependencies',
   ],
   timezone: 'Asia/Tokyo',
   // Mitigate supply-chain attacks by only considering versions that have been released for at least 1 week.
@@ -19,31 +20,25 @@
   internalChecksFilter: 'strict',
   // Use the OSV database (osv.dev) for vulnerability alerts in addition to the GitHub Advisory Database.
   osvVulnerabilityAlerts: true,
-  // Auto-create a migration PR when the Renovate config syntax becomes outdated.
-  configMigration: true,
-  lockFileMaintenance: {
-    enabled: true,
-    schedule: [
-      'before 20:00 on saturday',
-    ],
-  },
   vulnerabilityAlerts: {
     // Bypass minimumReleaseAge for security alerts (CVEs) so they are applied immediately.
     minimumReleaseAge: '0 days',
   },
   packageRules: [
     {
-      // Pin GitHub Action references to immutable SHAs on first sight. Inlined from
-      // `helpers:pinGitHubActionDigests` to colocate with the digest-only suppression rule below.
-      matchDepTypes: [
-        'action',
+      // `security:minimumReleaseAgeNpm` (pulled in via `config:best-practices`) sets the npm cooldown to
+      // 3 days. Override back to 7 days so npm shares the same cooldown invariant as every other datasource.
+      matchDatasources: [
+        'npm',
       ],
-      pinDigests: true,
+      minimumReleaseAge: '7 days',
     },
     {
-      // Suppress digest-only update PRs. Every new digest commit is, by definition, freshly published, so it
-      // can never satisfy the global `minimumReleaseAge` window — the PR perpetually sits in pending and gets
-      // superseded by the next digest before it ages out. The defenses we still have:
+      // Suppress digest-only update PRs. `helpers:pinGitHubActionDigests` (pulled in via `config:best-practices`)
+      // pins action references to SHAs and then keeps proposing digest bumps, but every new digest commit is by
+      // definition freshly published, so it can never satisfy the 7-day `minimumReleaseAge` window — the PR
+      // perpetually sits in pending and gets superseded by the next digest before it ages out. The defenses we
+      // still have:
       //   - The SHA pin itself (deps are immutable between bumps)
       //   - Real version bumps (major/minor/patch) still flow and are subject to the normal 7-day cooldown
       //   - CVE-tracked issues bypass cooldown via `vulnerabilityAlerts`
