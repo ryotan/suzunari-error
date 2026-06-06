@@ -33,15 +33,21 @@
       minimumReleaseAge: '7 days',
     },
     {
-      // Pin and replacement updates do not introduce new code: pin converts an existing range to an
-      // exact version, and replacement swaps to a maintained successor at an already-allowed version.
-      // The release-age window is irrelevant in both cases. `security:minimumReleaseAgeNpm` (pulled in
-      // via `config:best-practices`) only bypasses these for npm; this rule covers the rest.
+      // Pin / pinDigest / replacement updates do not introduce new code: pin converts an existing
+      // range to an exact version, pinDigest fixes an existing action reference to a SHA, and
+      // replacement swaps to a maintained successor at an already-allowed version. The release-age
+      // check is irrelevant in all three cases — and worse, the pin / pinDigest paths don't wire in
+      // the release timestamp at all, so any non-null `minimumReleaseAge` leaves the check in
+      // pending status forever (with default `minimumReleaseAgeBehaviour: 'timestamp-required'`).
+      // Setting it to `null` disables the check rather than just lowering the threshold.
+      // `security:minimumReleaseAgeNpm` (pulled in via `config:best-practices`) does the equivalent
+      // for npm only; this rule covers the rest.
       matchUpdateTypes: [
         'pin',
+        'pinDigest',
         'replacement',
       ],
-      minimumReleaseAge: '0 days',
+      minimumReleaseAge: null,
     },
     {
       // Suppress digest-only update PRs. `helpers:pinGitHubActionDigests` (pulled in via `config:best-practices`)
