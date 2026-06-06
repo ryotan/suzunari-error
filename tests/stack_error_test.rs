@@ -108,7 +108,7 @@ fn test_stack_source_resolver_specialization() {
     );
 
     // std::io::Error does NOT implement StackError → Deref fallback wins
-    let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+    let io_err = std::io::Error::other("test");
     let resolver = StackSourceResolver(&io_err);
     assert!(
         resolver.resolve().is_none(),

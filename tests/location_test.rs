@@ -42,7 +42,7 @@ fn test_snafu_implicit_generation() {
     // file!() is escaped via {:?} to match Debug's backslash escaping on Windows.
     assert!(debug.contains(&format!("file: {:?}", file)));
     assert!(debug.contains(&format!("line: {line}")));
-    assert!(debug.contains("col: 9"));
+    assert!(debug.contains("column: 9"));
 }
 
 /// Tests using Location with a custom error type manually.

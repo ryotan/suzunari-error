@@ -332,7 +332,7 @@ struct ContextWrapperError {
 #[test]
 fn test_context_captures_exact_line() {
     fn inner() -> Result<(), std::io::Error> {
-        Err(std::io::Error::new(std::io::ErrorKind::Other, "boom"))
+        Err(std::io::Error::other("boom"))
     }
     fn outer() -> Result<(), ContextWrapperError> {
         // The location should point to the exact line of the .context() call
@@ -485,7 +485,7 @@ enum SourceFalseError {
 
 #[test]
 fn test_source_false_on_enum_variant() {
-    let io_err = std::io::Error::new(std::io::ErrorKind::Other, "test");
+    let io_err = std::io::Error::other("test");
     // source(false) makes `source` a regular field, so it must be passed explicitly.
     // .build() is needed because ensure!() doesn't work with source(false) fields.
     let err = SuppressedSnafu { source: io_err }.build();

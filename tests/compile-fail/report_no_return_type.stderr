@@ -10,7 +10,7 @@ warning: unused import: `suzunari_error::*`
 2 | use suzunari_error::*;
   |     ^^^^^^^^^^^^^^^^^
   |
-  = note: `#[warn(unused_imports)]` on by default
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
 
 error[E0601]: `main` function not found in crate `$CRATE`
  --> tests/compile-fail/report_no_return_type.rs:7:2
