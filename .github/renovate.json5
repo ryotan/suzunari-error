@@ -7,10 +7,9 @@
   extends: [
     // `config:best-practices` bundles config:recommended + helpers:pinGitHubActionDigests + docker:pinDigests
     // + :configMigration + :pinDevDependencies + security:minimumReleaseAgeNpm + :maintainLockFilesWeekly
-    // + abandonments:recommended. The `:pinAllExceptPeerDependencies` preset escalates pinning from
-    // best-practices' devDeps-only default to "everything except `peerDependencies` and `engines`".
+    // + abandonments:recommended. This crate is a library, so we stay on the bundled `:pinDevDependencies`
+    // default — pinning direct dependencies would force exact versions on downstream consumers.
     'config:best-practices',
-    ':pinAllExceptPeerDependencies',
   ],
   timezone: 'Asia/Tokyo',
   // Mitigate supply-chain attacks by only considering versions that have been released for at least 1 week.
@@ -32,6 +31,17 @@
         'npm',
       ],
       minimumReleaseAge: '7 days',
+    },
+    {
+      // Pin and replacement updates do not introduce new code: pin converts an existing range to an
+      // exact version, and replacement swaps to a maintained successor at an already-allowed version.
+      // The release-age window is irrelevant in both cases. `security:minimumReleaseAgeNpm` (pulled in
+      // via `config:best-practices`) only bypasses these for npm; this rule covers the rest.
+      matchUpdateTypes: [
+        'pin',
+        'replacement',
+      ],
+      minimumReleaseAge: '0 days',
     },
     {
       // Suppress digest-only update PRs. `helpers:pinGitHubActionDigests` (pulled in via `config:best-practices`)
