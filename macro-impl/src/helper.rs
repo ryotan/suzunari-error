@@ -284,9 +284,9 @@ fn is_source_field(field: &Field) -> bool {
             let nested = meta_list
                 .parse_args_with(Punctuated::<Meta, syn::Token![,]>::parse_terminated)
                 .ok()?;
-            // Use filter_map + last to be consistent with the outer .last():
-            // both within a single #[snafu(...)] and across multiple #[snafu]
-            // attributes, the last `source` directive wins.
+            // Use filter_map + next_back to be consistent with the outer
+            // .next_back(): both within a single #[snafu(...)] and across
+            // multiple #[snafu] attributes, the last `source` directive wins.
             nested
                 .iter()
                 .filter_map(|meta| match meta {
@@ -300,9 +300,9 @@ fn is_source_field(field: &Field) -> bool {
                     }
                     _ => None,
                 })
-                .last()
+                .next_back()
         })
-        .last();
+        .next_back();
 
     snafu_source.unwrap_or(is_named_source)
 }
