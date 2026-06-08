@@ -50,17 +50,16 @@
       minimumReleaseAge: null,
     },
     {
-      // Suppress digest-only update PRs. `helpers:pinGitHubActionDigests` (pulled in via `config:best-practices`)
-      // pins action references to SHAs and then keeps proposing digest bumps, but every new digest commit is by
-      // definition freshly published, so it can never satisfy the 7-day `minimumReleaseAge` window — the PR
-      // perpetually sits in pending and gets superseded by the next digest before it ages out. The defenses we
-      // still have:
+      // Suppress all digest update PRs. `helpers:pinGitHubActionDigests` and `docker:pinDigests` (both
+      // pulled in via `config:best-practices`) pin references to SHAs and then keep proposing digest bumps,
+      // but every new digest commit is by definition freshly published, so it can never satisfy the 7-day
+      // `minimumReleaseAge` window — and the digest update path doesn't wire in the release timestamp
+      // anyway, so the check would stay in pending status forever regardless of the configured value.
+      // Cooldown is structurally unavailable for digest updates, so we suppress them entirely. The
+      // defenses we still have:
       //   - The SHA pin itself (deps are immutable between bumps)
       //   - Real version bumps (major/minor/patch) still flow and are subject to the normal 7-day cooldown
       //   - CVE-tracked issues bypass cooldown via `vulnerabilityAlerts`
-      matchDepTypes: [
-        'action',
-      ],
       matchUpdateTypes: [
         'digest',
       ],
