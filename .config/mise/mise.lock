@@ -16,7 +16,15 @@ url = "https://github.com/nektos/act/releases/download/v0.2.88/act_Linux_arm64.t
 checksum = "sha256:1eb9996682dfcc053ac8f3f90f2ec50376f0cdfc229712d82da03d673c63a2b3"
 url = "https://github.com/nektos/act/releases/download/v0.2.88/act_Linux_x86_64.tar.gz"
 
+[tools.act."platforms.linux-x64-baseline"]
+checksum = "sha256:1eb9996682dfcc053ac8f3f90f2ec50376f0cdfc229712d82da03d673c63a2b3"
+url = "https://github.com/nektos/act/releases/download/v0.2.88/act_Linux_x86_64.tar.gz"
+
 [tools.act."platforms.linux-x64-musl"]
+checksum = "sha256:1eb9996682dfcc053ac8f3f90f2ec50376f0cdfc229712d82da03d673c63a2b3"
+url = "https://github.com/nektos/act/releases/download/v0.2.88/act_Linux_x86_64.tar.gz"
+
+[tools.act."platforms.linux-x64-musl-baseline"]
 checksum = "sha256:1eb9996682dfcc053ac8f3f90f2ec50376f0cdfc229712d82da03d673c63a2b3"
 url = "https://github.com/nektos/act/releases/download/v0.2.88/act_Linux_x86_64.tar.gz"
 
@@ -28,7 +36,15 @@ url = "https://github.com/nektos/act/releases/download/v0.2.88/act_Darwin_arm64.
 checksum = "sha256:887cd13013fdd866f80872ef2b473b7d34af6c2e366cc77542c9b75dceea7a82"
 url = "https://github.com/nektos/act/releases/download/v0.2.88/act_Darwin_x86_64.tar.gz"
 
+[tools.act."platforms.macos-x64-baseline"]
+checksum = "sha256:887cd13013fdd866f80872ef2b473b7d34af6c2e366cc77542c9b75dceea7a82"
+url = "https://github.com/nektos/act/releases/download/v0.2.88/act_Darwin_x86_64.tar.gz"
+
 [tools.act."platforms.windows-x64"]
+checksum = "sha256:fb501a109f40193dbccf7124d3098e0802276ace86948507eedd5aee2b3bc18b"
+url = "https://github.com/nektos/act/releases/download/v0.2.88/act_Windows_x86_64.zip"
+
+[tools.act."platforms.windows-x64-baseline"]
 checksum = "sha256:fb501a109f40193dbccf7124d3098e0802276ace86948507eedd5aee2b3bc18b"
 url = "https://github.com/nektos/act/releases/download/v0.2.88/act_Windows_x86_64.zip"
 
@@ -51,7 +67,17 @@ checksum = "sha256:bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51
 url = "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz"
 provenance = "github-attestations"
 
+[tools.age."platforms.linux-x64-baseline"]
+checksum = "sha256:bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377"
+url = "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz"
+provenance = "github-attestations"
+
 [tools.age."platforms.linux-x64-musl"]
+checksum = "sha256:bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377"
+url = "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz"
+provenance = "github-attestations"
+
+[tools.age."platforms.linux-x64-musl-baseline"]
 checksum = "sha256:bdc69c09cbdd6cf8b1f333d372a1f58247b3a33146406333e30c0f26e8f51377"
 url = "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-linux-amd64.tar.gz"
 provenance = "github-attestations"
@@ -61,7 +87,22 @@ checksum = "sha256:01120ea2cbf0463d4c6bd767f99f3271bbed1cdc8a9aa718a76ba1fe4f019
 url = "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-darwin-arm64.tar.gz"
 provenance = "github-attestations"
 
+[tools.age."platforms.macos-x64"]
+checksum = "sha256:2b233301ad21ab7b1eabd9ae1198a164005fa4928fcdd745d47c39f8593209d7"
+url = "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-darwin-amd64.tar.gz"
+provenance = "github-attestations"
+
+[tools.age."platforms.macos-x64-baseline"]
+checksum = "sha256:2b233301ad21ab7b1eabd9ae1198a164005fa4928fcdd745d47c39f8593209d7"
+url = "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-darwin-amd64.tar.gz"
+provenance = "github-attestations"
+
 [tools.age."platforms.windows-x64"]
+checksum = "sha256:c56e8ce22f7e80cb85ad946cc82d198767b056366201d3e1a2b93d865be38154"
+url = "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-windows-amd64.zip"
+provenance = "github-attestations"
+
+[tools.age."platforms.windows-x64-baseline"]
 checksum = "sha256:c56e8ce22f7e80cb85ad946cc82d198767b056366201d3e1a2b93d865be38154"
 url = "https://github.com/FiloSottile/age/releases/download/v1.3.1/age-v1.3.1-windows-amd64.zip"
 provenance = "github-attestations"
@@ -133,7 +174,17 @@ checksum = "sha256:c956e5dfcac53d52bcf058360d579472f0c1d2d9b69f55209e256fe7783f4
 url = "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-linux-amd64"
 provenance = "cosign"
 
+[tools.cosign."platforms.linux-x64-baseline"]
+checksum = "sha256:c956e5dfcac53d52bcf058360d579472f0c1d2d9b69f55209e256fe7783f4c74"
+url = "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-linux-amd64"
+provenance = "cosign"
+
 [tools.cosign."platforms.linux-x64-musl"]
+checksum = "sha256:c956e5dfcac53d52bcf058360d579472f0c1d2d9b69f55209e256fe7783f4c74"
+url = "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-linux-amd64"
+provenance = "cosign"
+
+[tools.cosign."platforms.linux-x64-musl-baseline"]
 checksum = "sha256:c956e5dfcac53d52bcf058360d579472f0c1d2d9b69f55209e256fe7783f4c74"
 url = "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-linux-amd64"
 provenance = "cosign"
@@ -148,7 +199,17 @@ checksum = "sha256:4c3e7af8372d3ca3296e62fa56f23fcbb5721cc6ac1827900d398f110d7cd
 url = "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-darwin-amd64"
 provenance = "cosign"
 
+[tools.cosign."platforms.macos-x64-baseline"]
+checksum = "sha256:4c3e7af8372d3ca3296e62fa56f23fcbb5721cc6ac1827900d398f110d7cd280"
+url = "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-darwin-amd64"
+provenance = "cosign"
+
 [tools.cosign."platforms.windows-x64"]
+checksum = "sha256:9b85a88ebff2d9dd30ff4984a6f61f2cedc232dd87d81fa7f2ff3c0ed96c241c"
+url = "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-windows-amd64.exe"
+provenance = "cosign"
+
+[tools.cosign."platforms.windows-x64-baseline"]
 checksum = "sha256:9b85a88ebff2d9dd30ff4984a6f61f2cedc232dd87d81fa7f2ff3c0ed96c241c"
 url = "https://github.com/sigstore/cosign/releases/download/v3.0.6/cosign-windows-amd64.exe"
 provenance = "cosign"
@@ -172,7 +233,17 @@ checksum = "sha256:02d1290eba130e0b896f3709ffff22e1c75a51475ddb70476a85abc6b5807
 url = "https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_linux_amd64.tar.gz"
 provenance = "github-attestations"
 
+[tools.gh."platforms.linux-x64-baseline"]
+checksum = "sha256:02d1290eba130e0b896f3709ffff22e1c75a51475ddb70476a85abc6b5807af0"
+url = "https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_linux_amd64.tar.gz"
+provenance = "github-attestations"
+
 [tools.gh."platforms.linux-x64-musl"]
+checksum = "sha256:02d1290eba130e0b896f3709ffff22e1c75a51475ddb70476a85abc6b5807af0"
+url = "https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_linux_amd64.tar.gz"
+provenance = "github-attestations"
+
+[tools.gh."platforms.linux-x64-musl-baseline"]
 checksum = "sha256:02d1290eba130e0b896f3709ffff22e1c75a51475ddb70476a85abc6b5807af0"
 url = "https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_linux_amd64.tar.gz"
 provenance = "github-attestations"
@@ -187,7 +258,17 @@ checksum = "sha256:009425b9d175c482037fe25181817fd6b1ea3ae1f51cfae0e18f29f33d315
 url = "https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_macOS_amd64.zip"
 provenance = "github-attestations"
 
+[tools.gh."platforms.macos-x64-baseline"]
+checksum = "sha256:009425b9d175c482037fe25181817fd6b1ea3ae1f51cfae0e18f29f33d3152ac"
+url = "https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_macOS_amd64.zip"
+provenance = "github-attestations"
+
 [tools.gh."platforms.windows-x64"]
+checksum = "sha256:77aa01ed7317295ad550de0ad04f3f276b1ef0e9272e3d002ac28dd99853d211"
+url = "https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_windows_amd64.zip"
+provenance = "github-attestations"
+
+[tools.gh."platforms.windows-x64-baseline"]
 checksum = "sha256:77aa01ed7317295ad550de0ad04f3f276b1ef0e9272e3d002ac28dd99853d211"
 url = "https://github.com/cli/cli/releases/download/v2.93.0/gh_2.93.0_windows_amd64.zip"
 provenance = "github-attestations"
@@ -217,11 +298,25 @@ url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/ghali
 [tools.ghalint."platforms.linux-x64".provenance.slsa]
 url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/multiple.intoto.jsonl"
 
+[tools.ghalint."platforms.linux-x64-baseline"]
+checksum = "sha256:98ee0e3330de7286f470d1e89c03ff7ce70d7a5998ba0f15969c400447be579c"
+url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/ghalint_1.5.6_linux_amd64.tar.gz"
+
+[tools.ghalint."platforms.linux-x64-baseline".provenance.slsa]
+url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/multiple.intoto.jsonl"
+
 [tools.ghalint."platforms.linux-x64-musl"]
 checksum = "sha256:98ee0e3330de7286f470d1e89c03ff7ce70d7a5998ba0f15969c400447be579c"
 url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/ghalint_1.5.6_linux_amd64.tar.gz"
 
 [tools.ghalint."platforms.linux-x64-musl".provenance.slsa]
+url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/multiple.intoto.jsonl"
+
+[tools.ghalint."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:98ee0e3330de7286f470d1e89c03ff7ce70d7a5998ba0f15969c400447be579c"
+url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/ghalint_1.5.6_linux_amd64.tar.gz"
+
+[tools.ghalint."platforms.linux-x64-musl-baseline".provenance.slsa]
 url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/multiple.intoto.jsonl"
 
 [tools.ghalint."platforms.macos-arm64"]
@@ -238,11 +333,25 @@ url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/ghali
 [tools.ghalint."platforms.macos-x64".provenance.slsa]
 url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/multiple.intoto.jsonl"
 
+[tools.ghalint."platforms.macos-x64-baseline"]
+checksum = "sha256:d2a0e8605333068065dcf4c9b7b7a24891eda1750ac01fb755dfba426a390883"
+url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/ghalint_1.5.6_darwin_amd64.tar.gz"
+
+[tools.ghalint."platforms.macos-x64-baseline".provenance.slsa]
+url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/multiple.intoto.jsonl"
+
 [tools.ghalint."platforms.windows-x64"]
 checksum = "sha256:109ea9b39c8e263cef924bd3b4fe5505964204f934ca60d986f4090d01a99ba5"
 url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/ghalint_1.5.6_windows_amd64.zip"
 
 [tools.ghalint."platforms.windows-x64".provenance.slsa]
+url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/multiple.intoto.jsonl"
+
+[tools.ghalint."platforms.windows-x64-baseline"]
+checksum = "sha256:109ea9b39c8e263cef924bd3b4fe5505964204f934ca60d986f4090d01a99ba5"
+url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/ghalint_1.5.6_windows_amd64.zip"
+
+[tools.ghalint."platforms.windows-x64-baseline".provenance.slsa]
 url = "https://github.com/suzuki-shunsuke/ghalint/releases/download/v1.5.6/multiple.intoto.jsonl"
 
 [[tools.pinact]]
@@ -264,7 +373,17 @@ checksum = "sha256:cc220902615325b10bd3bc52ed3de27488f79adaec52adcd12bd2194c2d2c
 url = "https://github.com/suzuki-shunsuke/pinact/releases/download/v4.0.0/pinact_linux_amd64.tar.gz"
 provenance = "github-attestations"
 
+[tools.pinact."platforms.linux-x64-baseline"]
+checksum = "sha256:cc220902615325b10bd3bc52ed3de27488f79adaec52adcd12bd2194c2d2c592"
+url = "https://github.com/suzuki-shunsuke/pinact/releases/download/v4.0.0/pinact_linux_amd64.tar.gz"
+provenance = "github-attestations"
+
 [tools.pinact."platforms.linux-x64-musl"]
+checksum = "sha256:cc220902615325b10bd3bc52ed3de27488f79adaec52adcd12bd2194c2d2c592"
+url = "https://github.com/suzuki-shunsuke/pinact/releases/download/v4.0.0/pinact_linux_amd64.tar.gz"
+provenance = "github-attestations"
+
+[tools.pinact."platforms.linux-x64-musl-baseline"]
 checksum = "sha256:cc220902615325b10bd3bc52ed3de27488f79adaec52adcd12bd2194c2d2c592"
 url = "https://github.com/suzuki-shunsuke/pinact/releases/download/v4.0.0/pinact_linux_amd64.tar.gz"
 provenance = "github-attestations"
@@ -279,7 +398,17 @@ checksum = "sha256:242d0697152d31bf04f3759ec5c55cf8ccbf47b6e2680dd24531e63a6d890
 url = "https://github.com/suzuki-shunsuke/pinact/releases/download/v4.0.0/pinact_darwin_amd64.tar.gz"
 provenance = "github-attestations"
 
+[tools.pinact."platforms.macos-x64-baseline"]
+checksum = "sha256:242d0697152d31bf04f3759ec5c55cf8ccbf47b6e2680dd24531e63a6d890468"
+url = "https://github.com/suzuki-shunsuke/pinact/releases/download/v4.0.0/pinact_darwin_amd64.tar.gz"
+provenance = "github-attestations"
+
 [tools.pinact."platforms.windows-x64"]
+checksum = "sha256:800554b9f87c5136e9469ec9075a1f51fbea5ac402914d99f8afc4ec98a87901"
+url = "https://github.com/suzuki-shunsuke/pinact/releases/download/v4.0.0/pinact_windows_amd64.zip"
+provenance = "github-attestations"
+
+[tools.pinact."platforms.windows-x64-baseline"]
 checksum = "sha256:800554b9f87c5136e9469ec9075a1f51fbea5ac402914d99f8afc4ec98a87901"
 url = "https://github.com/suzuki-shunsuke/pinact/releases/download/v4.0.0/pinact_windows_amd64.zip"
 provenance = "github-attestations"
@@ -309,11 +438,25 @@ url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/
 [tools.slsa-verifier."platforms.linux-x64".provenance.slsa]
 url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-linux-amd64.intoto.jsonl"
 
+[tools.slsa-verifier."platforms.linux-x64-baseline"]
+checksum = "sha256:946dbec729094195e88ef78e1734324a27869f03e2c6bd2f61cbc06bd5350339"
+url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-linux-amd64"
+
+[tools.slsa-verifier."platforms.linux-x64-baseline".provenance.slsa]
+url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-linux-amd64.intoto.jsonl"
+
 [tools.slsa-verifier."platforms.linux-x64-musl"]
 checksum = "sha256:946dbec729094195e88ef78e1734324a27869f03e2c6bd2f61cbc06bd5350339"
 url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-linux-amd64"
 
 [tools.slsa-verifier."platforms.linux-x64-musl".provenance.slsa]
+url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-linux-amd64.intoto.jsonl"
+
+[tools.slsa-verifier."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:946dbec729094195e88ef78e1734324a27869f03e2c6bd2f61cbc06bd5350339"
+url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-linux-amd64"
+
+[tools.slsa-verifier."platforms.linux-x64-musl-baseline".provenance.slsa]
 url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-linux-amd64.intoto.jsonl"
 
 [tools.slsa-verifier."platforms.macos-arm64"]
@@ -330,11 +473,25 @@ url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/
 [tools.slsa-verifier."platforms.macos-x64".provenance.slsa]
 url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-darwin-amd64.intoto.jsonl"
 
+[tools.slsa-verifier."platforms.macos-x64-baseline"]
+checksum = "sha256:4baf25415727821f847a38bccedc86c3e5b17cbfc2eb534cd554feb6c856d6f1"
+url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-darwin-amd64"
+
+[tools.slsa-verifier."platforms.macos-x64-baseline".provenance.slsa]
+url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-darwin-amd64.intoto.jsonl"
+
 [tools.slsa-verifier."platforms.windows-x64"]
 checksum = "sha256:1d8f61ad747ecc3d375d2a563cebf2991748b7da1a9bda9a500804c3c499e3c0"
 url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-windows-amd64.exe"
 
 [tools.slsa-verifier."platforms.windows-x64".provenance.slsa]
+url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-windows-amd64.exe.intoto.jsonl"
+
+[tools.slsa-verifier."platforms.windows-x64-baseline"]
+checksum = "sha256:1d8f61ad747ecc3d375d2a563cebf2991748b7da1a9bda9a500804c3c499e3c0"
+url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-windows-amd64.exe"
+
+[tools.slsa-verifier."platforms.windows-x64-baseline".provenance.slsa]
 url = "https://github.com/slsa-framework/slsa-verifier/releases/download/v2.7.1/slsa-verifier-windows-amd64.exe.intoto.jsonl"
 
 [[tools.sops]]
@@ -362,11 +519,25 @@ url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.li
 [tools.sops."platforms.linux-x64".provenance.slsa]
 url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.intoto.jsonl"
 
+[tools.sops."platforms.linux-x64-baseline"]
+checksum = "sha256:620a9d7e3352ababeca6908cea24a6e8b14ce89a448ddbd3f94f1ef3398f470a"
+url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.linux.amd64"
+
+[tools.sops."platforms.linux-x64-baseline".provenance.slsa]
+url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.intoto.jsonl"
+
 [tools.sops."platforms.linux-x64-musl"]
 checksum = "sha256:620a9d7e3352ababeca6908cea24a6e8b14ce89a448ddbd3f94f1ef3398f470a"
 url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.linux.amd64"
 
 [tools.sops."platforms.linux-x64-musl".provenance.slsa]
+url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.intoto.jsonl"
+
+[tools.sops."platforms.linux-x64-musl-baseline"]
+checksum = "sha256:620a9d7e3352ababeca6908cea24a6e8b14ce89a448ddbd3f94f1ef3398f470a"
+url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.linux.amd64"
+
+[tools.sops."platforms.linux-x64-musl-baseline".provenance.slsa]
 url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.intoto.jsonl"
 
 [tools.sops."platforms.macos-arm64"]
@@ -383,11 +554,25 @@ url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.da
 [tools.sops."platforms.macos-x64".provenance.slsa]
 url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.intoto.jsonl"
 
+[tools.sops."platforms.macos-x64-baseline"]
+checksum = "sha256:dad79d1b1dea767ca38ffaa50e10330a3e807dd13c853ef9c880567acef4f1ef"
+url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.darwin.amd64"
+
+[tools.sops."platforms.macos-x64-baseline".provenance.slsa]
+url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.intoto.jsonl"
+
 [tools.sops."platforms.windows-x64"]
 checksum = "sha256:4654e53fff6d0a1842facd3a0ed5a66a8ab6164004b0ad4ca2d5e2b1c5473b65"
 url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.amd64.exe"
 
 [tools.sops."platforms.windows-x64".provenance.slsa]
+url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.intoto.jsonl"
+
+[tools.sops."platforms.windows-x64-baseline"]
+checksum = "sha256:4654e53fff6d0a1842facd3a0ed5a66a8ab6164004b0ad4ca2d5e2b1c5473b65"
+url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.amd64.exe"
+
+[tools.sops."platforms.windows-x64-baseline".provenance.slsa]
 url = "https://github.com/getsops/sops/releases/download/v3.13.1/sops-v3.13.1.intoto.jsonl"
 
 [[tools.zizmor]]
@@ -407,7 +592,15 @@ checksum = "sha256:aa1facd105f0d83fe5c55b1adcd9d7417de5d83aa27471f91dc0b66cf3803
 url = "https://github.com/zizmorcore/zizmor/releases/download/v1.25.2/zizmor-x86_64-unknown-linux-gnu.tar.gz"
 provenance = "github-attestations"
 
+[tools.zizmor."platforms.linux-x64-baseline"]
+checksum = "sha256:aa1facd105f0d83fe5c55b1adcd9d7417de5d83aa27471f91dc0b66cf3803577"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.25.2/zizmor-x86_64-unknown-linux-gnu.tar.gz"
+provenance = "github-attestations"
+
 [tools.zizmor."platforms.linux-x64-musl"]
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.linux-x64-musl-baseline"]
 provenance = "github-attestations"
 
 [tools.zizmor."platforms.macos-arm64"]
@@ -420,7 +613,17 @@ checksum = "sha256:353271b9ec301dd4ba158af481323c831c6e9b494d5ac3f5aa58cf4b20769
 url = "https://github.com/zizmorcore/zizmor/releases/download/v1.25.2/zizmor-x86_64-apple-darwin.tar.gz"
 provenance = "github-attestations"
 
+[tools.zizmor."platforms.macos-x64-baseline"]
+checksum = "sha256:353271b9ec301dd4ba158af481323c831c6e9b494d5ac3f5aa58cf4b207699cc"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.25.2/zizmor-x86_64-apple-darwin.tar.gz"
+provenance = "github-attestations"
+
 [tools.zizmor."platforms.windows-x64"]
+checksum = "sha256:65d46a8144f701200621b580f632076d80d082d60856de9f88793a95fb5882d7"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.25.2/zizmor-x86_64-pc-windows-msvc.zip"
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.windows-x64-baseline"]
 checksum = "sha256:65d46a8144f701200621b580f632076d80d082d60856de9f88793a95fb5882d7"
 url = "https://github.com/zizmorcore/zizmor/releases/download/v1.25.2/zizmor-x86_64-pc-windows-msvc.zip"
 provenance = "github-attestations"
