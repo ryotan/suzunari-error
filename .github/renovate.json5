@@ -50,6 +50,18 @@
       minimumReleaseAge: null,
     },
     {
+      // `renovate/stability-days` has no per-package release timestamp on lockFileMaintenance PRs (the
+      // entire lockfile is refreshed, not a single tracked version), so the check stays in pending
+      // status forever with the inherited 7-day threshold. Set null to clear it. Cooldown is still
+      // enforced one layer down by each tool's own release-age filter (e.g. bunfig `minimumReleaseAge`,
+      // mise `minimum_release_age`); managers without a native filter have
+      // `lockFileMaintenance: { enabled: false }` set per-rule below.
+      matchUpdateTypes: [
+        'lockFileMaintenance',
+      ],
+      minimumReleaseAge: null,
+    },
+    {
       // Suppress all digest update PRs. `helpers:pinGitHubActionDigests` and `docker:pinDigests` (both
       // pulled in via `config:best-practices`) pin references to SHAs and then keep proposing digest bumps,
       // but every new digest commit is by definition freshly published, so it can never satisfy the 7-day
