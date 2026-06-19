@@ -17,6 +17,12 @@
   // Suppress branch/PR creation while a version is still inside the minimumReleaseAge window.
   //   cf. https://docs.renovatebot.com/key-concepts/minimum-release-age/#recommended-settings
   internalChecksFilter: 'strict',
+  // Always rebase stale branches before merge. The default `auto` only rebases on a git-level conflict,
+  // but mise.lock maintenance produces purely additive diffs: when such a branch falls behind main, the
+  // same `[tools.X."platforms.Y"]` table gets appended a second time with no textual conflict, leaving a
+  // duplicate TOML key that breaks `mise lock` ("duplicate key" parse error). Forcing a rebase re-runs
+  // the artifact update against current main, which deduplicates the lockfile instead of stacking entries.
+  rebaseWhen: 'behind-base-branch',
   // Use the OSV database (osv.dev) for vulnerability alerts in addition to the GitHub Advisory Database.
   osvVulnerabilityAlerts: true,
   vulnerabilityAlerts: {
