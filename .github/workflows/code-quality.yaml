@@ -23,12 +23,20 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Harden Runner
-        # Monitor and (in audit mode) report unexpected egress and process activity on the runner. Linux-only
-        # — harden-runner does not support Windows and has only partial macOS support.
+        # Block unexpected egress and process activity on the runner. Linux-only — harden-runner does not
+        # support Windows and has only partial macOS support. Endpoints below were baselined from the
+        # audit-mode log observed across recent successful runs.
         if: runner.os == 'Linux'
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            index.crates.io:443
+            static.crates.io:443
+            static.rust-lang.org:443
+            *.actions.githubusercontent.com:443
+            *.blob.core.windows.net:443
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
