@@ -19,9 +19,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Harden Runner
+        # Endpoints below were baselined from the audit-mode log observed across recent successful runs.
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            *.actions.githubusercontent.com:443
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
