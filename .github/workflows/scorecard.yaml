@@ -1,0 +1,57 @@
+name: 'Scorecard'
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # Weekly on Saturdays.
+    - cron: '30 1 * * 6'
+
+# Default-deny token permissions; the analysis job below grants the extra scopes it needs.
+permissions:
+  contents: read
+
+jobs:
+  analysis:
+    name: 'Scorecard analysis'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Needed for Code Scanning upload.
+      security-events: write
+      # Needed for the GitHub OIDC token used by publish_results.
+      id-token: write
+    steps:
+      - name: Harden Runner
+        # New workflow — audit first to baseline expected egress, then switch to block once we have a
+        # sample of real runs (same rollout process used for the other workflows in this repo).
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: 'Checkout code'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          persist-credentials: false
+
+      - name: 'Run analysis'
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          # This repository is public — publishing helps the Scorecard team's public dataset
+          # (https://github.com/ossf/scorecard#public-data) and enables the results badge.
+          publish_results: true
+
+      - name: 'Upload artifact'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: SARIF file
+          path: results.sarif
+          retention-days: 5
+
+      - name: 'Upload to code-scanning'
+        uses: github/codeql-action/upload-sarif@e46ed2cbd01164d986452f91f178727624ae40d7 # v4.35.3
+        with:
+          sarif_file: results.sarif
