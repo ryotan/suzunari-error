@@ -40,4 +40,4 @@ snafu = { workspace = true, features = ["rust_1_81"] }
 suzunari-error-macro-impl.workspace = true
 
 [dev-dependencies]
-trybuild = "=1.0.117"
+trybuild = "=1.0.118"
