@@ -25,7 +25,7 @@ Emojis: ✨ feature, 🐛 bugfix, ♻️ refactor, ✅ test, 📝 docs, 🎨 str
 
 Conventional Branch format: `<type>/<description>` (lowercase, hyphens only)
 
-Types: `feature/`, `bugfix/`, `hotfix/`, `release/`, `chore/`
+Types: `feature/`, `fix/`, `hotfix/`, `release/`, `chore/`
 
 ## Build & Test Commands
 
