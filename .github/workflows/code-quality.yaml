@@ -23,13 +23,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Harden Runner
-        # Block unexpected egress and process activity on the runner. Linux-only — harden-runner does not
-        # support Windows and has only partial macOS support. Endpoints below were baselined from the
-        # audit-mode log observed across recent successful runs.
-        if: runner.os == 'Linux'
+        # Block unexpected egress and process activity on the runner. The allowed-endpoints list below was
+        # baselined from the audit-mode log of Linux runs, so block mode is Linux-only for now; macOS and
+        # Windows stay in audit until their own egress has been baselined the same way.
+        #
+        # A step-level `if:` cannot gate this action — its `pre` step has no `pre-if`, so it defaults to
+        # always() and applies the policy even when the step itself is skipped. Since v2.20.0 that policy
+        # is actually enforced on macOS and Windows, so the egress policy itself has to carry the condition.
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
-          egress-policy: block
+          egress-policy: ${{ runner.os == 'Linux' && 'block' || 'audit' }}
           allowed-endpoints: >
             github.com:443
             index.crates.io:443
