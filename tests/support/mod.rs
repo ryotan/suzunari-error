@@ -450,17 +450,25 @@ impl_struct_recorder!(SerializeStruct, SerializeStructVariant);
 /// belong to the metadata level" is the rule under test, so a macro that
 /// inferred it would be re-implementing what it is supposed to check, and a
 /// shared mistake would pass unnoticed.
+///
+/// An attribute inside `context` lands on the error type only, never on the
+/// hand-written struct — `#[suzu(source(false))]` means nothing there. When
+/// serde attributes start being transplanted they will need a second slot,
+/// since those have to reach both sides; deciding here which is which would be
+/// the same mistake as inferring the split.
 macro_rules! declare_case {
     (
         error: $name:ident,
         display: $display:literal,
-        context: { $($field:ident : $ty:ty = $value:expr),* $(,)? },
+        context: {
+            $( $(#[$error_only:meta])* $field:ident : $ty:ty = $value:expr ),* $(,)?
+        },
         metadata: { $($metadata:tt)* } $(,)?
     ) => {
         #[suzunari_error(serialize)]
         #[suzu(display($display))]
         struct $name {
-            $($field: $ty,)*
+            $( $(#[$error_only])* $field: $ty, )*
             $($metadata)*
         }
 
@@ -471,7 +479,7 @@ macro_rules! declare_case {
 
             #[derive(serde::Serialize)]
             pub struct $name {
-                $(pub $field: $ty,)*
+                $( pub $field: $ty, )*
             }
         }
 

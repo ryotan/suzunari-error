@@ -5,9 +5,17 @@
         > tests/serde_differential_pairwise.rs
 
 The generated Rust is committed and reviewed; neither pict nor this script is
-needed at build time. Editing the level-to-code mapping below changes every
-case at once, which is why the hand-written cases in serde_differential.rs are
-kept as a separate check on it.
+needed at build time. Editing the level-to-code mapping below changes every case
+at once, which is why the hand-written cases in serde_differential.rs are kept as
+a separate check on it.
+
+Two rules from the model decide the field layout:
+
+- `FieldType` describes the first declared field. Any further declared field is
+  a plain scalar.
+- The `source`-named field of `SourceFalseField` is always last and counts
+  towards `DeclaredFields`, so "one" plus "present" means it is the only one and
+  `FieldType` describes it.
 """
 import subprocess
 import sys
@@ -17,7 +25,7 @@ HEADER = '''//! Pairwise cases, generated from `tests/support/differential-cases
 //! Do not edit by hand. Regenerate with:
 //!
 //! ```text
-//! python3 tests/support/generate-cases.py tests/support/differential-cases.pict \
+//! python3 tests/support/generate-cases.py tests/support/differential-cases.pict \\
 //!     > tests/serde_differential_pairwise.rs
 //! ```
 //!
@@ -28,7 +36,7 @@ HEADER = '''//! Pairwise cases, generated from `tests/support/differential-cases
 //! against that struct, and `source` against what the source level implies.
 //!
 //! The hand-written cases in `serde_differential.rs` stay behind on purpose. If
-//! `declare_case!` or this generator gets the split between `context` and
+//! `declare_case!` or the generator gets the split between `context` and
 //! `metadata` wrong, every case here moves together and still agrees; the
 //! hand-written ones do not.
 
@@ -37,6 +45,7 @@ HEADER = '''//! Pairwise cases, generated from `tests/support/differential-cases
 #[macro_use]
 mod support;
 
+use std::collections::BTreeMap;
 use support::{Record, error_node, record};
 use suzunari_error::*;
 
@@ -57,11 +66,34 @@ fn has_source(recorded: &Record) -> bool {
     fields.iter().any(|(name, _)| *name == "source")
 }
 
+// --- types used as declared fields -----------------------------------------
+
+/// A struct of the user's own, derived plainly.
+#[derive(Debug, serde::Serialize)]
+pub struct Detail {
+    pub code: u32,
+}
+
+/// The same, but carrying a container attribute. It has to reach the payload
+/// untouched: the definition names the type, and the type's own impl runs.
+#[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Renamed {
+    pub field_name: &'static str,
+}
+
+/// A field that serializes as a map rather than as a struct.
+fn pairs() -> BTreeMap<&'static str, u32> {
+    BTreeMap::from([("a", 1), ("b", 2)])
+}
+
+// --- types used as the source ----------------------------------------------
+
 /// A source that is itself opted in, so its own `context` survives nesting.
 #[suzunari_error(serialize)]
 #[suzu(display("inner failed"))]
 struct InnerError {
-    detail: String,
+    detail: &'static str,
 }
 
 fn inner_error() -> InnerError {
@@ -98,25 +130,22 @@ impl std::fmt::Display for LibError {
 }
 '''
 
-CONTEXT = {
-    ("some", "concrete"): (
-        'label: String = "l".to_owned(), count: u32 = 7',
-        'label: "l", count: 7u32',
-    ),
-    ("some", "option"): (
-        'label: Option<String> = Some("l".to_owned()), count: Option<u32> = None',
-        'label: Some("l".to_owned()), count: None::<u32>',
-    ),
-    ("none", "na"): ("", ""),
+# (rust type, expression). One expression fills both the snafu selector and the
+# hand-written struct, so the two sides start from the same value.
+FIELD_TYPES = {
+    "scalar": ("&'static str", '"l"'),
+    "option": ("Option<u32>", "Some(7u32)"),
+    "serialize_struct": ("Detail", "Detail { code: 3 }"),
+    "container_attributed_struct": ("Renamed", 'Renamed { field_name: "x" }'),
+    "map_like": ("BTreeMap<&'static str, u32>", "pairs()"),
 }
 
-SOURCE_FIELD = {
-    "none": "",
-    "io_error": "source: std::io::Error,",
-    "serialize_type": "source: InnerError,",
-    "boxed": "source: BoxedStackError,",
-    "foreign_serialize": "source: ForeignError,",
-    "display_error": "#[suzu(from)] source: LibError,",
+SOURCE_TYPES = {
+    "io_error": "std::io::Error",
+    "serialize_type": "InnerError",
+    "boxed": "BoxedStackError",
+    "foreign_serialize": "ForeignError",
+    "display_error": "LibError",
 }
 
 LOCATION_FIELD = {
@@ -127,11 +156,58 @@ LOCATION_FIELD = {
 }
 
 
-def body(source, ty, selector):
-    """The test body for one source level."""
+def declared_fields(levels):
+    """The declared fields in order, as (attributes, name, type, expression)."""
+    if levels["DeclaredFields"] == "zero":
+        return []
+
+    ty, value = FIELD_TYPES[levels["FieldType"]]
+    source_false = levels["SourceFalseField"] == "present"
+
+    if levels["DeclaredFields"] == "one":
+        # With the source-named field present it is the only one, so FieldType
+        # describes it.
+        name = "source" if source_false else "label"
+        attrs = "#[suzu(source(false))] " if source_false else ""
+        return [(attrs, name, ty, value)]
+
+    first = ("", "label", ty, value)
+    if source_false:
+        last = ("#[suzu(source(false))] ", "source", "&'static str", '"not-an-error"')
+    else:
+        last = ("", "filler", "u32", "1u32")
+    return [first, last]
+
+
+def source_field(levels):
+    """The source field's tokens, or empty when there is no source."""
+    source = levels["Source"]
     if source == "none":
-        return f'''        fn failing() -> Result<(), {ty}> {{
-            ensure!(false, {selector});
+        return ""
+
+    ty = SOURCE_TYPES[source]
+    named = levels["SourceBinding"] == "named_source"
+    if source == "display_error":
+        # `from` generates the source conversion itself, and conflicts with a
+        # written `source`, so the attribute does the binding either way.
+        return f"#[suzu(from)] {'source' if named else 'cause'}: {ty},"
+    if named:
+        return f"source: {ty},"
+    return f"#[suzu(source)] cause: {ty},"
+
+
+def selector(ty_name, fields):
+    if not fields:
+        return f"{ty_name}Snafu"
+    args = ", ".join(f"{name}: {value}" for _, name, _, value in fields)
+    return f"{ty_name}Snafu {{ {args} }}"
+
+
+def body(levels, ty_name, sel):
+    source = levels["Source"]
+    if source == "none":
+        return f'''        fn failing() -> Result<(), {ty_name}> {{
+            ensure!(false, {sel});
             Ok(())
         }}
         let error = failing().unwrap_err();
@@ -139,7 +215,7 @@ def body(source, ty, selector):
         assert_context_matches(&error);
         assert!(!has_source(&record(&error)));'''
     if source == "io_error":
-        return f'''        let error = std::fs::read(MISSING_PATH).context({selector}).unwrap_err();
+        return f'''        let error = std::fs::read(MISSING_PATH).context({sel}).unwrap_err();
 
         assert_context_matches(&error);
         assert_eq!(
@@ -147,18 +223,28 @@ def body(source, ty, selector):
             &error_node(&io_message())
         );'''
     if source in ("serialize_type", "boxed"):
-        cause = "inner_error()" if source == "serialize_type" else "BoxedStackError::new(inner_error())"
+        cause = (
+            "inner_error()"
+            if source == "serialize_type"
+            else "BoxedStackError::new(inner_error())"
+        )
+        node = "StackErrorNode" if source == "serialize_type" else "BoxedStackErrorNode"
         return f'''        let cause = {cause};
         let standalone = record(&cause);
-        let error = Err::<(), _>(cause).context({selector}).unwrap_err();
+        let error = Err::<(), _>(cause).context({sel}).unwrap_err();
+        let recorded = record(&error);
 
         assert_context_matches(&error);
         // The source is one of ours, so nesting it must not change it.
-        assert_eq!(record(&error).field("source").some(), &standalone);'''
+        assert_eq!(recorded.field("source").some(), &standalone);
+        assert!(matches!(
+            recorded.field("source").some(),
+            Record::Struct {{ name: "{node}", .. }}
+        ));'''
     if source == "foreign_serialize":
         return f'''        let cause = ForeignError {{ code: 7 }};
         let standalone = record(&cause);
-        let error = Err::<(), _>(cause).context({selector}).unwrap_err();
+        let error = Err::<(), _>(cause).context({sel}).unwrap_err();
         let recorded = record(&error);
 
         assert_context_matches(&error);
@@ -167,7 +253,7 @@ def body(source, ty, selector):
         // the foreign type's own fields here.
         assert_ne!(recorded.field("source").some(), &standalone);'''
     if source == "display_error":
-        return f'''        let error = Err::<(), _>(LibError).context({selector}).unwrap_err();
+        return f'''        let error = Err::<(), _>(LibError).context({sel}).unwrap_err();
 
         assert_context_matches(&error);
         assert_eq!(record(&error).field("source").some(), &error_node("lib error"));'''
@@ -175,31 +261,35 @@ def body(source, ty, selector):
 
 
 def main(model):
-    rows = subprocess.run(
-        ["pict", model], capture_output=True, text=True, check=True
-    ).stdout.strip().splitlines()
+    rows = (
+        subprocess.run(["pict", model], capture_output=True, text=True, check=True)
+        .stdout.strip()
+        .splitlines()
+    )
     header = rows[0].split("\t")
     out = [HEADER]
 
     for index, row in enumerate(rows[1:], start=1):
         levels = dict(zip(header, row.split("\t")))
-        declared, field_ty = levels["DeclaredFields"], levels["FieldType"]
-        source, location = levels["Source"], levels["Location"]
-
-        context, args = CONTEXT[(declared, field_ty)]
-        metadata = " ".join(
-            part for part in (SOURCE_FIELD[source], LOCATION_FIELD[location]) if part
+        ty_name = f"Case{index:02}"
+        fields = declared_fields(levels)
+        context = ", ".join(
+            f"{attrs}{name}: {ty} = {value}" for attrs, name, ty, value in fields
         )
-        ty = f"Case{index:02}"
-        selector = f"{ty}Snafu {{ {args} }}" if args else f"{ty}Snafu"
+        metadata = " ".join(
+            part
+            for part in (source_field(levels), LOCATION_FIELD[levels["Location"]])
+            if part
+        )
+        summary = ", ".join(f"{k}={v}" for k, v in levels.items() if v != "na")
 
         out.append(f'''
-/// DeclaredFields={declared}, FieldType={field_ty}, Source={source}, Location={location}
+/// {summary}
 mod case_{index:02} {{
     use super::*;
 
     declare_case! {{
-        error: {ty},
+        error: {ty_name},
         display: "case {index:02}",
         context: {{ {context} }},
         metadata: {{ {metadata} }},
@@ -207,7 +297,7 @@ mod case_{index:02} {{
 
     #[test]
     fn matches_the_hand_written_equivalent() {{
-{body(source, ty, selector)}
+{body(levels, ty_name, selector(ty_name, fields))}
     }}
 }}''')
 
