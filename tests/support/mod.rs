@@ -98,6 +98,18 @@ impl Record {
         }
     }
 
+    /// Whether this is a struct record with no fields, announced or written.
+    pub fn as_empty_struct(&self) -> bool {
+        matches!(
+            self,
+            Record::Struct {
+                announced_len: 0,
+                fields,
+                ..
+            } if fields.is_empty()
+        )
+    }
+
     /// Unwraps an optional field's `Some`.
     ///
     /// Leaving a key out is `skip_serializing_if`'s job, so a key that is

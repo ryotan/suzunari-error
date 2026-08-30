@@ -33,8 +33,8 @@
 
 use crate::attribute::Options;
 use crate::helper::{combine_errors, find_location_field, find_source_field};
-use proc_macro2::{Span, TokenStream};
-use quote::{format_ident, quote};
+use proc_macro2::{Span, TokenStream, TokenTree};
+use quote::{ToTokens, format_ident, quote};
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
@@ -54,6 +54,46 @@ impl Shape<'_> {
     fn is_metadata(&self, ident: &Ident) -> bool {
         *ident == self.location || self.source.as_ref().is_some_and(|source| ident == source)
     }
+
+    /// Whether a declared field's type mentions `param`.
+    ///
+    /// Fields the definition skips do not count: their types never reach a
+    /// `Serialize` call, so a bound on them would only turn away values that
+    /// work. Matching is on the token, which also catches a parameter reached
+    /// through an associated type.
+    fn declares(&self, param: &Ident) -> bool {
+        self.fields
+            .named
+            .iter()
+            .filter(|field| {
+                field
+                    .ident
+                    .as_ref()
+                    .is_some_and(|ident| !self.is_metadata(ident))
+                    && !skips_serializing(field)
+            })
+            .any(|field| mentions_ident(field.ty.to_token_stream(), param))
+    }
+}
+
+/// Whether `tokens` name `wanted` anywhere, groups included.
+///
+/// The recursion is not optional. A type that arrived through a
+/// `macro_rules!` `$ty:ty` capture is re-emitted inside an invisible group, so a
+/// scan of the top level alone finds nothing and silently drops the bound.
+fn mentions_ident(tokens: TokenStream, wanted: &Ident) -> bool {
+    tokens.into_iter().any(|token| match token {
+        TokenTree::Ident(ident) => ident == *wanted,
+        TokenTree::Group(group) => mentions_ident(group.stream(), wanted),
+        _ => false,
+    })
+}
+
+/// Whether a field carries an attribute that keeps it out of the output.
+fn skips_serializing(field: &Field) -> bool {
+    serde_attrs(field)
+        .flat_map(nested_names)
+        .any(|name| name == "skip" || name == "skip_serializing")
 }
 
 /// Generates the `Serialize` impl and the marker impl for `input`.
@@ -162,7 +202,7 @@ pub(crate) fn generate_serialize_impl(
     // derives that generated them know. Naming `Self: StackError` borrows their
     // bounds rather than guessing at them; `Error` carries `Display` along.
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-    let serialize_bounds = serialize_bounds(input, &serde);
+    let serialize_bounds = serialize_bounds(input, &shapes, &serde);
     let outer_where = merge_where(
         where_clause,
         &quote! {
@@ -265,7 +305,7 @@ fn context_definition(
         .params
         .insert(0, syn::parse_quote!('__suzu));
     let (adapter_impl, adapter_ty, _) = adapter_generics.split_for_impl();
-    let serialize_bounds = serialize_bounds(input, serde);
+    let serialize_bounds = serialize_bounds(input, shapes, serde);
     let adapter_where = merge_where(where_clause, &quote! { where #(#serialize_bounds,)* });
 
     // serde spells the same intent differently by shape: on a struct
@@ -455,14 +495,25 @@ pub(crate) fn strip_serde_attrs(input: &mut DeriveInput) {
     }
 }
 
-/// `T: Serialize` for each of the type's parameters.
+/// `T: Serialize` for each parameter a declared field actually uses.
 ///
-/// The same bound serde's own derive infers, which is the point: the payload
+/// The same inference serde's own derive makes, which is the point: the payload
 /// has to match what the user would have got from `#[derive(Serialize)]`.
-fn serialize_bounds(input: &DeriveInput, serde: &TokenStream) -> Vec<TokenStream> {
+///
+/// Bounding every parameter instead would be wrong, not merely wide. A
+/// parameter that only names the source's type is ordinary — `struct
+/// WrapError<T: Error> { source: T }` — and the source is skipped in the
+/// definition, so demanding `Serialize` of it would reject `io::Error`, the
+/// commonest thing to put there.
+fn serialize_bounds(
+    input: &DeriveInput,
+    shapes: &[Shape<'_>],
+    serde: &TokenStream,
+) -> Vec<TokenStream> {
     input
         .generics
         .type_params()
+        .filter(|param| shapes.iter().any(|shape| shape.declares(&param.ident)))
         .map(|param| {
             let ident = &param.ident;
             quote! { #ident: #serde::Serialize }
