@@ -158,6 +158,24 @@ FIELD_TYPES = {
     "serialize_struct": ("Detail", "Detail { code: 3 }"),
     "container_attributed_struct": ("Renamed", 'Renamed { field_name: "x" }'),
     "map_like": ("BTreeMap<&'static str, u32>", "pairs()"),
+    "generic_param": ("T", "9u32"),
+    "borrowed": ("&'a str", '"b"'),
+}
+
+# The parameters on the error type, and the instantiation the test uses. A
+# parameter no field uses does not compile, which is why the model ties these to
+# the field type both ways.
+GENERICS = {
+    "none": ("", ""),
+    "type_param": ("<T: ::core::fmt::Debug>", "<u32>"),
+    "lifetime": ("<'a>", "<'static>"),
+}
+
+# `bound` replaces the bound serde would have inferred, so what it says depends
+# on which parameter there is.
+BOUNDS = {
+    "type_param": "T: serde::Serialize",
+    "lifetime": "&'a str: serde::Serialize",
 }
 
 SOURCE_TYPES = {
@@ -179,7 +197,16 @@ FIELD_ATTRS = {
     "serialize_with": '#[serde(serialize_with = "crate::debug_string")]',
     "flatten": "#[serde(flatten)]",
     "deser_only": '#[serde(alias = "other")]',
+    # Filled in per case: see `field_attr`.
+    "bound": None,
 }
+
+
+def field_attr(levels):
+    """The attribute for the first declared field."""
+    if levels["FieldAttr"] == "bound":
+        return f'#[serde(bound(serialize = "{BOUNDS[levels["Generics"]]}"))]'
+    return FIELD_ATTRS[levels["FieldAttr"]]
 
 LOCATION_FIELD = {
     "injected": "",
@@ -199,7 +226,7 @@ def declared_fields(levels):
 
     ty, value = FIELD_TYPES[levels["FieldType"]]
     source_false = levels["SourceFalseField"] == "present"
-    attr = FIELD_ATTRS[levels["FieldAttr"]]
+    attr = field_attr(levels)
 
     if levels["DeclaredFields"] == "one":
         # With the source-named field present it is the only one, so FieldType
@@ -241,6 +268,7 @@ def selector(ty_name, fields):
 
 
 def body(levels, ty_name, sel):
+    ty_name = ty_name + GENERICS[levels["Generics"]][1]
     source = levels["Source"]
     if source == "none":
         return f'''        fn failing() -> Result<(), {ty_name}> {{
@@ -309,6 +337,7 @@ def main(model):
     for index, row in enumerate(rows[1:], start=1):
         levels = dict(zip(header, row.split("\t")))
         ty_name = f"Case{index:02}"
+        generics, concrete = GENERICS[levels["Generics"]]
         fields = declared_fields(levels)
         context = ", ".join(
             f"[{shared}] [{error_only}] {name}: {ty} = {value}"
@@ -328,6 +357,8 @@ mod case_{index:02} {{
 
     declare_case! {{
         error: {ty_name},
+        generics: {{ {generics} }},
+        concrete: {{ {concrete} }},
         display: "case {index:02}",
         context: {{ {context} }},
         metadata: {{ {metadata} }},

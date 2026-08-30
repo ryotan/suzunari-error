@@ -462,12 +462,18 @@ impl_struct_recorder!(SerializeStruct, SerializeStructVariant);
 /// derive does not compile; there it would have agreed silently with a matching
 /// mistake in the macro. Serde attributes have to be written first.
 macro_rules! declare_case {
-    // Attributes are written in two bracketed groups per field: those the
-    // hand-written struct shares, then those the error type keeps to itself.
-    // The brackets are not decoration — `macro_rules!` cannot tell two adjacent
-    // runs of attributes apart without them.
+    // The full form. `generics` is written into both type declarations;
+    // `concrete` is the instantiation the test uses, since a test needs a type,
+    // not a family of them.
+    //
+    // Attributes come in two bracketed groups per field: those the hand-written
+    // struct shares, then those the error type keeps to itself. The brackets are
+    // not decoration — `macro_rules!` cannot tell two adjacent runs of
+    // attributes apart without them.
     (
         error: $name:ident,
+        generics: { $($generics:tt)* },
+        concrete: { $($concrete:tt)* },
         display: $display:literal,
         context: {
             $(
@@ -482,7 +488,7 @@ macro_rules! declare_case {
         #[allow(dead_code)]
         #[suzunari_error(serialize)]
         #[suzu(display($display))]
-        struct $name {
+        struct $name $($generics)* {
             $(
                 $(#[$shared])*
                 $(#[$error_only])*
@@ -498,7 +504,7 @@ macro_rules! declare_case {
 
             #[allow(dead_code)]
             #[derive(serde::Serialize)]
-            pub struct $name {
+            pub struct $name $($generics)* {
                 $(
                     $(#[$shared])*
                     pub $field: $ty,
@@ -506,12 +512,12 @@ macro_rules! declare_case {
             }
         }
 
-        fn expected_context() -> oracle::$name {
+        fn expected_context() -> oracle::$name $($concrete)* {
             oracle::$name { $($field: $value,)* }
         }
 
         /// The declared fields must record identically through both paths.
-        fn assert_context_matches(error: &$name) {
+        fn assert_context_matches(error: &$name $($concrete)*) {
             assert_eq!(
                 record(error).field("context"),
                 &record(&expected_context())
@@ -519,7 +525,31 @@ macro_rules! declare_case {
         }
     };
 
-    // Shorthand for a case with no attributes on any declared field.
+    // No parameters.
+    (
+        error: $name:ident,
+        display: $display:literal,
+        context: {
+            $(
+                [ $(#[$shared:meta])* ] [ $(#[$error_only:meta])* ]
+                $field:ident : $ty:ty = $value:expr
+            ),* $(,)?
+        },
+        metadata: { $($metadata:tt)* } $(,)?
+    ) => {
+        declare_case! {
+            error: $name,
+            generics: {},
+            concrete: {},
+            display: $display,
+            context: {
+                $( [ $(#[$shared])* ] [ $(#[$error_only])* ] $field: $ty = $value ),*
+            },
+            metadata: { $($metadata)* },
+        }
+    };
+
+    // No parameters and no attributes on any declared field.
     (
         error: $name:ident,
         display: $display:literal,

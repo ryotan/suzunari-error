@@ -51,6 +51,11 @@ DeclaredFields: zero, one, many
 
 # The type of the first declared field. Every field type must also be Debug,
 # which #[suzunari_error] requires independently of serde.
+#
+# Missing: a field whose type is an associated type, such as `T::Item` under
+# `T: Iterator`. It is the only shape that makes the error type's `where` clause
+# load-bearing in the definition — measured, dropping the clause changes nothing
+# for any level here.
 FieldType: scalar, option, borrowed, serialize_struct, container_attributed_struct, map_like, generic_param, na
 
 # The serde attribute on the first declared field. Representatives, not the full
@@ -129,7 +134,5 @@ IF [Generics] = "lifetime" THEN [FieldType] = "borrowed";
 # ---------------------------------------------------------------------------
 
 [TypeShape] = "struct";
-# `bound` needs parameters, so the generics restriction excludes it too.
-[Generics] = "none";
 # An opted-in enum cannot be built as a source either.
 [Source] <> "serialize_enum";
