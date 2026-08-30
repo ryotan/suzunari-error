@@ -515,3 +515,53 @@ mod container_attributes_on_a_nested_struct {
         );
     }
 }
+
+/// A field named `source` that is not the source, alongside a real source under
+/// another name.
+///
+/// This is the combination that a name-based shortcut gets wrong: codegen has to
+/// use snafu's own rule, so that the `source(false)` field lands in `context`
+/// and the renamed one continues the chain.
+///
+/// It is also a live example of why the payload nests rather than flattens.
+/// Both keys are called `source`; they do not collide only because they sit at
+/// different levels. Flattened, one would have silently overwritten the other.
+mod source_named_field_that_is_not_the_source {
+    use super::*;
+
+    #[suzunari_error(serialize)]
+    #[suzu(display("both kinds of source"))]
+    struct BothError {
+        #[suzu(source(false))]
+        source: String,
+        #[suzu(source)]
+        cause: std::io::Error,
+    }
+
+    mod oracle {
+        #[derive(serde::Serialize)]
+        pub struct BothError {
+            pub source: String,
+        }
+    }
+
+    #[test]
+    fn the_declared_one_stays_in_context_and_the_renamed_one_continues_the_chain() {
+        let error = std::fs::read("/nonexistent-suzunari-error")
+            .context(BothSnafu {
+                source: "not-an-error".to_owned(),
+            })
+            .unwrap_err();
+
+        let expected = oracle::BothError {
+            source: "not-an-error".to_owned(),
+        };
+        assert_eq!(record(&error).field("context"), &record(&expected));
+
+        let expected_tail = std::io::Error::from_raw_os_error(2).to_string();
+        assert_eq!(
+            record(&error).field("source").some(),
+            &error_node(&expected_tail)
+        );
+    }
+}
