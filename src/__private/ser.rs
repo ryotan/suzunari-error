@@ -195,6 +195,58 @@ fn next_node(error: &dyn StackError) -> Option<NextNode<'_>> {
 pub trait SerializeAsNode: Serialize {}
 
 // ---------------------------------------------------------------------------
+// Source dispatch — autoref specialization on the marker
+// ---------------------------------------------------------------------------
+
+/// Wraps a source field so the two branches below can compete for it.
+///
+/// Generated code calls
+/// `(&&SourceNodeResolver(&self.source)).source_node()`. Method resolution
+/// tries the specialized impl first — its target carries one more `&` — and
+/// reaches the fallback only when the field's type is not [`SerializeAsNode`].
+///
+/// This is the trait-based form of the autoref specialization the parent module
+/// already uses for `stack_source()`. The `Deref`-based form cannot work here:
+/// the fallback branch has to borrow the value, and a `Deref` target cannot.
+pub struct SourceNodeResolver<'a, T>(pub &'a T);
+
+/// Specialized branch: the field's own `Serialize` impl already emits a node,
+/// so nested levels keep their `context`.
+pub trait ResolveSourceNode {
+    /// What the `source` key serializes as.
+    type Node: Serialize;
+
+    /// Resolves the wrapped source field to its node.
+    fn source_node(&self) -> Self::Node;
+}
+
+impl<'a, T: SerializeAsNode> ResolveSourceNode for &SourceNodeResolver<'a, T> {
+    type Node = &'a T;
+
+    fn source_node(&self) -> Self::Node {
+        self.0
+    }
+}
+
+/// Fallback branch: the field is a plain `Error`, so the chain continues as
+/// phase 2 and every level below it keeps only its `Display` output.
+pub trait ResolveSourceNodeFallback {
+    /// What the `source` key serializes as.
+    type Node: Serialize;
+
+    /// Resolves the wrapped source field to its node.
+    fn source_node(&self) -> Self::Node;
+}
+
+impl<'a, T: Error + 'static> ResolveSourceNodeFallback for SourceNodeResolver<'a, T> {
+    type Node = DynError<'a>;
+
+    fn source_node(&self) -> Self::Node {
+        DynError(self.0)
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Impls for this crate's own types
 // ---------------------------------------------------------------------------
 

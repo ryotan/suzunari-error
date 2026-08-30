@@ -20,6 +20,11 @@ use core::fmt::{Debug, Display};
 #[cfg(feature = "serde")]
 pub mod ser;
 
+// Generated code refers to serde through this re-export, never a bare `::serde`,
+// so downstream crates don't need serde as a direct dependency.
+#[cfg(feature = "serde")]
+pub use serde;
+
 // ---------------------------------------------------------------------------
 // StackSourceResolver — resolves StackError::stack_source()
 // ---------------------------------------------------------------------------
