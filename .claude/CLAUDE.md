@@ -48,6 +48,13 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo test -p suzunari-error-feature-tests --features test-std
 cargo test -p suzunari-error-feature-tests --features test-alloc
 cargo test -p suzunari-error-feature-tests --no-default-features --features test-core-only  # core-only
+
+# The same three tiers with serde. The core-only one is the only place the
+# no-allocation claim can be checked: serde without an allocator has no default
+# `collect_str`, so a serializer has to write the value itself.
+cargo test -p suzunari-error-feature-tests --features test-std,test-serde
+cargo test -p suzunari-error-feature-tests --no-default-features --features test-alloc,test-serde
+cargo test -p suzunari-error-feature-tests --no-default-features --features test-core-only,test-serde
 ```
 
 ## Architecture
