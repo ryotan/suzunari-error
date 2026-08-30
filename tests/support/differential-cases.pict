@@ -1,0 +1,29 @@
+# Factor/level model for the differential cases in tests/serde_differential.rs.
+#
+# This is the subset the macro handles today: structs only, no serde attributes
+# transplanted, std only. The full model in the design document also covers
+# enums, generics and the serde attribute levels; those arrive with the macro's
+# own coverage, and its levels and constraints need reviewing before reuse.
+#
+# Generated with:
+#   pict tests/support/differential-cases.pict
+#
+# The output is committed as the case list in tests/serde_differential.rs, so
+# pict is not needed at build time.
+
+# Whether the type declares any fields of its own. "none" means `context` is an
+# empty object, which is distinct from a type-erased node having no `context`.
+DeclaredFields: some, none
+
+# The type of a declared field. "na" pairs with DeclaredFields = none.
+FieldType: concrete, option, na
+
+# What the source field is, which decides how dispatch resolves it.
+Source: none, io_error, serialize_type, boxed, foreign_serialize, display_error
+
+# How the location field is identified. It must stay out of `context` in every
+# form.
+Location: injected, suzu_named, typed, stack_attr
+
+IF [DeclaredFields] = "none" THEN [FieldType] = "na";
+IF [DeclaredFields] = "some" THEN [FieldType] <> "na";
