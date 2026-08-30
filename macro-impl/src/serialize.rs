@@ -133,9 +133,15 @@ pub(crate) fn generate_serialize_impl(
                 None => node(no_source.clone()),
             }
         }
+        // An enum with no variants cannot be constructed, so there is nothing to
+        // match on. `match *self {}` is how an uninhabited place is matched;
+        // `match self {}` would be a reference, which is not uninhabited.
+        _ if shapes.is_empty() => quote! { match *self {} },
         _ => {
             let arms = shapes.iter().map(|shape| {
-                let variant = shape.variant.expect("enum shapes carry a variant");
+                let Some(variant) = shape.variant else {
+                    unreachable!("shapes built from an enum always carry a variant");
+                };
                 match &shape.source {
                     Some(field) => {
                         let binding = format_ident!("__suzu_source");
@@ -214,13 +220,14 @@ fn shapes(input: &DeriveInput) -> Result<Vec<Shape<'_>>, Error> {
 }
 
 fn shape<'a>(variant: Option<&'a Ident>, fields: &'a FieldsNamed) -> Result<Shape<'a>, Error> {
+    // find_location_field operates on FieldsNamed, so ident is always Some.
+    let Some(location) = find_location_field(fields)?.ident.clone() else {
+        unreachable!("find_location_field operates on FieldsNamed; ident is always present");
+    };
     Ok(Shape {
         variant,
         fields,
-        location: find_location_field(fields)?
-            .ident
-            .clone()
-            .expect("location field comes from FieldsNamed"),
+        location,
         source: find_source_field(fields).and_then(|field| field.ident.clone()),
     })
 }
@@ -285,7 +292,9 @@ fn context_definition(
         }
     } else {
         let variants = shapes.iter().map(|shape| {
-            let variant = shape.variant.expect("enum shapes carry a variant");
+            let Some(variant) = shape.variant else {
+                unreachable!("shapes built from an enum always carry a variant");
+            };
             let mirrored = mirrored_fields(shape);
             quote! { #variant { #(#mirrored,)* } }
         });
@@ -333,7 +342,9 @@ fn mirrored_fields(shape: &Shape<'_>) -> Vec<TokenStream> {
         .named
         .iter()
         .map(|field| {
-            let ident = field.ident.as_ref().expect("FieldsNamed");
+            let Some(ident) = field.ident.as_ref() else {
+                unreachable!("mirrored_fields operates on FieldsNamed; ident is always present");
+            };
             let ty = &field.ty;
             if shape.is_metadata(ident) {
                 return quote! { #[serde(skip)] #ident: #ty };
@@ -365,7 +376,10 @@ fn check_serde_attrs(shape: &Shape<'_>) -> Result<(), Error> {
         .named
         .iter()
         .flat_map(|field| {
-            let metadata = shape.is_metadata(field.ident.as_ref().expect("FieldsNamed"));
+            let Some(ident) = field.ident.as_ref() else {
+                unreachable!("check_serde_attrs operates on FieldsNamed; ident is always present");
+            };
+            let metadata = shape.is_metadata(ident);
             serde_attrs(field).filter_map(move |attr| {
                 if metadata {
                     return Some(Error::new(
@@ -387,6 +401,25 @@ fn check_serde_attrs(shape: &Shape<'_>) -> Result<(), Error> {
         .collect();
 
     combine_errors(errors)
+}
+
+/// The names directly inside one `#[serde(...)]`.
+///
+/// A parse failure yields nothing: serde owns this namespace and reports its
+/// own syntax errors. Here it only decides which of two wordings to use.
+fn nested_names(attr: &Attribute) -> Vec<String> {
+    let Meta::List(list) = &attr.meta else {
+        return Vec::new();
+    };
+    Punctuated::<Meta, Comma>::parse_terminated
+        .parse2(list.tokens.clone())
+        .map(|metas| {
+            metas
+                .iter()
+                .filter_map(|meta| meta.path().get_ident().map(ToString::to_string))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// Where `getter` appears inside one `#[serde(...)]`, if it does.
@@ -478,15 +511,8 @@ fn container_errors(attrs: &[Attribute], on_variant: bool) -> impl Iterator<Item
 /// user is most likely to reach for.
 fn container_message(attr: &Attribute, on_variant: bool) -> String {
     let where_it_is = if on_variant { "a variant" } else { "the type" };
-    let mentions = |name: &str| -> bool {
-        let Meta::List(list) = &attr.meta else {
-            return false;
-        };
-        Punctuated::<Meta, Comma>::parse_terminated
-            .parse2(list.tokens.clone())
-            .map(|metas| metas.iter().any(|meta| meta.path().is_ident(name)))
-            .unwrap_or(false)
-    };
+    let named = nested_names(attr);
+    let mentions = |name: &str| named.iter().any(|nested| nested == name);
 
     if mentions("rename_all") || mentions("rename_all_fields") {
         return format!(
