@@ -34,13 +34,23 @@ readme = "README.md"
 default = ["std"]
 std = ["alloc", "snafu/std"]
 alloc = ["snafu/alloc", "suzunari-error-macro-impl/alloc"]
+# Does not imply alloc: the BoxedStackError impl is confined to the alloc tier
+# only because the type is.
+serde = ["dep:serde"]
 
 [dependencies]
 snafu = { workspace = true, features = ["rust_1_81"] }
 suzunari-error-macro-impl.workspace = true
+serde = { version = "1.0", default-features = false, optional = true, features = [
+  "derive",
+] }
 
 [dev-dependencies]
 trybuild = "=1.0.120"
+serde_json = "1.0"
+# Token-level comparison: catches struct names and field counts that a JSON
+# string comparison hides. Requires std.
+serde_test = "1.0"
 
 # All three use `#[report]`, which needs `std`. Declaring that lets `cargo test
 # --no-default-features` skip them instead of failing to build them.
