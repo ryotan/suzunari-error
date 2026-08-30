@@ -9,3 +9,12 @@ fn compile_fail() {
     t.compile_fail("tests/compile-fail/suzunari_*.rs");
     t.compile_fail("tests/compile-fail/stack_*.rs");
 }
+
+/// The serde cases need the feature: without it they fail on the feature check
+/// instead, with a different message.
+#[cfg(feature = "serde")]
+#[test]
+fn compile_fail_serde() {
+    let t = trybuild::TestCases::new();
+    t.compile_fail("tests/compile-fail/serialize_*.rs");
+}

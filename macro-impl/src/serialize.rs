@@ -75,6 +75,7 @@ pub(crate) fn generate_serialize_impl(
         ));
     }
 
+    check_container_attrs(input)?;
     let shapes = shapes(input)?;
     combine_errors(
         shapes
@@ -445,4 +446,65 @@ fn merge_where(existing: Option<&syn::WhereClause>, extra: &TokenStream) -> Toke
         }
         None => extra.clone(),
     }
+}
+
+/// Rejects `#[serde(...)]` written on the type or on a variant.
+///
+/// The generated definition is a different container than the one the user
+/// annotated. Measured across that level, the attributes are a mixed bag: some
+/// change the payload in a way the type did not ask for, some do nothing at
+/// all, and one fails only at runtime. The level is refused whole rather than
+/// an allowlist maintained, which would have to track serde forever.
+fn check_container_attrs(input: &DeriveInput) -> Result<(), Error> {
+    let mut errors: Vec<Error> = container_errors(&input.attrs, false).collect();
+    if let Data::Enum(data) = &input.data {
+        for variant in &data.variants {
+            errors.extend(container_errors(&variant.attrs, true));
+        }
+    }
+    combine_errors(errors)
+}
+
+fn container_errors(attrs: &[Attribute], on_variant: bool) -> impl Iterator<Item = Error> + '_ {
+    attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("serde"))
+        .map(move |attr| Error::new(attr.span(), container_message(attr, on_variant)))
+}
+
+/// What to say about one rejected container attribute.
+///
+/// Two of them have a specific answer worth giving, since they are the ones a
+/// user is most likely to reach for.
+fn container_message(attr: &Attribute, on_variant: bool) -> String {
+    let where_it_is = if on_variant { "a variant" } else { "the type" };
+    let mentions = |name: &str| -> bool {
+        let Meta::List(list) = &attr.meta else {
+            return false;
+        };
+        Punctuated::<Meta, Comma>::parse_terminated
+            .parse2(list.tokens.clone())
+            .map(|metas| metas.iter().any(|meta| meta.path().is_ident(name)))
+            .unwrap_or(false)
+    };
+
+    if mentions("rename_all") || mentions("rename_all_fields") {
+        return format!(
+            "#[serde(...)] on {where_it_is} is not supported. To rename the declared \
+             fields, write #[suzunari_error(serialize(rename_all = \"...\"))] instead"
+        );
+    }
+    if mentions("rename") {
+        return format!(
+            "#[serde(rename = ...)] on {where_it_is} is not supported. The name reaches \
+             the payload as `type`, which comes from StackError::type_name() and is not \
+             renameable"
+        );
+    }
+    format!(
+        "#[serde(...)] on {where_it_is} is not supported: the definition generated from it \
+         is a different container, where the attribute would either change the payload or \
+         do nothing. Field-level attributes are carried over; renaming is available as \
+         #[suzunari_error(serialize(rename_all = \"...\"))]"
+    )
 }
