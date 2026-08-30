@@ -36,7 +36,7 @@ std = ["alloc", "snafu/std"]
 alloc = ["snafu/alloc", "suzunari-error-macro-impl/alloc"]
 # Does not imply alloc: the BoxedStackError impl is confined to the alloc tier
 # only because the type is.
-serde = ["dep:serde"]
+serde = ["dep:serde", "suzunari-error-macro-impl/serde"]
 
 [dependencies]
 snafu = { workspace = true, features = ["rust_1_81"] }
