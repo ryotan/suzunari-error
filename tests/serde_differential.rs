@@ -661,3 +661,62 @@ mod rename_all {
         );
     }
 }
+
+/// A parameter is bound by `Serialize` only where a declared field uses it.
+///
+/// Bounding every parameter would reject ordinary types: one that names the
+/// source's type is normal, the source is skipped in the definition, and
+/// `io::Error` is the commonest thing to put there. This is the inference serde
+/// makes for its own derive.
+mod parameter_bounds {
+    use super::*;
+
+    /// The parameter names the source's type and nothing else.
+    #[suzunari_error(serialize)]
+    #[suzu(display("wrapping {}", core::any::type_name::<T>()))]
+    struct WrapError<T: core::fmt::Debug + core::error::Error + 'static> {
+        source: T,
+    }
+
+    /// The parameter is a declared field the definition skips.
+    #[suzunari_error(serialize)]
+    #[suzu(display("skipped"))]
+    struct SkipError<T: core::fmt::Debug> {
+        #[serde(skip)]
+        value: T,
+    }
+
+    /// Neither of the above can serialize, and both have to work anyway.
+    #[derive(Debug)]
+    struct NotSerialize;
+
+    #[test]
+    fn a_parameter_only_the_source_uses_needs_none() {
+        let error = std::fs::read("/nonexistent-suzunari-error")
+            .context(WrapSnafu)
+            .unwrap_err();
+        let recorded = record(&error);
+
+        assert!(recorded.field("context").as_empty_struct());
+        assert_eq!(
+            recorded.field("source").some(),
+            &error_node(&std::io::Error::from_raw_os_error(2).to_string())
+        );
+    }
+
+    #[test]
+    fn a_skipped_declared_field_needs_none_either() {
+        fn failing() -> Result<(), SkipError<NotSerialize>> {
+            ensure!(
+                false,
+                SkipSnafu {
+                    value: NotSerialize
+                }
+            );
+            Ok(())
+        }
+
+        let recorded = record(&failing().unwrap_err());
+        assert!(recorded.field("context").as_empty_struct());
+    }
+}
