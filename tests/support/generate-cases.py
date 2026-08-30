@@ -128,6 +128,26 @@ impl std::fmt::Display for LibError {
         f.write_str("lib error")
     }
 }
+
+// --- helpers named by transplanted attributes ------------------------------
+//
+// Referenced by absolute path so they resolve the same from the error type and
+// from the hand-written struct, which sit in different modules.
+
+/// Always true, so `skip_serializing_if` takes the skipping branch. That is the
+/// branch where a definition announcing a field it never writes would show.
+pub fn always_skip<T>(_: &T) -> bool {
+    true
+}
+
+/// Serializes any field through its `Debug`, so one function covers every
+/// `FieldType` level.
+pub fn debug_string<T: std::fmt::Debug, S: serde::Serializer>(
+    value: &T,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.collect_str(&format_args!("{value:?}"))
+}
 '''
 
 # (rust type, expression). One expression fills both the snafu selector and the
@@ -148,6 +168,19 @@ SOURCE_TYPES = {
     "display_error": "LibError",
 }
 
+# The attribute placed on the first declared field. It reaches both the error
+# type and the hand-written struct: on the latter it is plain serde behaviour,
+# which is what the comparison is against.
+FIELD_ATTRS = {
+    "none": "",
+    "rename": '#[serde(rename = "renamed")]',
+    "skip": "#[serde(skip)]",
+    "skip_serializing_if": '#[serde(skip_serializing_if = "crate::always_skip")]',
+    "serialize_with": '#[serde(serialize_with = "crate::debug_string")]',
+    "flatten": "#[serde(flatten)]",
+    "deser_only": '#[serde(alias = "other")]',
+}
+
 LOCATION_FIELD = {
     "injected": "",
     "suzu_named": "#[suzu(location)] at: Location,",
@@ -157,25 +190,29 @@ LOCATION_FIELD = {
 
 
 def declared_fields(levels):
-    """The declared fields in order, as (attributes, name, type, expression)."""
+    """The declared fields in order.
+
+    Each is (shared attributes, error-only attributes, name, type, expression).
+    """
     if levels["DeclaredFields"] == "zero":
         return []
 
     ty, value = FIELD_TYPES[levels["FieldType"]]
     source_false = levels["SourceFalseField"] == "present"
+    attr = FIELD_ATTRS[levels["FieldAttr"]]
 
     if levels["DeclaredFields"] == "one":
         # With the source-named field present it is the only one, so FieldType
-        # describes it.
+        # and FieldAttr describe it.
         name = "source" if source_false else "label"
-        attrs = "#[suzu(source(false))] " if source_false else ""
-        return [(attrs, name, ty, value)]
+        suzu = "#[suzu(source(false))]" if source_false else ""
+        return [(attr, suzu, name, ty, value)]
 
-    first = ("", "label", ty, value)
+    first = (attr, "", "label", ty, value)
     if source_false:
-        last = ("#[suzu(source(false))] ", "source", "&'static str", '"not-an-error"')
+        last = ("", "#[suzu(source(false))]", "source", "&'static str", '"not-an-error"')
     else:
-        last = ("", "filler", "u32", "1u32")
+        last = ("", "", "filler", "u32", "1u32")
     return [first, last]
 
 
@@ -199,7 +236,7 @@ def source_field(levels):
 def selector(ty_name, fields):
     if not fields:
         return f"{ty_name}Snafu"
-    args = ", ".join(f"{name}: {value}" for _, name, _, value in fields)
+    args = ", ".join(f"{name}: {value}" for _, _, name, _, value in fields)
     return f"{ty_name}Snafu {{ {args} }}"
 
 
@@ -274,7 +311,8 @@ def main(model):
         ty_name = f"Case{index:02}"
         fields = declared_fields(levels)
         context = ", ".join(
-            f"{attrs}{name}: {ty} = {value}" for attrs, name, ty, value in fields
+            f"[{shared}] [{error_only}] {name}: {ty} = {value}"
+            for shared, error_only, name, ty, value in fields
         )
         metadata = " ".join(
             part
