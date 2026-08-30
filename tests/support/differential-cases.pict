@@ -1,29 +1,135 @@
-# Factor/level model for the differential cases in tests/serde_differential.rs.
+# Factor/level model for the differential cases.
 #
-# This is the subset the macro handles today: structs only, no serde attributes
-# transplanted, std only. The full model in the design document also covers
-# enums, generics and the serde attribute levels; those arrive with the macro's
-# own coverage, and its levels and constraints need reviewing before reuse.
+# Reviewed against the decisions settled since the design document's first cut,
+# and against what has been measured rather than assumed. Where a level or a
+# constraint came from a measurement, the note says so.
 #
 # Generated with:
 #   pict tests/support/differential-cases.pict
 #
-# The output is committed as the case list in tests/serde_differential.rs, so
-# pict is not needed at build time.
+# The output is committed as the case list, so pict is not needed at build time.
+#
+# ---------------------------------------------------------------------------
+# Two things this model deliberately leaves out
+#
+# Tier is not a factor. The generated code does not vary by tier; only which
+# types exist does, so crossing it with everything would multiply cases to check
+# something that does not change. The suite is run under each feature
+# combination instead. Core-only cannot use the recording serializer, which
+# builds `Vec` and `String`, but it gets the same comparison by a different
+# route: a serializer writing a canonical form into a fixed buffer, with the two
+# sides compared as bytes. It must fail rather than truncate when the buffer
+# fills, or two truncated outputs could match. Core-only runs only the cases
+# whose fixtures need no allocation, and in exchange proves the one thing no
+# other tier can — that `collect_str` forces no allocation, since serde has no
+# default implementation of it there.
+#
+# Which field an attribute lands on is fixed rather than varied: `FieldType` and
+# `FieldAttr` describe the FIRST declared field, and any further declared fields
+# are plain scalars with no attribute. Without that rule `skip` combined with
+# several fields would empty `context` and collide with the zero-field case.
+# The `source`-named field of `SourceFalseField` is always the LAST declared
+# field and counts towards `DeclaredFields`, so "one" plus "present" means that
+# field is the only one and `FieldType` describes it.
+# ---------------------------------------------------------------------------
 
-# Whether the type declares any fields of its own. "none" means `context` is an
-# empty object, which is distinct from a type-erased node having no `context`.
-DeclaredFields: some, none
+# The shape being serialized.
+TypeShape: struct, enum_struct_variant, enum_unit_variant
 
-# The type of a declared field. "na" pairs with DeclaredFields = none.
-FieldType: concrete, option, na
+# Whether the enum also contains a variant of the *other* shape. A unit variant
+# serializes as null under `untagged`, so an enum holding both needs its two
+# variant shapes handled differently within one definition.
+EnumHasOtherShape: na, yes, no
 
-# What the source field is, which decides how dispatch resolves it.
-Source: none, io_error, serialize_type, boxed, foreign_serialize, display_error
+# Parameters on the error type. Both forms are measured to work under
+# #[suzunari_error]; the serialize path currently rejects them.
+Generics: none, type_param, lifetime
+
+# How many fields the type declares. "one" cannot observe field order, which is
+# why "many" exists separately.
+DeclaredFields: zero, one, many
+
+# The type of the first declared field. Every field type must also be Debug,
+# which #[suzunari_error] requires independently of serde.
+FieldType: scalar, option, borrowed, serialize_struct, container_attributed_struct, map_like, generic_param, na
+
+# The serde attribute on the first declared field. Representatives, not the full
+# list: every attribute serde accepts is checked individually in
+# tests/serde_remote_parity.rs, which is what refuses a new one. This factor
+# checks how a behaviour class interacts with everything else.
+#   skip           stands for skip, skip_serializing
+#   serialize_with stands for serialize_with, with
+#   deser_only     stands for alias, default, deserialize_with,
+#                  skip_deserializing, borrow
+FieldAttr: none, rename, skip, skip_serializing_if, serialize_with, flatten, bound, deser_only, na
 
 # How the location field is identified. It must stay out of `context` in every
 # form.
 Location: injected, suzu_named, typed, stack_attr
 
-IF [DeclaredFields] = "none" THEN [FieldType] = "na";
-IF [DeclaredFields] = "some" THEN [FieldType] <> "na";
+# What the source field holds, which decides how dispatch resolves it.
+Source: none, io_error, serialize_type, serialize_enum, boxed, foreign_serialize, display_error
+
+# How the source field is identified. Codegen must use snafu's own rule, not the
+# field's name. For `display_error` the binding comes from #[suzu(from)], which
+# generates the source conversion itself — measured to work under any field
+# name, and to conflict with a written #[snafu(source)].
+SourceBinding: na, named_source, renamed_with_attr
+
+# A field literally named `source` carrying #[snafu(source(false))]. It is a
+# declared field, so it belongs in `context` and must be Serialize. Paired with
+# a renamed real source, this is the combination a name-based shortcut gets
+# wrong.
+# Not weighted. An earlier version of this model gave the construct half the
+# suite, but that came from a constraint since removed as wrong; on the model as
+# it stands it lands at 17%, which is about right for what it is. Weighting was
+# measured and does almost nothing here (17% to 13%), and under the temporary
+# restrictions below it is not even monotonic.
+SourceFalseField: absent, present
+
+IF [DeclaredFields] = "zero" THEN [FieldType] = "na" AND [FieldAttr] = "na";
+IF [DeclaredFields] <> "zero" THEN [FieldType] <> "na" AND [FieldAttr] <> "na";
+
+IF [TypeShape] = "struct" THEN [EnumHasOtherShape] = "na";
+IF [TypeShape] <> "struct" THEN [EnumHasOtherShape] <> "na";
+IF [TypeShape] = "enum_unit_variant" THEN
+    [DeclaredFields] = "zero" AND [Source] = "none"
+    AND [Location] = "injected" AND [SourceFalseField] = "absent";
+
+IF [Source] = "none" THEN [SourceBinding] = "na";
+IF [Source] <> "none" THEN [SourceBinding] <> "na";
+
+# The name `source` is taken by the non-source field, so a real source alongside
+# it has to be bound by an attribute.
+IF [SourceFalseField] = "present" THEN [DeclaredFields] <> "zero";
+IF [SourceFalseField] = "present" AND [Source] <> "none" THEN
+    [SourceBinding] = "renamed_with_attr";
+
+# Measured: flatten turns the whole container into a map, so the field has to
+# serialize as one.
+IF [FieldAttr] = "flatten" THEN
+    [FieldType] IN {"serialize_struct", "container_attributed_struct", "map_like"};
+
+# bound replaces an inferred bound, so it is only meaningful with parameters.
+IF [FieldAttr] = "bound" THEN [Generics] <> "none";
+
+# Both ways round. A parameter no field uses does not compile, so a parameter
+# implies the matching field type just as much as the field type implies the
+# parameter — which also rules out parameters with no declared fields at all.
+IF [FieldType] = "generic_param" THEN [Generics] = "type_param";
+IF [Generics] = "type_param" THEN [FieldType] = "generic_param";
+IF [FieldType] = "borrowed" THEN [Generics] = "lifetime";
+IF [Generics] = "lifetime" THEN [FieldType] = "borrowed";
+
+# ---------------------------------------------------------------------------
+# What the macro cannot do yet.
+#
+# Delete a line as the feature lands; pict then reports one fewer excluded
+# level, so its warning doubles as the remaining work.
+# ---------------------------------------------------------------------------
+
+[TypeShape] = "struct";
+[Generics] = "none";
+IF [DeclaredFields] <> "zero" THEN [FieldAttr] = "none";
+# An opted-in enum cannot be built as a source either.
+[Source] <> "serialize_enum";
