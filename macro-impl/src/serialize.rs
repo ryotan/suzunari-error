@@ -31,6 +31,7 @@
 //! specialized branch resolves each to its own — there is no single type the
 //! `source` field could have.
 
+use crate::attribute::Options;
 use crate::helper::{combine_errors, find_location_field, find_source_field};
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
@@ -62,6 +63,7 @@ impl Shape<'_> {
 pub(crate) fn generate_serialize_impl(
     input: &DeriveInput,
     crate_path: &TokenStream,
+    options: &Options,
 ) -> Result<TokenStream, Error> {
     // A proc-macro cannot see the features of the crate invoking it, only its
     // own — hence the mirrored feature on this crate. Without this check the
@@ -87,7 +89,7 @@ pub(crate) fn generate_serialize_impl(
     // `#[serde(crate = ...)]` takes a string, so the path is spelled twice.
     let serde_str = quote!(#serde).to_string();
 
-    let context_items = context_definition(&shapes, input, &serde, &serde_str);
+    let context_items = context_definition(&shapes, input, options, &serde, &serde_str);
     let adapter = format_ident!("__SuzuContext");
 
     let node = |source: TokenStream| {
@@ -234,6 +236,7 @@ fn shape<'a>(variant: Option<&'a Ident>, fields: &'a FieldsNamed) -> Result<Shap
 fn context_definition(
     shapes: &[Shape<'_>],
     input: &DeriveInput,
+    options: &Options,
     serde: &TokenStream,
     serde_str: &str,
 ) -> TokenStream {
@@ -257,10 +260,24 @@ fn context_definition(
     let serialize_bounds = serialize_bounds(input, serde);
     let adapter_where = merge_where(where_clause, &quote! { where #(#serialize_bounds,)* });
 
+    // serde spells the same intent differently by shape: on a struct
+    // `rename_all` renames fields, on an enum it renames variants — which
+    // `untagged` never emits — and `rename_all_fields` renames the fields.
+    // Measured. The option stays one spelling; picking serde's is this macro's
+    // job, and there is nothing else in the payload it could mean.
+    let rename_struct = options
+        .rename_all
+        .as_ref()
+        .map(|case| quote! { , rename_all = #case });
+    let rename_enum = options
+        .rename_all
+        .as_ref()
+        .map(|case| quote! { , rename_all_fields = #case });
+
     let body = if matches!(input.data, Data::Struct(_)) {
         let mirrored = mirrored_fields(&shapes[0]);
         quote! {
-            #[serde(remote = #remote, rename = #remote)]
+            #[serde(remote = #remote, rename = #remote #rename_struct)]
             struct #def #impl_generics #where_clause {
                 #(#mirrored,)*
             }
@@ -275,7 +292,7 @@ fn context_definition(
             // `untagged`: the variant's name is already in `type`, so a wrapper
             // here would repeat it. A variant whose fields are all skipped
             // serializes as `{}`, matching a struct that declares nothing.
-            #[serde(remote = #remote, rename = #remote, untagged)]
+            #[serde(remote = #remote, rename = #remote, untagged #rename_enum)]
             enum #def #impl_generics #where_clause {
                 #(#variants,)*
             }

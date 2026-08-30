@@ -565,3 +565,99 @@ mod source_named_field_that_is_not_the_source {
         );
     }
 }
+
+/// `serialize(rename_all = …)` renames the declared fields, and nothing else.
+///
+/// serde spells the same intent differently by shape — `rename_all` on a
+/// struct, `rename_all_fields` on an enum, where plain `rename_all` renames
+/// variants that `untagged` never emits. Measured, and the reason the option
+/// stays one spelling.
+mod rename_all {
+    use super::*;
+
+    #[suzunari_error(serialize(rename_all = "camelCase"))]
+    #[suzu(display("struct case"))]
+    struct StructError {
+        file_path: &'static str,
+        nested: Plain,
+    }
+
+    /// A field type of the user's own, with no case setting. Its keys must not
+    /// be touched: `rename_all` is per container, and this is another one.
+    #[derive(Debug, serde::Serialize)]
+    struct Plain {
+        inner_field: u32,
+    }
+
+    #[suzunari_error(serialize(rename_all = "camelCase"))]
+    enum EnumError {
+        #[suzu(display("read"))]
+        ReadFailed { file_path: &'static str },
+        #[suzu(display("missing"))]
+        Missing,
+    }
+
+    fn struct_error() -> StructError {
+        fn failing() -> Result<(), StructError> {
+            ensure!(
+                false,
+                StructSnafu {
+                    file_path: "/p",
+                    nested: Plain { inner_field: 1 },
+                }
+            );
+            Ok(())
+        }
+        failing().unwrap_err()
+    }
+
+    #[test]
+    fn it_renames_declared_fields_only() {
+        let recorded = record(&struct_error());
+        let context = recorded.field("context");
+
+        assert!(context.has_field("filePath"));
+        assert!(!context.has_field("file_path"));
+        // The nested type is a container of its own and keeps its own names.
+        assert!(context.field("nested").has_field("inner_field"));
+
+        // The envelope is untouched. Its keys are fields of `StackErrorNode`,
+        // which no user attribute reaches.
+        for key in ["type", "message", "location", "context"] {
+            assert!(recorded.has_field(key), "missing {key}");
+        }
+        assert!(recorded.field("location").has_field("file"));
+    }
+
+    #[test]
+    fn an_enum_renames_variant_fields_not_variants() {
+        fn read() -> Result<(), EnumError> {
+            ensure!(false, ReadFailedSnafu { file_path: "/p" });
+            Ok(())
+        }
+        fn missing() -> Result<(), EnumError> {
+            ensure!(false, MissingSnafu);
+            Ok(())
+        }
+
+        let read = record(&read().unwrap_err());
+        assert!(read.field("context").has_field("filePath"));
+        // The variant reaches the payload through `type`, which is not
+        // renameable — it comes from `type_name()`.
+        assert_eq!(
+            read.field("type"),
+            &Record::Str("EnumError::ReadFailed".to_owned())
+        );
+
+        // A variant that declares nothing still gets an empty context.
+        let missing = record(&missing().unwrap_err());
+        assert_eq!(
+            missing.field("context"),
+            &Record::Struct {
+                name: "EnumError",
+                announced_len: 0,
+                fields: Vec::new(),
+            }
+        );
+    }
+}
