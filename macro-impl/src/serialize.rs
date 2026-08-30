@@ -43,13 +43,6 @@ pub(crate) fn generate_serialize_impl(
         ));
     }
 
-    if !input.generics.params.is_empty() {
-        return Err(Error::new(
-            input.generics.span(),
-            "#[suzunari_error(serialize)] does not support generic types yet",
-        ));
-    }
-
     let fields = match &input.data {
         Data::Struct(data) => match &data.fields {
             Fields::Named(fields) => fields,
@@ -78,8 +71,14 @@ pub(crate) fn generate_serialize_impl(
 
     check_serde_attrs(fields, &location, source.as_ref())?;
 
-    let (context_items, context_value) =
-        context_parts(fields, name, &location, source.as_ref(), &serde, &serde_str);
+    let (context_items, context_value) = context_parts(
+        fields,
+        input,
+        &location,
+        source.as_ref(),
+        &serde,
+        &serde_str,
+    );
     let source_value = match &source {
         // Autoref specialization: the specialized branch keys on the crate's
         // marker, never on `Serialize` alone. A foreign error that merely
@@ -93,11 +92,23 @@ pub(crate) fn generate_serialize_impl(
         None => quote! { ::core::option::Option::<()>::None },
     };
 
+    // The impl needs whatever `Display` and `StackError` need, which only the
+    // derives that generated them know. Naming `Self: StackError` borrows their
+    // bounds rather than guessing at them; `Error` carries `Display` along.
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let serialize_bounds = serialize_bounds(input, &serde);
+    let bounds = quote! {
+        where
+            Self: #crate_path::StackError,
+            #(#serialize_bounds,)*
+    };
+    let outer_where = merge_where(where_clause, &bounds);
+
     Ok(quote! {
         const _: () = {
             #context_items
 
-            impl #serde::Serialize for #name {
+            impl #impl_generics #serde::Serialize for #name #ty_generics #outer_where {
                 fn serialize<__S>(&self, serializer: __S) -> ::core::result::Result<__S::Ok, __S::Error>
                 where
                     __S: #serde::Serializer,
@@ -118,7 +129,7 @@ pub(crate) fn generate_serialize_impl(
                 }
             }
 
-            impl #ser::SerializeAsNode for #name {}
+            impl #impl_generics #ser::SerializeAsNode for #name #ty_generics #outer_where {}
         };
     })
 }
@@ -134,12 +145,13 @@ pub(crate) fn generate_serialize_impl(
 /// one (`BoxedStackError` forwards `type_name()` to the value it holds).
 fn context_parts(
     fields: &FieldsNamed,
-    name: &Ident,
+    input: &DeriveInput,
     location: &Ident,
     source: Option<&Ident>,
     serde: &TokenStream,
     serde_str: &str,
 ) -> (TokenStream, TokenStream) {
+    let name = &input.ident;
     let is_metadata =
         |ident: &Ident| ident == location || source.is_some_and(|source| ident == source);
 
@@ -159,7 +171,22 @@ fn context_parts(
 
     let def = format_ident!("__SuzuContextDef");
     let adapter = format_ident!("__SuzuContext");
+    // serde wants the bare path: naming the parameters is rejected with
+    // "remove generic parameters from this path".
     let remote = name.to_string();
+
+    let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    // The adapter holds a borrow, so it needs a lifetime of its own on top of
+    // whatever the error type already has.
+    let mut adapter_generics = generics.clone();
+    adapter_generics
+        .params
+        .insert(0, syn::parse_quote!('__suzu));
+    let (adapter_impl, adapter_ty, _) = adapter_generics.split_for_impl();
+    let serialize_bounds = serialize_bounds(input, serde);
+    let adapter_where = merge_where(where_clause, &quote! { where #(#serialize_bounds,)* });
 
     let items = quote! {
         // `rename` is required: a definition's own identifier is what reaches
@@ -168,15 +195,15 @@ fn context_parts(
         #[derive(#serde::Serialize)]
         #[serde(crate = #serde_str)]
         #[serde(remote = #remote, rename = #remote)]
-        struct #def {
+        struct #def #impl_generics #where_clause {
             #(#mirrored,)*
         }
 
         /// Carries the borrow that the generated `serialize` needs; the
         /// definition itself is not a `Serialize` impl for the error type.
-        struct #adapter<'__suzu>(&'__suzu #name);
+        struct #adapter #adapter_generics (&'__suzu #name #ty_generics) #where_clause;
 
-        impl #serde::Serialize for #adapter<'_> {
+        impl #adapter_impl #serde::Serialize for #adapter #adapter_ty #adapter_where {
             fn serialize<__S>(&self, serializer: __S) -> ::core::result::Result<__S::Ok, __S::Error>
             where
                 __S: #serde::Serializer,
@@ -271,5 +298,31 @@ pub(crate) fn strip_serde_attrs(input: &mut DeriveInput) {
         Data::Struct(data) => strip(&mut data.fields),
         Data::Enum(data) => data.variants.iter_mut().for_each(|v| strip(&mut v.fields)),
         Data::Union(_) => {}
+    }
+}
+
+/// `T: Serialize` for each of the type's parameters.
+///
+/// The same bound serde's own derive infers, which is the point: the payload
+/// has to match what the user would have got from `#[derive(Serialize)]`.
+fn serialize_bounds(input: &DeriveInput, serde: &TokenStream) -> Vec<TokenStream> {
+    input
+        .generics
+        .type_params()
+        .map(|param| {
+            let ident = &param.ident;
+            quote! { #ident: #serde::Serialize }
+        })
+        .collect()
+}
+
+/// Appends predicates to a `where` clause that may not exist yet.
+fn merge_where(existing: Option<&syn::WhereClause>, extra: &TokenStream) -> TokenStream {
+    match existing {
+        Some(clause) => {
+            let predicates = &clause.predicates;
+            quote! { #extra #predicates }
+        }
+        None => extra.clone(),
     }
 }
