@@ -11,6 +11,9 @@
 //! express "the same as this other value". So this records the serde data model
 //! into a comparable tree instead.
 
+// Shared by several test binaries, each of which uses a different part.
+#![allow(dead_code, unused_macros)]
+
 use serde::{Serialize, Serializer};
 use std::fmt::Display;
 
