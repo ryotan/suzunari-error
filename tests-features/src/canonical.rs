@@ -62,18 +62,11 @@ impl serde::ser::Error for Error {
 pub struct Buffer<'a> {
     bytes: &'a mut [u8],
     written: usize,
-    /// Set when a write did not fit, so that a `fmt::Error` — which carries
-    /// nothing — can be reported as the overflow it was.
-    overflowed: bool,
 }
 
 impl<'a> Buffer<'a> {
     pub fn new(bytes: &'a mut [u8]) -> Self {
-        Buffer {
-            bytes,
-            written: 0,
-            overflowed: false,
-        }
+        Buffer { bytes, written: 0 }
     }
 
     /// What has been written so far.
@@ -84,7 +77,6 @@ impl<'a> Buffer<'a> {
     fn put(&mut self, text: &str) -> Result<(), Error> {
         let end = self.written + text.len();
         if end > self.bytes.len() {
-            self.overflowed = true;
             return Err(Error::Overflow);
         }
         self.bytes[self.written..end].copy_from_slice(text.as_bytes());

@@ -33,7 +33,45 @@
 //! |---------|---------|----------|
 //! | `std`   | Yes     | `alloc` + [`StackReport`]'s [`Termination`](std::process::Termination) impl + [`#[report]`](macro@report) macro |
 //! | `alloc` | via `std` | [`BoxedStackError`] + `From<T> for BoxedStackError` generation |
+//! | `serde` | No      | `impl Serialize` for types opted in with [`#[suzunari_error(serialize)]`](macro@suzunari_error), and for [`BoxedStackError`] |
 //! | _(none)_ | —      | Core-only: [`Location`], [`StackError`], [`StackReport`] (formatting only), [`DisplayError`] |
+//!
+//! `serde` does not imply `alloc`: the [`BoxedStackError`] impl is confined to
+//! that tier only because the type is.
+//!
+//! # Serialization
+//!
+//! With the `serde` feature, `#[suzunari_error(serialize)]` generates an
+//! `impl Serialize` that emits the error chain as a nested payload, carrying the
+//! same levels [`StackReport`] prints:
+//!
+//! ```json
+//! {
+//!   "type": "FetchError",
+//!   "message": "fetch failed for /foo",
+//!   "location": { "file": "src/fetch.rs", "line": 12, "column": 9 },
+//!   "context": { "uri": "/foo" },
+//!   "source": { "message": "No such file or directory (os error 2)" }
+//! }
+//! ```
+//!
+//! - `context` holds the type's own declared fields, and is present even when
+//!   there are none. It is absent only where the concrete type was erased —
+//!   through [`BoxedStackError`] — and the fields cannot be read
+//! - `source` is omitted when there is no cause
+//! - A cause that is not one of this crate's types continues the chain with
+//!   `message` alone, whatever else it can serialize. Its own `Serialize` never
+//!   replaces the node, which would drop everything below it
+//!
+//! A declared field's own `#[serde(...)]` applies as it would on a struct
+//! derived directly. `#[serde(...)]` on the type or on a variant is refused; the
+//! one setting worth having is available as
+//! `#[suzunari_error(serialize(rename_all = "camelCase"))]`, which renames the
+//! declared fields and nothing else.
+//!
+//! **The payload carries file paths, line numbers and every message in the
+//! chain.** That is the point of it, and it means the payload is diagnostic
+//! detail: decide deliberately before sending one across a trust boundary.
 //!
 //! # `#[suzu(...)]` Attribute
 //!

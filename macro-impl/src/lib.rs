@@ -63,9 +63,21 @@ pub fn derive_stack_error(input: TokenStream) -> TokenStream {
 /// # Options
 ///
 /// - **`serialize`**: also generates `impl serde::Serialize`, emitting the error
-///   chain as a nested envelope. Requires the crate's `serde` feature. Opt-in
-///   per type, because error types with non-`Serialize` fields are normal and
+///   chain as a nested payload. Requires the crate's `serde` feature. Opt-in per
+///   type, because error types with non-`Serialize` fields are normal and
 ///   because cargo feature unification would otherwise infect the whole graph.
+///   - **`serialize(rename_all = "...")`** renames the declared fields, taking
+///     the same cases serde does. It is the only container-level setting
+///     accepted: `#[serde(...)]` on the type or on a variant is refused, because
+///     the definition generated from it is a different container. One spelling
+///     covers both shapes — serde needs `rename_all` on a struct and
+///     `rename_all_fields` on an enum, where plain `rename_all` would rename
+///     variants that never reach the payload.
+///
+/// A declared field's own `#[serde(...)]` is carried into the generated
+/// definition and applies as it would on a struct derived directly. Two are
+/// refused: anything on the `source` or `location` field, which the definition
+/// skips, and `getter`, which serde accepts only inside a remote definition.
 #[proc_macro_attribute]
 pub fn suzunari_error(attr: TokenStream, item: TokenStream) -> TokenStream {
     suzunari_error_impl(attr.into(), item.into())
