@@ -88,6 +88,16 @@ impl Record {
         }
     }
 
+    /// Whether a struct record carries the named field at all.
+    pub fn has_field(&self, name: &str) -> bool {
+        match self {
+            Record::Struct { fields, .. } | Record::StructVariant { fields, .. } => {
+                fields.iter().any(|(field, _)| *field == name)
+            }
+            _ => false,
+        }
+    }
+
     /// Unwraps an optional field's `Some`.
     ///
     /// Leaving a key out is `skip_serializing_if`'s job, so a key that is
