@@ -104,6 +104,22 @@ fn inner_error() -> InnerError {
     failing().unwrap_err()
 }
 
+/// An opted-in enum used as a source, so the variant's own `context` has to
+/// survive nesting just as a struct's does.
+#[suzunari_error(serialize)]
+enum InnerEnumError {
+    #[suzu(display("inner enum failed"))]
+    Failed { detail: &'static str },
+}
+
+fn inner_enum_error() -> InnerEnumError {
+    fn failing() -> Result<(), InnerEnumError> {
+        ensure!(false, FailedSnafu { detail: "d" });
+        Ok(())
+    }
+    failing().unwrap_err()
+}
+
 /// A foreign error that happens to derive `Serialize`. Dispatch must not let
 /// its own fields replace the node.
 #[derive(Debug, serde::Serialize)]
@@ -181,6 +197,7 @@ BOUNDS = {
 SOURCE_TYPES = {
     "io_error": "std::io::Error",
     "serialize_type": "InnerError",
+    "serialize_enum": "InnerEnumError",
     "boxed": "BoxedStackError",
     "foreign_serialize": "ForeignError",
     "display_error": "LibError",
@@ -260,11 +277,13 @@ def source_field(levels):
     return f"#[suzu(source)] cause: {ty},"
 
 
-def selector(ty_name, fields):
+def selector(levels, ty_name, fields):
+    """The snafu context selector. For an enum it is named after the variant."""
+    base = "UnderSnafu" if levels["TypeShape"] != "struct" else f"{ty_name}Snafu"
     if not fields:
-        return f"{ty_name}Snafu"
+        return base
     args = ", ".join(f"{name}: {value}" for _, _, name, _, value in fields)
-    return f"{ty_name}Snafu {{ {args} }}"
+    return f"{base} {{ {args} }}"
 
 
 def body(levels, ty_name, sel):
@@ -287,13 +306,13 @@ def body(levels, ty_name, sel):
             record(&error).field("source").some(),
             &error_node(&io_message())
         );'''
-    if source in ("serialize_type", "boxed"):
-        cause = (
-            "inner_error()"
-            if source == "serialize_type"
-            else "BoxedStackError::new(inner_error())"
-        )
-        node = "StackErrorNode" if source == "serialize_type" else "BoxedStackErrorNode"
+    if source in ("serialize_type", "serialize_enum", "boxed"):
+        cause = {
+            "serialize_type": "inner_error()",
+            "serialize_enum": "inner_enum_error()",
+            "boxed": "BoxedStackError::new(inner_error())",
+        }[source]
+        node = "BoxedStackErrorNode" if source == "boxed" else "StackErrorNode"
         return f'''        let cause = {cause};
         let standalone = record(&cause);
         let error = Err::<(), _>(cause).context({sel}).unwrap_err();
@@ -325,6 +344,49 @@ def body(levels, ty_name, sel):
     raise ValueError(source)
 
 
+# The extra variant added when the enum also holds the other shape. It is never
+# the one being serialized; it exists so the definition has to handle both.
+OTHER_VARIANT = {
+    "enum_struct_variant": '#[suzu(display("other"))] Other,',
+    "enum_unit_variant": '#[suzu(display("other"))] Other { note: u32 },',
+}
+
+
+def declaration(levels, index, ty_name, generics, concrete, context, metadata):
+    """The `declare_case!` invocation for one case."""
+    shape = levels["TypeShape"]
+    others = OTHER_VARIANT[shape] if levels["EnumHasOtherShape"] == "yes" else ""
+
+    if shape == "enum_unit_variant":
+        # The model forces zero declared fields, no source and an injected
+        # location here, so there is nothing else to write.
+        return f"""    declare_case! {{
+        error: {ty_name},
+        unit_variant: Under,
+        others: {{ {others} }},
+        display: "case {index:02}",
+    }}"""
+    if shape == "enum_struct_variant":
+        return f"""    declare_case! {{
+        error: {ty_name},
+        variant: Under,
+        others: {{ {others} }},
+        generics: {{ {generics} }},
+        concrete: {{ {concrete} }},
+        display: "case {index:02}",
+        context: {{ {context} }},
+        metadata: {{ {metadata} }},
+    }}"""
+    return f"""    declare_case! {{
+        error: {ty_name},
+        generics: {{ {generics} }},
+        concrete: {{ {concrete} }},
+        display: "case {index:02}",
+        context: {{ {context} }},
+        metadata: {{ {metadata} }},
+    }}"""
+
+
 def main(model):
     rows = (
         subprocess.run(["pict", model], capture_output=True, text=True, check=True)
@@ -350,23 +412,17 @@ def main(model):
         )
         summary = ", ".join(f"{k}={v}" for k, v in levels.items() if v != "na")
 
+        decl = declaration(levels, index, ty_name, generics, concrete, context, metadata)
         out.append(f'''
 /// {summary}
 mod case_{index:02} {{
     use super::*;
 
-    declare_case! {{
-        error: {ty_name},
-        generics: {{ {generics} }},
-        concrete: {{ {concrete} }},
-        display: "case {index:02}",
-        context: {{ {context} }},
-        metadata: {{ {metadata} }},
-    }}
+{decl}
 
     #[test]
     fn matches_the_hand_written_equivalent() {{
-{body(levels, ty_name, selector(ty_name, fields))}
+{body(levels, ty_name, selector(levels, ty_name, fields))}
     }}
 }}''')
 

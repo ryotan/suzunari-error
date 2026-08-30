@@ -125,14 +125,3 @@ IF [FieldType] = "generic_param" THEN [Generics] = "type_param";
 IF [Generics] = "type_param" THEN [FieldType] = "generic_param";
 IF [FieldType] = "borrowed" THEN [Generics] = "lifetime";
 IF [Generics] = "lifetime" THEN [FieldType] = "borrowed";
-
-# ---------------------------------------------------------------------------
-# What the macro cannot do yet.
-#
-# Delete a line as the feature lands; pict then reports one fewer excluded
-# level, so its warning doubles as the remaining work.
-# ---------------------------------------------------------------------------
-
-[TypeShape] = "struct";
-# An opted-in enum cannot be built as a source either.
-[Source] <> "serialize_enum";
