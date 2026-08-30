@@ -9,7 +9,8 @@ use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::{Colon, Comma};
 use syn::{
-    Data, DeriveInput, Error, Field, FieldModifiers, Fields, FieldsNamed, Meta, Visibility,
+    Data, DeriveInput, Error, Expr, ExprLit, Field, FieldModifiers, Fields, FieldsNamed, Lit,
+    LitStr, Meta, MetaList, Visibility,
 };
 
 /// Implementation of `#[suzunari_error]`.
@@ -98,7 +99,7 @@ pub(crate) fn suzunari_error_impl(
     // generated definition, and the error type itself has no Serialize derive
     // to accept them.
     let serialize_impl = if options.serialize {
-        let generated = serialize::generate_serialize_impl(&input, &crate_path)?;
+        let generated = serialize::generate_serialize_impl(&input, &crate_path, &options)?;
         serialize::strip_serde_attrs(&mut input);
         generated
     } else {
@@ -115,8 +116,15 @@ pub(crate) fn suzunari_error_impl(
 /// Options accepted by `#[suzunari_error(...)]` itself, as opposed to the
 /// `#[suzu(...)]` attributes that appear on the type and its fields.
 #[derive(Default)]
-struct Options {
+pub(crate) struct Options {
     serialize: bool,
+    /// The case to convert declared field names to.
+    ///
+    /// Re-exposed here rather than read from a type-level `#[serde(...)]`,
+    /// which is rejected: the generated definition is a different container
+    /// than the one the user annotated. It is the only renaming there is —
+    /// `type` comes from `type_name()`, and the envelope's own keys are fixed.
+    pub(crate) rename_all: Option<LitStr>,
 }
 
 impl Options {
@@ -143,6 +151,10 @@ impl Options {
                     options.serialize = true;
                     None
                 }
+                Meta::List(list) if list.path.is_ident("serialize") => {
+                    options.serialize = true;
+                    options.parse_serialize(list).err()
+                }
                 _ => Some(Error::new(
                     meta.span(),
                     "unknown #[suzunari_error] option; the only option is `serialize`. \
@@ -153,6 +165,35 @@ impl Options {
         combine_errors(errors)?;
 
         Ok(options)
+    }
+
+    /// The arguments inside `serialize(...)`.
+    fn parse_serialize(&mut self, list: &MetaList) -> Result<(), Error> {
+        let metas = list.parse_args_with(Punctuated::<Meta, Comma>::parse_terminated)?;
+
+        let errors = metas
+            .iter()
+            .filter_map(|meta| match meta {
+                Meta::NameValue(pair) if pair.path.is_ident("rename_all") => match &pair.value {
+                    Expr::Lit(ExprLit {
+                        lit: Lit::Str(value),
+                        ..
+                    }) => {
+                        self.rename_all = Some(value.clone());
+                        None
+                    }
+                    other => Some(Error::new(
+                        other.span(),
+                        "`rename_all` takes a string, such as \"camelCase\"",
+                    )),
+                },
+                _ => Some(Error::new(
+                    meta.span(),
+                    "unknown `serialize` argument; the only one is `rename_all`",
+                )),
+            })
+            .collect();
+        combine_errors(errors)
     }
 }
 
