@@ -90,7 +90,6 @@ fn context_object_does_not_leak_the_definition_name() {
             serde_test::Token::U32(location.column()),
             serde_test::Token::StructEnd,
             serde_test::Token::Str("context"),
-            serde_test::Token::Some,
             // Not `__SuzuContextDef`.
             serde_test::Token::Struct {
                 name: "LookupError",
@@ -227,7 +226,6 @@ fn empty_context_is_distinct_from_an_erased_one() {
             serde_test::Token::U32(location.column()),
             serde_test::Token::StructEnd,
             serde_test::Token::Str("context"),
-            serde_test::Token::Some,
             serde_test::Token::Struct {
                 name: "BareError",
                 len: 0,

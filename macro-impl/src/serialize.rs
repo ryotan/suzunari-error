@@ -176,8 +176,5 @@ fn context_parts(
         }
     };
 
-    (
-        items,
-        quote! { ::core::option::Option::Some(#adapter(self)) },
-    )
+    (items, quote! { #adapter(self) })
 }

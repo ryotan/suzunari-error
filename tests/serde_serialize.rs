@@ -95,6 +95,37 @@ fn omits_source_when_there_is_no_cause() {
     assert_eq!(value["type"], "LeafError");
     assert!(value.get("source").is_none());
     assert!(value.get("context").is_none());
+
+    // The shortest node there is: no `context` because the type is erased, no
+    // `source` because there is no cause.
+    let boxed = BoxedStackError::new(leaf().unwrap_err());
+    let location = boxed.location();
+    serde_test::assert_ser_tokens(
+        &boxed,
+        &[
+            serde_test::Token::Struct {
+                name: "BoxedStackErrorNode",
+                len: 3,
+            },
+            serde_test::Token::Str("type"),
+            serde_test::Token::Str("LeafError"),
+            serde_test::Token::Str("message"),
+            serde_test::Token::Str("no cause"),
+            serde_test::Token::Str("location"),
+            serde_test::Token::Struct {
+                name: "Location",
+                len: 3,
+            },
+            serde_test::Token::Str("file"),
+            serde_test::Token::Str(location.file()),
+            serde_test::Token::Str("line"),
+            serde_test::Token::U32(location.line()),
+            serde_test::Token::Str("column"),
+            serde_test::Token::U32(location.column()),
+            serde_test::Token::StructEnd,
+            serde_test::Token::StructEnd,
+        ],
+    );
 }
 
 /// Struct names and field counts, which a JSON string comparison discards.
@@ -111,9 +142,8 @@ fn node_struct_names_and_field_counts() {
     serde_test::assert_ser_tokens(
         &boxed,
         &[
-            // context is skipped: 5 declared fields, 4 emitted.
             serde_test::Token::Struct {
-                name: "StackErrorNode",
+                name: "BoxedStackErrorNode",
                 len: 4,
             },
             serde_test::Token::Str("type"),

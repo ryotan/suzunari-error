@@ -9,12 +9,17 @@
 //! The payload mirrors [`StackReport`](crate::StackReport)'s two phases, so the
 //! human-readable and machine-readable outputs show the same information:
 //!
-//! - [`StackErrorNode`] — phase 1, an error implementing
-//!   [`StackError`](crate::StackError): `type`, `message`, `location`, and
-//!   `context` when the concrete type is known.
+//! - [`StackErrorNode`] — phase 1, concrete type known: `type`, `message`,
+//!   `location`, `context`.
+//! - [`BoxedStackErrorNode`] — phase 1, reached through a type-erased boundary:
+//!   the same minus `context`, because the declared fields are unreachable.
 //! - [`ErrorNode`] — phase 2, a plain [`Error`] tail: `message` only.
 //!
-//! Both are `#[derive(Serialize)]` structs that the adapters below fill in.
+//! The split is deliberate. An absent `context` and an empty one mean different
+//! things, and `type` cannot separate them: an erased node still has a type
+//! name, because the erasure forwards `type_name()` to the value it holds.
+//!
+//! All three are `#[derive(Serialize)]` structs that the adapters below fill in.
 //! Nothing here calls `serialize_struct` by hand: a hand-written impl must also
 //! call `skip_field` for every field it omits, and forgetting that is invisible
 //! in JSON.
@@ -83,11 +88,12 @@ fn serialize_location<S: Serializer>(
 // Node shapes
 // ---------------------------------------------------------------------------
 
-/// Phase 1 node: an error that implements [`StackError`](crate::StackError).
+/// Phase 1 node for an error whose concrete type is known.
 ///
-/// Generic over its parts so that both the type-erased walk
-/// ([`DynStackError`]) and generated code build the same field set in the same
-/// order.
+/// `context` is not optional here. A concrete type always has one — empty when
+/// it declares no fields of its own — and making that a type-level fact is what
+/// keeps it from being conflated with [`BoxedStackErrorNode`], where the fields
+/// exist but are unreachable.
 #[derive(Serialize)]
 pub struct StackErrorNode<M, C, Src> {
     /// `StackError::type_name()` — `"Type"` or `"Enum::Variant"`.
@@ -98,12 +104,32 @@ pub struct StackErrorNode<M, C, Src> {
     /// Where the error was constructed.
     #[serde(serialize_with = "serialize_location")]
     pub location: Location,
-    /// The type's declared fields. `None` when the concrete type is erased.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub context: Option<C>,
+    /// The type's declared fields.
+    pub context: C,
     /// The next node in the chain. `None` when there is no cause.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<Src>,
+}
+
+/// Phase 1 node for an error reached through a type-erased boundary.
+///
+/// Identical to [`StackErrorNode`] minus `context`: only `&dyn StackError` is
+/// available, so the declared fields cannot be read. It carries no type
+/// parameters because both the message and the continuation are fixed by that.
+#[derive(Serialize)]
+pub struct BoxedStackErrorNode<'a> {
+    /// `StackError::type_name()`, forwarded from the value behind the erasure —
+    /// so this is the wrapped error's name, never the wrapper's.
+    #[serde(rename = "type")]
+    pub type_name: &'static str,
+    /// The error's `Display` output.
+    pub message: Message<'a, dyn StackError + 'a>,
+    /// Where the error was constructed.
+    #[serde(serialize_with = "serialize_location")]
+    pub location: Location,
+    /// The next node in the chain. `None` when there is no cause.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<NextNode<'a>>,
 }
 
 /// Phase 2 node: a plain [`Error`] tail, with no location information.
@@ -134,19 +160,17 @@ pub enum NextNode<'a> {
 // Trait-object adapters
 // ---------------------------------------------------------------------------
 
-/// Serializes a `&dyn StackError` as a [`StackErrorNode`] and walks the chain.
-///
-/// The concrete type is not available, so `context` is omitted.
+/// Serializes a `&dyn StackError` as a [`BoxedStackErrorNode`] and walks the
+/// chain. The concrete type is not available, so there is no `context` to emit.
 pub struct DynStackError<'a>(pub &'a dyn StackError);
 
 impl Serialize for DynStackError<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let error = self.0;
-        StackErrorNode::<_, (), _> {
+        BoxedStackErrorNode {
             type_name: error.type_name(),
             message: Message(error),
             location: error.location(),
-            context: None,
             source: next_node(error),
         }
         .serialize(serializer)
