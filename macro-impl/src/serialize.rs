@@ -15,15 +15,45 @@
 //! metadata fields rather than a subset: omitting fields does not compile for
 //! enums, and `skip` additionally lifts the `Serialize` bound on the skipped
 //! field, which is what lets a non-`Serialize` source through.
+//!
+//! # Enums
+//!
+//! The definition is `untagged`, so a variant contributes no wrapper of its own
+//! — the variant's name already reaches the payload as part of `type`.
+//!
+//! A variant that declares nothing still produces `{}` rather than `null`,
+//! because `#[suzunari_error]` gives every unit variant an injected location
+//! field first. A definition with a genuine unit variant does serialize as
+//! `null` under `untagged`, but that shape never gets here.
+//!
+//! The node is built once per variant rather than once with the source chosen
+//! inside it. Two variants can hold sources of different types, and the
+//! specialized branch resolves each to its own — there is no single type the
+//! `source` field could have.
 
 use crate::helper::{combine_errors, find_location_field, find_source_field};
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Comma;
 use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, FieldsNamed, Ident, Meta};
+
+/// One struct, or one variant of an enum: the fields, and which of them are
+/// metadata rather than declared.
+struct Shape<'a> {
+    variant: Option<&'a Ident>,
+    fields: &'a FieldsNamed,
+    location: Ident,
+    source: Option<Ident>,
+}
+
+impl Shape<'_> {
+    fn is_metadata(&self, ident: &Ident) -> bool {
+        *ident == self.location || self.source.as_ref().is_some_and(|source| ident == source)
+    }
+}
 
 /// Generates the `Serialize` impl and the marker impl for `input`.
 ///
@@ -43,19 +73,13 @@ pub(crate) fn generate_serialize_impl(
         ));
     }
 
-    let fields = match &input.data {
-        Data::Struct(data) => match &data.fields {
-            Fields::Named(fields) => fields,
-            _ => unreachable!("#[suzunari_error] already rejected non-named fields"),
-        },
-        Data::Enum(_) => {
-            return Err(Error::new(
-                input.ident.span(),
-                "#[suzunari_error(serialize)] does not support enums yet",
-            ));
-        }
-        Data::Union(_) => unreachable!("unions are rejected before this point"),
-    };
+    let shapes = shapes(input)?;
+    combine_errors(
+        shapes
+            .iter()
+            .filter_map(|shape| check_serde_attrs(shape).err())
+            .collect(),
+    )?;
 
     let name = &input.ident;
     let serde = quote! { #crate_path::__private::serde };
@@ -63,33 +87,66 @@ pub(crate) fn generate_serialize_impl(
     // `#[serde(crate = ...)]` takes a string, so the path is spelled twice.
     let serde_str = quote!(#serde).to_string();
 
-    let location = find_location_field(fields)?
-        .ident
-        .clone()
-        .expect("location field comes from FieldsNamed");
-    let source = find_source_field(fields).and_then(|field| field.ident.clone());
+    let context_items = context_definition(&shapes, input, &serde, &serde_str);
+    let adapter = format_ident!("__SuzuContext");
 
-    check_serde_attrs(fields, &location, source.as_ref())?;
-
-    let (context_items, context_value) = context_parts(
-        fields,
-        input,
-        &location,
-        source.as_ref(),
-        &serde,
-        &serde_str,
-    );
-    let source_value = match &source {
-        // Autoref specialization: the specialized branch keys on the crate's
-        // marker, never on `Serialize` alone. A foreign error that merely
-        // derives `Serialize` would otherwise be inlined raw, producing a node
-        // with no `type`, `message` or `location`.
-        Some(field) => quote! {
-            ::core::option::Option::Some(
-                (&&#ser::SourceNodeResolver(&self.#field)).source_node()
+    let node = |source: TokenStream| {
+        quote! {
+            #serde::Serialize::serialize(
+                &#ser::StackErrorNode {
+                    type_name: <Self as #crate_path::StackError>::type_name(self),
+                    message: #ser::Message(self),
+                    location: <Self as #crate_path::StackError>::location(self),
+                    context: #adapter(self),
+                    source: #source,
+                },
+                serializer,
             )
-        },
-        None => quote! { ::core::option::Option::<()>::None },
+        }
+    };
+    // Autoref specialization: the specialized branch keys on the crate's
+    // marker, never on `Serialize` alone. A foreign error that merely derives
+    // `Serialize` would otherwise be inlined raw, producing a node with no
+    // `type`, `message` or `location`.
+    let resolve = |binding: &Ident| {
+        quote! {
+            ::core::option::Option::Some(
+                (&&#ser::SourceNodeResolver(#binding)).source_node()
+            )
+        }
+    };
+    let no_source = quote! { ::core::option::Option::<()>::None };
+
+    let dispatch = match &input.data {
+        Data::Struct(_) => {
+            let shape = &shapes[0];
+            match &shape.source {
+                Some(field) => {
+                    let binding = format_ident!("__suzu_source");
+                    let bind = quote! { let #binding = &self.#field; };
+                    let node = node(resolve(&binding));
+                    quote! { #bind #node }
+                }
+                None => node(no_source.clone()),
+            }
+        }
+        _ => {
+            let arms = shapes.iter().map(|shape| {
+                let variant = shape.variant.expect("enum shapes carry a variant");
+                match &shape.source {
+                    Some(field) => {
+                        let binding = format_ident!("__suzu_source");
+                        let node = node(resolve(&binding));
+                        quote! { Self::#variant { #field: #binding, .. } => { #node } }
+                    }
+                    None => {
+                        let node = node(no_source.clone());
+                        quote! { Self::#variant { .. } => { #node } }
+                    }
+                }
+            });
+            quote! { match self { #(#arms)* } }
+        }
     };
 
     // The impl needs whatever `Display` and `StackError` need, which only the
@@ -97,12 +154,14 @@ pub(crate) fn generate_serialize_impl(
     // bounds rather than guessing at them; `Error` carries `Display` along.
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let serialize_bounds = serialize_bounds(input, &serde);
-    let bounds = quote! {
-        where
-            Self: #crate_path::StackError,
-            #(#serialize_bounds,)*
-    };
-    let outer_where = merge_where(where_clause, &bounds);
+    let outer_where = merge_where(
+        where_clause,
+        &quote! {
+            where
+                Self: #crate_path::StackError,
+                #(#serialize_bounds,)*
+        },
+    );
 
     Ok(quote! {
         const _: () = {
@@ -116,16 +175,7 @@ pub(crate) fn generate_serialize_impl(
                     use #ser::ResolveSourceNode as _;
                     use #ser::ResolveSourceNodeFallback as _;
 
-                    #serde::Serialize::serialize(
-                        &#ser::StackErrorNode {
-                            type_name: <Self as #crate_path::StackError>::type_name(self),
-                            message: #ser::Message(self),
-                            location: <Self as #crate_path::StackError>::location(self),
-                            context: #context_value,
-                            source: #source_value,
-                        },
-                        serializer,
-                    )
+                    #dispatch
                 }
             }
 
@@ -134,8 +184,46 @@ pub(crate) fn generate_serialize_impl(
     })
 }
 
+/// Splits the input into one shape per struct or variant.
+fn shapes(input: &DeriveInput) -> Result<Vec<Shape<'_>>, Error> {
+    match &input.data {
+        Data::Struct(data) => match &data.fields {
+            Fields::Named(fields) => Ok(vec![shape(None, fields)?]),
+            _ => unreachable!("#[suzunari_error] already rejected non-named fields"),
+        },
+        Data::Enum(data) => {
+            let mut shapes = Vec::new();
+            let mut errors = Vec::new();
+            for variant in &data.variants {
+                match &variant.fields {
+                    Fields::Named(fields) => match shape(Some(&variant.ident), fields) {
+                        Ok(shape) => shapes.push(shape),
+                        Err(error) => errors.push(error),
+                    },
+                    _ => unreachable!("#[suzunari_error] already rejected non-named fields"),
+                }
+            }
+            combine_errors(errors)?;
+            Ok(shapes)
+        }
+        Data::Union(_) => unreachable!("unions are rejected before this point"),
+    }
+}
+
+fn shape<'a>(variant: Option<&'a Ident>, fields: &'a FieldsNamed) -> Result<Shape<'a>, Error> {
+    Ok(Shape {
+        variant,
+        fields,
+        location: find_location_field(fields)?
+            .ident
+            .clone()
+            .expect("location field comes from FieldsNamed"),
+        source: find_source_field(fields).and_then(|field| field.ident.clone()),
+    })
+}
+
 /// Builds the `remote` definition plus the adapter that lets it sit in the
-/// node's `context` field, and the expression that fills that field.
+/// node's `context` field.
 ///
 /// A type that declares no fields of its own — only the injected `location` —
 /// still gets a definition, which serializes as an empty object. `context` is
@@ -143,32 +231,13 @@ pub(crate) fn generate_serialize_impl(
 /// whose concrete type was erased, where the fields exist but are unreachable.
 /// `type` cannot carry that distinction, because a type-erased node still has
 /// one (`BoxedStackError` forwards `type_name()` to the value it holds).
-fn context_parts(
-    fields: &FieldsNamed,
+fn context_definition(
+    shapes: &[Shape<'_>],
     input: &DeriveInput,
-    location: &Ident,
-    source: Option<&Ident>,
     serde: &TokenStream,
     serde_str: &str,
-) -> (TokenStream, TokenStream) {
+) -> TokenStream {
     let name = &input.ident;
-    let is_metadata =
-        |ident: &Ident| ident == location || source.is_some_and(|source| ident == source);
-
-    // A complete mirror: every field is present, and the metadata ones are
-    // skipped. A declared field's own `#[serde(...)]` comes along unchanged —
-    // the definition's fields are the same fields, so an attribute means there
-    // what it would have meant on a struct the user derived directly.
-    let mirrored = fields.named.iter().map(|field| {
-        let ident = field.ident.as_ref().expect("FieldsNamed");
-        let ty = &field.ty;
-        if is_metadata(ident) {
-            return quote! { #[serde(skip)] #ident: #ty };
-        }
-        let attrs = serde_attrs(field);
-        quote! { #(#attrs)* #ident: #ty }
-    });
-
     let def = format_ident!("__SuzuContextDef");
     let adapter = format_ident!("__SuzuContext");
     // serde wants the bare path: naming the parameters is rejected with
@@ -188,16 +257,38 @@ fn context_parts(
     let serialize_bounds = serialize_bounds(input, serde);
     let adapter_where = merge_where(where_clause, &quote! { where #(#serialize_bounds,)* });
 
-    let items = quote! {
+    let body = if matches!(input.data, Data::Struct(_)) {
+        let mirrored = mirrored_fields(&shapes[0]);
+        quote! {
+            #[serde(remote = #remote, rename = #remote)]
+            struct #def #impl_generics #where_clause {
+                #(#mirrored,)*
+            }
+        }
+    } else {
+        let variants = shapes.iter().map(|shape| {
+            let variant = shape.variant.expect("enum shapes carry a variant");
+            let mirrored = mirrored_fields(shape);
+            quote! { #variant { #(#mirrored,)* } }
+        });
+        quote! {
+            // `untagged`: the variant's name is already in `type`, so a wrapper
+            // here would repeat it. A variant whose fields are all skipped
+            // serializes as `{}`, matching a struct that declares nothing.
+            #[serde(remote = #remote, rename = #remote, untagged)]
+            enum #def #impl_generics #where_clause {
+                #(#variants,)*
+            }
+        }
+    };
+
+    quote! {
         // `rename` is required: a definition's own identifier is what reaches
         // `serialize_struct` as the struct name. JSON discards struct names,
         // so without this the leak survives until a `Token`-level comparison.
         #[derive(#serde::Serialize)]
         #[serde(crate = #serde_str)]
-        #[serde(remote = #remote, rename = #remote)]
-        struct #def #impl_generics #where_clause {
-            #(#mirrored,)*
-        }
+        #body
 
         /// Carries the borrow that the generated `serialize` needs; the
         /// definition itself is not a `Serialize` impl for the error type.
@@ -211,9 +302,28 @@ fn context_parts(
                 #def::serialize(self.0, serializer)
             }
         }
-    };
+    }
+}
 
-    (items, quote! { #adapter(self) })
+/// A complete mirror: every field is present, and the metadata ones are
+/// skipped. A declared field's own `#[serde(...)]` comes along unchanged — the
+/// definition's fields are the same fields, so an attribute means there what it
+/// would have meant on a struct the user derived directly.
+fn mirrored_fields(shape: &Shape<'_>) -> Vec<TokenStream> {
+    shape
+        .fields
+        .named
+        .iter()
+        .map(|field| {
+            let ident = field.ident.as_ref().expect("FieldsNamed");
+            let ty = &field.ty;
+            if shape.is_metadata(ident) {
+                return quote! { #[serde(skip)] #ident: #ty };
+            }
+            let attrs = serde_attrs(field);
+            quote! { #(#attrs)* #ident: #ty }
+        })
+        .collect()
 }
 
 /// The field's own `#[serde(...)]` attributes.
@@ -231,20 +341,13 @@ fn serde_attrs(field: &Field) -> impl Iterator<Item = &Attribute> {
 /// cannot go anywhere: serde rejects it outside a `remote` definition, so a
 /// user writing it would fail on the struct they could have written by hand
 /// while succeeding here — and it changes where the value is read from.
-fn check_serde_attrs(
-    fields: &FieldsNamed,
-    location: &Ident,
-    source: Option<&Ident>,
-) -> Result<(), Error> {
-    let is_metadata =
-        |ident: &Ident| ident == location || source.is_some_and(|source| ident == source);
-
-    let errors = fields
+fn check_serde_attrs(shape: &Shape<'_>) -> Result<(), Error> {
+    let errors = shape
+        .fields
         .named
         .iter()
         .flat_map(|field| {
-            let ident = field.ident.as_ref().expect("FieldsNamed");
-            let metadata = is_metadata(ident);
+            let metadata = shape.is_metadata(field.ident.as_ref().expect("FieldsNamed"));
             serde_attrs(field).filter_map(move |attr| {
                 if metadata {
                     return Some(Error::new(
@@ -272,7 +375,7 @@ fn check_serde_attrs(
 ///
 /// A parse failure is ignored: serde owns this namespace and reports its own
 /// syntax errors once the attribute reaches the definition.
-fn getter_span(attr: &Attribute) -> Option<proc_macro2::Span> {
+fn getter_span(attr: &Attribute) -> Option<Span> {
     let Meta::List(list) = &attr.meta else {
         return None;
     };

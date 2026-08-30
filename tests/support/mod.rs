@@ -462,9 +462,11 @@ impl_struct_recorder!(SerializeStruct, SerializeStructVariant);
 /// derive does not compile; there it would have agreed silently with a matching
 /// mistake in the macro. Serde attributes have to be written first.
 macro_rules! declare_case {
-    // The full form. `generics` is written into both type declarations;
-    // `concrete` is the instantiation the test uses, since a test needs a type,
-    // not a family of them.
+    // A struct.
+    //
+    // `generics` is written into both type declarations; `concrete` is the
+    // instantiation the test uses, since a test needs a type, not a family of
+    // them.
     //
     // Attributes come in two bracketed groups per field: those the hand-written
     // struct shares, then those the error type keeps to itself. The brackets are
@@ -497,32 +499,66 @@ macro_rules! declare_case {
             $($metadata)*
         }
 
-        mod oracle {
-            // Needed only when a declared field's type is not in the prelude.
-            #[allow(unused_imports)]
-            use super::*;
+        declare_case!(@oracle $name, { $($generics)* }, { $($concrete)* },
+            $( [ $(#[$shared])* ] $field : $ty = $value ),* );
+    };
 
-            #[allow(dead_code)]
-            #[derive(serde::Serialize)]
-            pub struct $name $($generics)* {
+    // An enum, with the declared fields on the variant under test.
+    //
+    // The hand-written side stays a plain struct: `untagged` means the variant
+    // serializes as though it were one, under the enum's own name.
+    (
+        error: $name:ident,
+        variant: $variant:ident,
+        others: { $($others:tt)* },
+        generics: { $($generics:tt)* },
+        concrete: { $($concrete:tt)* },
+        display: $display:literal,
+        context: {
+            $(
+                [ $(#[$shared:meta])* ] [ $(#[$error_only:meta])* ]
+                $field:ident : $ty:ty = $value:expr
+            ),* $(,)?
+        },
+        metadata: { $($metadata:tt)* } $(,)?
+    ) => {
+        #[allow(dead_code)]
+        #[suzunari_error(serialize)]
+        enum $name $($generics)* {
+            #[suzu(display($display))]
+            $variant {
                 $(
                     $(#[$shared])*
-                    pub $field: $ty,
+                    $(#[$error_only])*
+                    $field: $ty,
                 )*
-            }
+                $($metadata)*
+            },
+            $($others)*
         }
 
-        fn expected_context() -> oracle::$name $($concrete)* {
-            oracle::$name { $($field: $value,)* }
+        declare_case!(@oracle $name, { $($generics)* }, { $($concrete)* },
+            $( [ $(#[$shared])* ] $field : $ty = $value ),* );
+    };
+
+    // An enum whose variant under test is a unit variant. It declares nothing
+    // and takes no source, so `context` comes out empty — the same as a struct
+    // that declares nothing, which is the point of covering it.
+    (
+        error: $name:ident,
+        unit_variant: $variant:ident,
+        others: { $($others:tt)* },
+        display: $display:literal $(,)?
+    ) => {
+        #[allow(dead_code)]
+        #[suzunari_error(serialize)]
+        enum $name {
+            #[suzu(display($display))]
+            $variant,
+            $($others)*
         }
 
-        /// The declared fields must record identically through both paths.
-        fn assert_context_matches(error: &$name $($concrete)*) {
-            assert_eq!(
-                record(error).field("context"),
-                &record(&expected_context())
-            );
-        }
+        declare_case!(@oracle $name, {}, {},);
     };
 
     // No parameters.
@@ -561,6 +597,38 @@ macro_rules! declare_case {
             display: $display,
             context: { $( [] [] $field: $ty = $value ),* },
             metadata: { $($metadata)* },
+        }
+    };
+
+    // The hand-written struct and the comparison, shared by every shape above.
+    (@oracle $name:ident, { $($generics:tt)* }, { $($concrete:tt)* },
+        $( [ $(#[$shared:meta])* ] $field:ident : $ty:ty = $value:expr ),*
+    ) => {
+        mod oracle {
+            // Needed only when a declared field's type is not in the prelude.
+            #[allow(unused_imports)]
+            use super::*;
+
+            #[allow(dead_code)]
+            #[derive(serde::Serialize)]
+            pub struct $name $($generics)* {
+                $(
+                    $(#[$shared])*
+                    pub $field: $ty,
+                )*
+            }
+        }
+
+        fn expected_context() -> oracle::$name $($concrete)* {
+            oracle::$name { $($field: $value,)* }
+        }
+
+        /// The declared fields must record identically through both paths.
+        fn assert_context_matches(error: &$name $($concrete)*) {
+            assert_eq!(
+                record(error).field("context"),
+                &record(&expected_context())
+            );
         }
     };
 }
