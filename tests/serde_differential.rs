@@ -354,3 +354,164 @@ mod no_source {
         assert!(!fields.iter().any(|(name, _)| *name == "source"));
     }
 }
+
+/// A declared field holding a struct of the user's own that derives
+/// `Serialize`.
+///
+/// Unlike the source field, a declared field has no dispatch: whatever it holds
+/// serializes through its own impl, which is the whole point of `context`. The
+/// "a foreign `Serialize` impl must not replace the node" rule applies to
+/// `source` alone, where replacing the node would cut the chain short.
+mod declared_field_is_a_serialize_struct {
+    use super::*;
+
+    // `Debug` because `#[suzunari_error]` derives it on the error type, which
+    // is a requirement the crate already had; `Serialize` is what `context`
+    // needs.
+    #[derive(Debug, serde::Serialize)]
+    struct Request {
+        method: String,
+        path: String,
+    }
+
+    #[suzunari_error(serialize)]
+    #[suzu(display("request rejected"))]
+    struct RejectedError {
+        request: Request,
+        retries: u32,
+    }
+
+    mod oracle {
+        use super::Request;
+
+        #[derive(serde::Serialize)]
+        pub struct RejectedError {
+            pub request: Request,
+            pub retries: u32,
+        }
+    }
+
+    fn request() -> Request {
+        Request {
+            method: "GET".to_owned(),
+            path: "/v1".to_owned(),
+        }
+    }
+
+    fn reject() -> Result<(), RejectedError> {
+        ensure!(
+            false,
+            RejectedSnafu {
+                request: request(),
+                retries: 2u32,
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn it_nests_through_its_own_impl() {
+        let error = reject().unwrap_err();
+
+        let expected = oracle::RejectedError {
+            request: request(),
+            retries: 2,
+        };
+
+        assert_eq!(record(&error).field("context"), &record(&expected));
+
+        // And it really is nested, not flattened into `context`.
+        let recorded = record(&error);
+        let nested = recorded.field("context").field("request");
+        assert!(matches!(
+            nested,
+            Record::Struct {
+                name: "Request",
+                ..
+            }
+        ));
+    }
+}
+
+/// Container-level serde attributes on a struct used as a declared field.
+///
+/// They apply normally. The type is the user's own and carries its own
+/// `#[derive(Serialize)]`, so nothing about it passes through the generated
+/// definition — the definition only names the field and lets the type's own
+/// impl run. The rule that rejects container attributes on the error type is
+/// about the definition being a *different container* than the one annotated,
+/// which does not arise here.
+mod container_attributes_on_a_nested_struct {
+    use super::*;
+
+    #[derive(Debug, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Renamed {
+        request_id: String,
+        retry_count: u32,
+    }
+
+    /// `transparent` makes the struct serialize as its single field, so the
+    /// declared field becomes a bare string rather than an object.
+    #[derive(Debug, serde::Serialize)]
+    #[serde(transparent)]
+    struct Wrapped {
+        inner: String,
+    }
+
+    #[suzunari_error(serialize)]
+    #[suzu(display("nested attributes"))]
+    struct NestedError {
+        renamed: Renamed,
+        wrapped: Wrapped,
+    }
+
+    mod oracle {
+        use super::{Renamed, Wrapped};
+
+        #[derive(serde::Serialize)]
+        pub struct NestedError {
+            pub renamed: Renamed,
+            pub wrapped: Wrapped,
+        }
+    }
+
+    fn parts() -> (Renamed, Wrapped) {
+        (
+            Renamed {
+                request_id: "r1".to_owned(),
+                retry_count: 2,
+            },
+            Wrapped {
+                inner: "w".to_owned(),
+            },
+        )
+    }
+
+    fn fail() -> Result<(), NestedError> {
+        let (renamed, wrapped) = parts();
+        ensure!(false, NestedSnafu { renamed, wrapped });
+        Ok(())
+    }
+
+    #[test]
+    fn they_apply_exactly_as_they_would_on_their_own() {
+        let error = fail().unwrap_err();
+        let (renamed, wrapped) = parts();
+
+        let expected = oracle::NestedError { renamed, wrapped };
+        assert_eq!(record(&error).field("context"), &record(&expected));
+
+        // rename_all reached the nested field names.
+        let recorded = record(&error);
+        let nested = recorded.field("context").field("renamed");
+        assert!(nested.has_field("requestId"));
+        assert!(!nested.has_field("request_id"));
+
+        // transparent collapsed the struct to its single field.
+        assert_eq!(
+            recorded.field("context").field("wrapped"),
+            &Record::Str("w".to_owned())
+        );
+    }
+}
