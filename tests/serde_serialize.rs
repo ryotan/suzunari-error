@@ -1,0 +1,149 @@
+//! Serialization of error chains through the type-erased `BoxedStackError`.
+//!
+//! These tests cover the macro-independent half of the serde feature: the node
+//! shapes and the chain walk. Because the concrete type is erased here, no node
+//! carries `context` — that arrives with `#[suzunari_error(serialize)]`.
+
+#![cfg(feature = "serde")]
+
+use suzunari_error::*;
+
+#[suzunari_error]
+#[suzu(display("read failed for {path}"))]
+struct ReadError {
+    path: String,
+    source: std::io::Error,
+}
+
+#[suzunari_error]
+#[suzu(display("fetch failed"))]
+struct FetchError {
+    source: BoxedStackError,
+}
+
+fn read_error() -> ReadError {
+    std::fs::read("/nonexistent-suzunari-error")
+        .context(ReadSnafu {
+            path: "/nonexistent-suzunari-error",
+        })
+        .unwrap_err()
+}
+
+/// A `StackError` followed by a plain `Error` tail: phase 1 then phase 2.
+#[test]
+fn serializes_stack_error_then_plain_error_tail() {
+    let boxed = BoxedStackError::new(read_error());
+    let value = serde_json::to_value(&boxed).unwrap();
+
+    assert_eq!(value["type"], "ReadError");
+    assert_eq!(
+        value["message"],
+        "read failed for /nonexistent-suzunari-error"
+    );
+    assert!(
+        value["location"]["file"]
+            .as_str()
+            .unwrap()
+            .ends_with("serde_serialize.rs")
+    );
+    assert!(value["location"]["line"].is_number());
+    assert!(value["location"]["column"].is_number());
+
+    // The concrete type is erased by BoxedStackError, so `path` is unreachable.
+    assert!(value.get("context").is_none());
+
+    // Phase 2: the io::Error tail carries a message and nothing else.
+    let tail = &value["source"];
+    assert!(tail["message"].as_str().unwrap().contains("os error 2"));
+    assert!(tail.get("type").is_none());
+    assert!(tail.get("location").is_none());
+    assert!(tail.get("source").is_none());
+}
+
+/// Two `StackError` levels: the chain must not truncate at the erased boundary.
+#[test]
+fn serializes_nested_stack_errors() {
+    let inner = BoxedStackError::new(read_error());
+    let outer = Err::<(), _>(inner).context(FetchSnafu).unwrap_err();
+    let value = serde_json::to_value(BoxedStackError::new(outer)).unwrap();
+
+    assert_eq!(value["type"], "FetchError");
+    assert_eq!(value["source"]["type"], "ReadError");
+    assert!(value["source"]["location"]["line"].is_number());
+    assert!(
+        value["source"]["source"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("os error 2")
+    );
+}
+
+/// An error with no cause omits `source` rather than emitting null.
+#[test]
+fn omits_source_when_there_is_no_cause() {
+    #[suzunari_error]
+    #[suzu(display("no cause"))]
+    struct LeafError {}
+
+    fn leaf() -> Result<(), LeafError> {
+        ensure!(false, LeafSnafu);
+        Ok(())
+    }
+
+    let value = serde_json::to_value(BoxedStackError::new(leaf().unwrap_err())).unwrap();
+
+    assert_eq!(value["type"], "LeafError");
+    assert!(value.get("source").is_none());
+    assert!(value.get("context").is_none());
+}
+
+/// Struct names and field counts, which a JSON string comparison discards.
+///
+/// Guards two things JSON cannot show: that the `Location` remote definition
+/// does not leak its own identifier (`LocationDef`) into the data model, and
+/// that the two node shapes stay distinguishable rather than one reusing the
+/// other's struct name for a different field set.
+#[test]
+fn node_struct_names_and_field_counts() {
+    let boxed = BoxedStackError::new(read_error());
+    let location = boxed.location();
+
+    serde_test::assert_ser_tokens(
+        &boxed,
+        &[
+            // context is skipped: 5 declared fields, 4 emitted.
+            serde_test::Token::Struct {
+                name: "StackErrorNode",
+                len: 4,
+            },
+            serde_test::Token::Str("type"),
+            serde_test::Token::Str("ReadError"),
+            serde_test::Token::Str("message"),
+            serde_test::Token::Str("read failed for /nonexistent-suzunari-error"),
+            serde_test::Token::Str("location"),
+            serde_test::Token::Struct {
+                name: "Location",
+                len: 3,
+            },
+            serde_test::Token::Str("file"),
+            serde_test::Token::Str(location.file()),
+            serde_test::Token::Str("line"),
+            serde_test::Token::U32(location.line()),
+            serde_test::Token::Str("column"),
+            serde_test::Token::U32(location.column()),
+            serde_test::Token::StructEnd,
+            serde_test::Token::Str("source"),
+            // `Option` contributes a `Some` of its own. JSON discards it, but a
+            // non-self-describing format would encode a discriminant here.
+            serde_test::Token::Some,
+            serde_test::Token::Struct {
+                name: "ErrorNode",
+                len: 1,
+            },
+            serde_test::Token::Str("message"),
+            serde_test::Token::Str("No such file or directory (os error 2)"),
+            serde_test::Token::StructEnd,
+            serde_test::Token::StructEnd,
+        ],
+    );
+}

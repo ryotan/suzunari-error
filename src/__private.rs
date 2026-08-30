@@ -17,6 +17,9 @@ use crate::display_error::DisplayError;
 use core::error::Error;
 use core::fmt::{Debug, Display};
 
+#[cfg(feature = "serde")]
+pub mod ser;
+
 // ---------------------------------------------------------------------------
 // StackSourceResolver — resolves StackError::stack_source()
 // ---------------------------------------------------------------------------
