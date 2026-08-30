@@ -1,5 +1,8 @@
 #![no_std]
 
+#[cfg(feature = "test-serde")]
+pub mod canonical;
+
 #[cfg(feature = "test-alloc")]
 extern crate alloc;
 
