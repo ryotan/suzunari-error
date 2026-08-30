@@ -16,11 +16,14 @@
 //! enums, and `skip` additionally lifts the `Serialize` bound on the skipped
 //! field, which is what lets a non-`Serialize` source through.
 
-use crate::helper::{find_location_field, find_source_field};
+use crate::helper::{combine_errors, find_location_field, find_source_field};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
+use syn::parse::Parser;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::{Data, DeriveInput, Error, Fields, FieldsNamed, Ident};
+use syn::token::Comma;
+use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, FieldsNamed, Ident, Meta};
 
 /// Generates the `Serialize` impl and the marker impl for `input`.
 ///
@@ -72,6 +75,8 @@ pub(crate) fn generate_serialize_impl(
         .clone()
         .expect("location field comes from FieldsNamed");
     let source = find_source_field(fields).and_then(|field| field.ident.clone());
+
+    check_serde_attrs(fields, &location, source.as_ref())?;
 
     let (context_items, context_value) =
         context_parts(fields, name, &location, source.as_ref(), &serde, &serde_str);
@@ -139,12 +144,17 @@ fn context_parts(
         |ident: &Ident| ident == location || source.is_some_and(|source| ident == source);
 
     // A complete mirror: every field is present, and the metadata ones are
-    // skipped. User attributes are deliberately not carried over yet.
+    // skipped. A declared field's own `#[serde(...)]` comes along unchanged —
+    // the definition's fields are the same fields, so an attribute means there
+    // what it would have meant on a struct the user derived directly.
     let mirrored = fields.named.iter().map(|field| {
         let ident = field.ident.as_ref().expect("FieldsNamed");
         let ty = &field.ty;
-        let skip = is_metadata(ident).then(|| quote! { #[serde(skip)] });
-        quote! { #skip #ident: #ty }
+        if is_metadata(ident) {
+            return quote! { #[serde(skip)] #ident: #ty };
+        }
+        let attrs = serde_attrs(field);
+        quote! { #(#attrs)* #ident: #ty }
     });
 
     let def = format_ident!("__SuzuContextDef");
@@ -177,4 +187,89 @@ fn context_parts(
     };
 
     (items, quote! { #adapter(self) })
+}
+
+/// The field's own `#[serde(...)]` attributes.
+fn serde_attrs(field: &Field) -> impl Iterator<Item = &Attribute> {
+    field
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("serde"))
+}
+
+/// Rejects the serde attributes that cannot be transplanted.
+///
+/// Two kinds. An attribute on the `source` or `location` field would be
+/// silently ignored, because those are skipped in the definition. And `getter`
+/// cannot go anywhere: serde rejects it outside a `remote` definition, so a
+/// user writing it would fail on the struct they could have written by hand
+/// while succeeding here — and it changes where the value is read from.
+fn check_serde_attrs(
+    fields: &FieldsNamed,
+    location: &Ident,
+    source: Option<&Ident>,
+) -> Result<(), Error> {
+    let is_metadata =
+        |ident: &Ident| ident == location || source.is_some_and(|source| ident == source);
+
+    let errors = fields
+        .named
+        .iter()
+        .flat_map(|field| {
+            let ident = field.ident.as_ref().expect("FieldsNamed");
+            let metadata = is_metadata(ident);
+            serde_attrs(field).filter_map(move |attr| {
+                if metadata {
+                    return Some(Error::new(
+                        attr.span(),
+                        "#[serde(...)] on the source or location field is ignored: \
+                         both belong to the metadata level, not to `context`",
+                    ));
+                }
+                getter_span(attr).map(|span| {
+                    Error::new(
+                        span,
+                        "#[serde(getter = ...)] cannot be used here: serde accepts it only \
+                         inside a remote definition, so it would apply to the generated \
+                         definition and not to this type",
+                    )
+                })
+            })
+        })
+        .collect();
+
+    combine_errors(errors)
+}
+
+/// Where `getter` appears inside one `#[serde(...)]`, if it does.
+///
+/// A parse failure is ignored: serde owns this namespace and reports its own
+/// syntax errors once the attribute reaches the definition.
+fn getter_span(attr: &Attribute) -> Option<proc_macro2::Span> {
+    let Meta::List(list) = &attr.meta else {
+        return None;
+    };
+    Punctuated::<Meta, Comma>::parse_terminated
+        .parse2(list.tokens.clone())
+        .ok()?
+        .iter()
+        .find(|meta| meta.path().is_ident("getter"))
+        .map(Spanned::span)
+}
+
+/// Removes every `#[serde(...)]` from the type's fields.
+///
+/// The error type itself has no `Serialize` derive, so an attribute left on it
+/// would not compile. Its meaning moves to the generated definition.
+pub(crate) fn strip_serde_attrs(input: &mut DeriveInput) {
+    let strip = |fields: &mut Fields| {
+        for field in fields.iter_mut() {
+            field.attrs.retain(|attr| !attr.path().is_ident("serde"));
+        }
+    };
+    match &mut input.data {
+        Data::Struct(data) => strip(&mut data.fields),
+        Data::Enum(data) => data.variants.iter_mut().for_each(|v| strip(&mut v.fields)),
+        Data::Union(_) => {}
+    }
 }

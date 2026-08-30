@@ -129,7 +129,7 @@ IF [Generics] = "lifetime" THEN [FieldType] = "borrowed";
 # ---------------------------------------------------------------------------
 
 [TypeShape] = "struct";
+# `bound` needs parameters, so the generics restriction excludes it too.
 [Generics] = "none";
-IF [DeclaredFields] <> "zero" THEN [FieldAttr] = "none";
 # An opted-in enum cannot be built as a source either.
 [Source] <> "serialize_enum";

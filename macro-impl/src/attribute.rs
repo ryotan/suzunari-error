@@ -94,8 +94,13 @@ pub(crate) fn suzunari_error_impl(
     };
 
     // Step 4: Optional Serialize generation, from the already-resolved fields.
+    // The serde attributes are read here and then removed: they belong to the
+    // generated definition, and the error type itself has no Serialize derive
+    // to accept them.
     let serialize_impl = if options.serialize {
-        serialize::generate_serialize_impl(&input, &crate_path)?
+        let generated = serialize::generate_serialize_impl(&input, &crate_path)?;
+        serialize::strip_serde_attrs(&mut input);
+        generated
     } else {
         quote! {}
     };

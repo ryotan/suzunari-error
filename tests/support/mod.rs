@@ -451,24 +451,43 @@ impl_struct_recorder!(SerializeStruct, SerializeStructVariant);
 /// inferred it would be re-implementing what it is supposed to check, and a
 /// shared mistake would pass unnoticed.
 ///
-/// An attribute inside `context` lands on the error type only, never on the
-/// hand-written struct — `#[suzu(source(false))]` means nothing there. When
-/// serde attributes start being transplanted they will need a second slot,
-/// since those have to reach both sides; deciding here which is which would be
-/// the same mistake as inferring the split.
+/// Attributes inside `context` are routed by namespace. A `#[serde(...)]` goes
+/// to both sides, because the hand-written struct is a plain `#[derive]` and
+/// that is exactly the reference behaviour being compared against. Anything
+/// else goes to the error type alone — `#[suzu(source(false))]` means nothing
+/// on a plain struct.
+///
+/// Routing by namespace is not the same as inferring the `context`/`metadata`
+/// split. Here a mistake fails loudly, because the wrong attribute on a plain
+/// derive does not compile; there it would have agreed silently with a matching
+/// mistake in the macro. Serde attributes have to be written first.
 macro_rules! declare_case {
+    // Attributes are written in two bracketed groups per field: those the
+    // hand-written struct shares, then those the error type keeps to itself.
+    // The brackets are not decoration — `macro_rules!` cannot tell two adjacent
+    // runs of attributes apart without them.
     (
         error: $name:ident,
         display: $display:literal,
         context: {
-            $( $(#[$error_only:meta])* $field:ident : $ty:ty = $value:expr ),* $(,)?
+            $(
+                [ $(#[$shared:meta])* ] [ $(#[$error_only:meta])* ]
+                $field:ident : $ty:ty = $value:expr
+            ),* $(,)?
         },
         metadata: { $($metadata:tt)* } $(,)?
     ) => {
+        // A field carrying `#[serde(skip)]` is read by nothing at all in a
+        // fixture this small, which is not a signal worth seeing here.
+        #[allow(dead_code)]
         #[suzunari_error(serialize)]
         #[suzu(display($display))]
         struct $name {
-            $( $(#[$error_only])* $field: $ty, )*
+            $(
+                $(#[$shared])*
+                $(#[$error_only])*
+                $field: $ty,
+            )*
             $($metadata)*
         }
 
@@ -477,9 +496,13 @@ macro_rules! declare_case {
             #[allow(unused_imports)]
             use super::*;
 
+            #[allow(dead_code)]
             #[derive(serde::Serialize)]
             pub struct $name {
-                $( pub $field: $ty, )*
+                $(
+                    $(#[$shared])*
+                    pub $field: $ty,
+                )*
             }
         }
 
@@ -493,6 +516,21 @@ macro_rules! declare_case {
                 record(error).field("context"),
                 &record(&expected_context())
             );
+        }
+    };
+
+    // Shorthand for a case with no attributes on any declared field.
+    (
+        error: $name:ident,
+        display: $display:literal,
+        context: { $( $field:ident : $ty:ty = $value:expr ),* $(,)? },
+        metadata: { $($metadata:tt)* } $(,)?
+    ) => {
+        declare_case! {
+            error: $name,
+            display: $display,
+            context: { $( [] [] $field: $ty = $value ),* },
+            metadata: { $($metadata)* },
         }
     };
 }
