@@ -7,7 +7,7 @@ use quote::{format_ident, quote};
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::token::Colon;
-use syn::{Data, DeriveInput, Error, Field, FieldMutability, Fields, FieldsNamed, Visibility};
+use syn::{Data, DeriveInput, Error, Field, FieldModifiers, Fields, FieldsNamed, Visibility};
 
 /// Implementation of `#[suzunari_error]`.
 ///
@@ -132,6 +132,8 @@ fn location_field_impl(crate_path: &TokenStream) -> Field {
         ident: Some(format_ident!("location")),
         colon_token: Some(Colon::default()),
         ty: syn::parse_quote!(#crate_path::Location),
-        mutability: FieldMutability::None,
+        modifiers: FieldModifiers::default(),
+        // The injected field is never given a default value.
+        default: None,
     }
 }

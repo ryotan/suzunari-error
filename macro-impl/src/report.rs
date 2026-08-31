@@ -2,7 +2,7 @@ use crate::helper::get_crate_path;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
-use syn::{Error, ItemFn, ReturnType, Type};
+use syn::{Error, ItemFn, ReturnType, Safety, Type};
 
 pub(crate) fn report_impl(attr: TokenStream, stream: TokenStream) -> Result<TokenStream, Error> {
     // #[report] takes no arguments
@@ -22,9 +22,11 @@ pub(crate) fn report_impl(attr: TokenStream, stream: TokenStream) -> Result<Toke
             "#[report] does not support async functions; place it below the async runtime attribute",
         ));
     }
-    if input.sig.unsafety.is_some() {
+    // `Safety::Safe` is only valid inside an extern block, which rustc rejects
+    // for a free function on its own, so `unsafe` is the only case to reject here.
+    if let Safety::Unsafe(unsafety) = &input.sig.safety {
         return Err(Error::new(
-            input.sig.unsafety.span(),
+            unsafety.span(),
             "#[report] does not support unsafe functions",
         ));
     }
