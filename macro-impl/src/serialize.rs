@@ -33,13 +33,18 @@
 
 use crate::attribute::Options;
 use crate::helper::{combine_errors, find_location_field, find_source_field};
-use proc_macro2::{Span, TokenStream, TokenTree};
-use quote::{ToTokens, format_ident, quote};
+use proc_macro2::{Span, TokenStream};
+use quote::{format_ident, quote};
+use std::collections::HashSet;
 use syn::parse::Parser;
-use syn::punctuated::Punctuated;
+use syn::punctuated::{Pair, Punctuated};
 use syn::spanned::Spanned;
 use syn::token::Comma;
-use syn::{Attribute, Data, DeriveInput, Error, Field, Fields, FieldsNamed, Ident, Meta};
+use syn::{
+    Attribute, Data, DeriveInput, Error, Expr, ExprLit, Field, Fields, FieldsNamed,
+    GenericArgument, Ident, Lit, LitStr, Meta, MetaList, PathArguments, ReturnType, Type,
+    TypeParamBound, TypePath, WherePredicate,
+};
 
 /// One struct, or one variant of an enum: the fields, and which of them are
 /// metadata rather than declared.
@@ -55,45 +60,176 @@ impl Shape<'_> {
         *ident == self.location || self.source.as_ref().is_some_and(|source| ident == source)
     }
 
-    /// Whether a declared field's type mentions `param`.
+    /// The fields the type declares, as opposed to the metadata ones.
     ///
-    /// Fields the definition skips do not count: their types never reach a
-    /// `Serialize` call, so a bound on them would only turn away values that
-    /// work. Matching is on the token, which also catches a parameter reached
-    /// through an associated type.
-    fn declares(&self, param: &Ident) -> bool {
-        self.fields
-            .named
-            .iter()
-            .filter(|field| {
-                field
-                    .ident
-                    .as_ref()
-                    .is_some_and(|ident| !self.is_metadata(ident))
-                    && !skips_serializing(field)
-            })
-            .any(|field| mentions_ident(field.ty.to_token_stream(), param))
+    /// Metadata never reaches `context`, so it never bears on what the
+    /// parameters must implement.
+    fn declared_fields(&self) -> impl Iterator<Item = &Field> {
+        self.fields.named.iter().filter(|field| {
+            field
+                .ident
+                .as_ref()
+                .is_some_and(|ident| !self.is_metadata(ident))
+        })
     }
 }
 
-/// Whether `tokens` name `wanted` anywhere, groups included.
+/// Whether a field's type says anything about what the parameters must
+/// implement.
 ///
-/// The recursion is not optional. A type that arrived through a
-/// `macro_rules!` `$ty:ty` capture is re-emitted inside an invisible group, so a
-/// scan of the top level alone finds nothing and silently drops the bound.
-fn mentions_ident(tokens: TokenStream, wanted: &Ident) -> bool {
-    tokens.into_iter().any(|token| match token {
-        TokenTree::Ident(ident) => ident == *wanted,
-        TokenTree::Group(group) => mentions_ident(group.stream(), wanted),
-        _ => false,
+/// Mirrors [`serde_derive/src/ser.rs`](https://github.com/serde-rs/serde/blob/7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8/serde_derive/src/ser.rs#L160).
+/// A field serde does not write itself says nothing, and neither does one
+/// carrying a bound of its own — that bound is the answer already. Generating
+/// one here anyway would overrule the `#[serde(bound = "...")]` the user
+/// reached for, leaving them no way to correct the inference at all.
+fn contributes_bound(field: &Field) -> bool {
+    !serde_attrs(field).flat_map(nested_names).any(|name| {
+        name == "skip"
+            || name == "skip_serializing"
+            || name == "serialize_with"
+            || name == "with"
+            || name == "bound"
     })
 }
 
-/// Whether a field carries an attribute that keeps it out of the output.
-fn skips_serializing(field: &Field) -> bool {
-    serde_attrs(field)
-        .flat_map(nested_names)
-        .any(|name| name == "skip" || name == "skip_serializing")
+/// Strips the invisible groups a `macro_rules!` `$ty:ty` capture leaves behind.
+///
+/// The unwrapping is not optional. A type that arrived through such a capture is
+/// re-emitted inside a group carrying no delimiter, so a match on the type alone
+/// sees `Type::Group` and never the path inside it.
+fn ungroup(mut ty: &Type) -> &Type {
+    while let Type::Group(group) = ty {
+        ty = &group.elem;
+    }
+    ty
+}
+
+/// What the declared fields require `Serialize` of.
+///
+/// Mirrors the walk in [`serde_derive/src/bound.rs`](https://github.com/serde-rs/serde/blob/7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8/serde_derive/src/bound.rs#L97)
+/// (serde 1.0.229, MIT OR Apache-2.0 — the same licence as this crate).
+///
+/// The mirror is not optional. The generated definition carries
+/// `#[derive(Serialize)]`, so serde decides its bounds by that walk, and
+/// `remote` makes the result an inherent function rather than a trait impl. The
+/// impls written here call it, so their `where` clauses have to state whatever
+/// serde put there; there is no trait to name instead. Re-read those files when
+/// the serde dependency moves.
+#[derive(Default)]
+struct RequiredBounds {
+    /// Parameters used anywhere in a contributing field's type.
+    params: HashSet<Ident>,
+    /// Field types that are themselves an associated type of a parameter.
+    associated: Vec<TypePath>,
+}
+
+impl RequiredBounds {
+    fn visit_field(&mut self, field: &Field, all: &HashSet<Ident>) {
+        // A field whose type *is* an associated type of a parameter is bounded
+        // as that whole path. `S::Key` is what reaches `Serialize`; `S` never
+        // does, and demanding it of `S` turns away every marker type.
+        if let Type::Path(ty) = ungroup(&field.ty)
+            && let Some(Pair::Punctuated(first, _)) = ty.path.segments.pairs().next()
+            && all.contains(&first.ident)
+        {
+            self.associated.push(ty.clone());
+        }
+        self.visit_type(&field.ty, all);
+    }
+
+    fn visit_type(&mut self, ty: &Type, all: &HashSet<Ident>) {
+        match ty {
+            Type::Array(ty) => self.visit_type(&ty.elem, all),
+            Type::Group(ty) => self.visit_type(&ty.elem, all),
+            Type::Paren(ty) => self.visit_type(&ty.elem, all),
+            Type::Ptr(ty) => self.visit_type(&ty.elem, all),
+            Type::Reference(ty) => self.visit_type(&ty.elem, all),
+            Type::Slice(ty) => self.visit_type(&ty.elem, all),
+            Type::Tuple(ty) => ty.elems.iter().for_each(|elem| self.visit_type(elem, all)),
+            Type::FnPtr(ty) => {
+                ty.inputs
+                    .iter()
+                    .for_each(|arg| self.visit_type(&arg.ty, all));
+                self.visit_return_type(&ty.output, all);
+            }
+            Type::ImplTrait(ty) => self.visit_bounds(ty.bounds.iter(), all),
+            Type::TraitObject(ty) => self.visit_bounds(ty.bounds.iter(), all),
+            Type::Path(ty) => {
+                if let Some(qself) = &ty.qself {
+                    self.visit_type(&qself.ty, all);
+                }
+                self.visit_path(&ty.path, all);
+            }
+            // A parameter named only by a macro path is not used by it:
+            // `mac: T!()` says nothing about `T`. Never, Infer and Verbatim
+            // cannot name one at all.
+            _ => {}
+        }
+    }
+
+    fn visit_path(&mut self, path: &syn::Path, all: &HashSet<Ident>) {
+        // `PhantomData<T>` is Serialize whether or not `T` is. serde carries
+        // this as a hardcoded exception rather than a general rule, because
+        // there is no general rule to have: nothing in the type tells you
+        // whether a wrapper needs its parameter. Every other such type is the
+        // user's to declare with a field-level `#[serde(bound = "...")]`.
+        if path
+            .segments
+            .last()
+            .is_some_and(|seg| seg.ident == "PhantomData")
+        {
+            return;
+        }
+        if path.leading_colon.is_none()
+            && path.segments.len() == 1
+            && all.contains(&path.segments[0].ident)
+        {
+            self.params.insert(path.segments[0].ident.clone());
+        }
+        for segment in &path.segments {
+            self.visit_path_arguments(&segment.arguments, all);
+        }
+    }
+
+    fn visit_path_arguments(&mut self, arguments: &PathArguments, all: &HashSet<Ident>) {
+        match arguments {
+            PathArguments::None => {}
+            PathArguments::AngleBracketed(arguments) => {
+                for arg in &arguments.args {
+                    match arg {
+                        GenericArgument::Type(arg) => self.visit_type(arg, all),
+                        GenericArgument::AssocType(arg) => self.visit_type(&arg.ty, all),
+                        _ => {}
+                    }
+                }
+            }
+            PathArguments::Parenthesized(arguments) => {
+                arguments
+                    .inputs
+                    .iter()
+                    .for_each(|arg| self.visit_type(&arg.ty, all));
+                self.visit_return_type(&arguments.output, all);
+            }
+        }
+    }
+
+    fn visit_return_type(&mut self, return_type: &ReturnType, all: &HashSet<Ident>) {
+        if let ReturnType::Type(_, output) = return_type {
+            self.visit_type(output, all);
+        }
+    }
+
+    fn visit_bounds<'b>(
+        &mut self,
+        bounds: impl Iterator<Item = &'b TypeParamBound>,
+        all: &HashSet<Ident>,
+    ) {
+        for bound in bounds {
+            if let TypeParamBound::Trait(bound) = bound {
+                self.visit_path(&bound.path, all);
+            }
+        }
+    }
 }
 
 /// Generates the `Serialize` impl and the marker impl for `input`.
@@ -130,7 +266,10 @@ pub(crate) fn generate_serialize_impl(
     // `#[serde(crate = ...)]` takes a string, so the path is spelled twice.
     let serde_str = quote!(#serde).to_string();
 
-    let context_items = context_definition(&shapes, input, options, &serde, &serde_str);
+    // Both the definition's derive and the two impls written here have to agree
+    // on these, so they are worked out once and handed to each.
+    let bounds = serialize_bounds(input, &shapes, &serde)?;
+    let context_items = context_definition(&shapes, input, options, &serde, &serde_str, &bounds);
     let adapter = format_ident!("__SuzuContext");
 
     let node = |source: TokenStream| {
@@ -202,13 +341,12 @@ pub(crate) fn generate_serialize_impl(
     // derives that generated them know. Naming `Self: StackError` borrows their
     // bounds rather than guessing at them; `Error` carries `Display` along.
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-    let serialize_bounds = serialize_bounds(input, &shapes, &serde);
     let outer_where = merge_where(
         where_clause,
         &quote! {
             where
                 Self: #crate_path::StackError,
-                #(#serialize_bounds,)*
+                #(#bounds,)*
         },
     );
 
@@ -287,6 +425,7 @@ fn context_definition(
     options: &Options,
     serde: &TokenStream,
     serde_str: &str,
+    bounds: &[TokenStream],
 ) -> TokenStream {
     let name = &input.ident;
     let def = format_ident!("__SuzuContextDef");
@@ -305,8 +444,7 @@ fn context_definition(
         .params
         .insert(0, syn::parse_quote!('__suzu));
     let (adapter_impl, adapter_ty, _) = adapter_generics.split_for_impl();
-    let serialize_bounds = serialize_bounds(input, shapes, serde);
-    let adapter_where = merge_where(where_clause, &quote! { where #(#serialize_bounds,)* });
+    let adapter_where = merge_where(where_clause, &quote! { where #(#bounds,)* });
 
     // serde spells the same intent differently by shape: on a struct
     // `rename_all` renames fields, on an enum it renames variants — which
@@ -448,17 +586,26 @@ fn check_serde_attrs(shape: &Shape<'_>) -> Result<(), Error> {
 /// A parse failure yields nothing: serde owns this namespace and reports its
 /// own syntax errors. Here it only decides which of two wordings to use.
 fn nested_names(attr: &Attribute) -> Vec<String> {
+    nested_metas(attr)
+        .iter()
+        .filter_map(|meta| meta.path().get_ident().map(ToString::to_string))
+        .collect()
+}
+
+/// The nested metas of one `#[serde(...)]`, for the settings that carry a value
+/// rather than only a name.
+fn nested_metas(attr: &Attribute) -> Vec<Meta> {
     let Meta::List(list) = &attr.meta else {
         return Vec::new();
     };
+    nested_metas_of(list)
+}
+
+/// The nested metas inside a meta list.
+fn nested_metas_of(list: &MetaList) -> Vec<Meta> {
     Punctuated::<Meta, Comma>::parse_terminated
         .parse2(list.tokens.clone())
-        .map(|metas| {
-            metas
-                .iter()
-                .filter_map(|meta| meta.path().get_ident().map(ToString::to_string))
-                .collect()
-        })
+        .map(|metas| metas.into_iter().collect())
         .unwrap_or_default()
 }
 
@@ -495,10 +642,13 @@ pub(crate) fn strip_serde_attrs(input: &mut DeriveInput) {
     }
 }
 
-/// `T: Serialize` for each parameter a declared field actually uses.
+/// The predicates the generated impls need, in the order serde emits them.
 ///
-/// The same inference serde's own derive makes, which is the point: the payload
-/// has to match what the user would have got from `#[derive(Serialize)]`.
+/// Three sources, matching the three steps of
+/// [`serde_derive/src/ser.rs`](https://github.com/serde-rs/serde/blob/7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8/serde_derive/src/ser.rs#L135):
+/// what a field's own `#[serde(bound = "...")]` states, then — for the fields
+/// that carry no such bound — the parameters and the associated types found by
+/// [`RequiredBounds`].
 ///
 /// Bounding every parameter instead would be wrong, not merely wide. A
 /// parameter that only names the source's type is ordinary — `struct
@@ -509,16 +659,101 @@ fn serialize_bounds(
     input: &DeriveInput,
     shapes: &[Shape<'_>],
     serde: &TokenStream,
-) -> Vec<TokenStream> {
-    input
+) -> Result<Vec<TokenStream>, Error> {
+    let all: HashSet<Ident> = input
         .generics
         .type_params()
-        .filter(|param| shapes.iter().any(|shape| shape.declares(&param.ident)))
+        .map(|param| param.ident.clone())
+        .collect();
+    if all.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut declared = Vec::new();
+    let mut required = RequiredBounds::default();
+    let mut errors = Vec::new();
+    for shape in shapes {
+        for field in shape.declared_fields() {
+            match field_bound_predicates(field) {
+                Ok(predicates) if !predicates.is_empty() => declared.extend(predicates),
+                Ok(_) if contributes_bound(field) => required.visit_field(field, &all),
+                Ok(_) => {}
+                Err(error) => errors.push(error),
+            }
+        }
+    }
+    combine_errors(errors)?;
+
+    // Declaration order for the parameters, then the associated types in the
+    // order they were met: the same order serde emits them in, so a `where`
+    // clause built here reads like the one on the definition.
+    let params = input
+        .generics
+        .type_params()
+        .filter(|param| required.params.contains(&param.ident))
         .map(|param| {
             let ident = &param.ident;
             quote! { #ident: #serde::Serialize }
-        })
-        .collect()
+        });
+    let associated = required
+        .associated
+        .iter()
+        .map(|path| quote! { #path: #serde::Serialize });
+
+    // An enum can meet the same predicate once per variant, and a repeated one
+    // is only noise in the generated code.
+    let mut seen = HashSet::new();
+    Ok(declared
+        .into_iter()
+        .chain(params)
+        .chain(associated)
+        .filter(|predicate| seen.insert(predicate.to_string()))
+        .collect())
+}
+
+/// The `where` predicates a field's own `#[serde(bound = "...")]` states.
+///
+/// serde accepts the setting in two spellings, `bound = "..."` and
+/// `bound(serialize = "...", deserialize = "...")`, and takes the serializing
+/// half of the second. A `deserialize`-only bound states nothing here.
+///
+/// serde adds these before running its inference, and leaves the field out of
+/// that inference — see [`contributes_bound`]. Both halves are needed: dropping
+/// the predicates leaves the definition demanding something the impls here never
+/// state.
+fn field_bound_predicates(field: &Field) -> Result<Vec<TokenStream>, Error> {
+    let mut predicates = Vec::new();
+    for meta in serde_attrs(field).flat_map(nested_metas) {
+        let literal = match &meta {
+            Meta::NameValue(pair) if pair.path.is_ident("bound") => str_literal(&pair.value),
+            Meta::List(list) if list.path.is_ident("bound") => nested_metas_of(list)
+                .into_iter()
+                .find_map(|nested| match nested {
+                    Meta::NameValue(pair) if pair.path.is_ident("serialize") => {
+                        str_literal(&pair.value)
+                    }
+                    _ => None,
+                }),
+            _ => None,
+        };
+        let Some(literal) = literal else { continue };
+        let parsed = literal
+            .parse_with(Punctuated::<WherePredicate, Comma>::parse_terminated)
+            .map_err(|error| Error::new(literal.span(), error.to_string()))?;
+        predicates.extend(parsed.iter().map(|predicate| quote! { #predicate }));
+    }
+    Ok(predicates)
+}
+
+/// The string behind `name = "..."`, if the value is one.
+fn str_literal(value: &Expr) -> Option<LitStr> {
+    match value {
+        Expr::Lit(ExprLit {
+            lit: Lit::Str(literal),
+            ..
+        }) => Some(literal.clone()),
+        _ => None,
+    }
 }
 
 /// Appends predicates to a `where` clause that may not exist yet.
