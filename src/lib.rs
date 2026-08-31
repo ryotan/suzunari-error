@@ -55,6 +55,9 @@
 //! }
 //! ```
 //!
+//! - `type` is the type's bare name, without type arguments: `LookupError<u32>`
+//!   and `LookupError<String>` both serialize as `"LookupError"`. It comes from
+//!   [`StackError::type_name()`], which the derive emits as a string literal
 //! - `context` holds the type's own declared fields, and is present even when
 //!   there are none. It is absent only where the concrete type was erased —
 //!   through [`BoxedStackError`] — and the fields cannot be read
