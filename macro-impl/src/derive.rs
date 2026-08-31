@@ -125,6 +125,26 @@ fn generate_enum_impl(
     let enum_name_str = name.to_string();
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
+    // An enum with no variants is uninhabited: there is nothing to construct and
+    // so nothing to match on, and no variant can carry a source either. It needs
+    // `match *self {}`, matching the uninhabited place — `match self {}` matches
+    // a reference, which stays inhabited even when the enum is not, and rustc
+    // rejects it as a non-exhaustive pattern.
+    if variant_infos.is_empty() {
+        let boxed_impl = boxed_stack_error_impl(name, crate_path, generics);
+        return Ok(quote! {
+            impl #impl_generics #crate_path::StackError for #name #ty_generics #where_clause {
+                fn location(&self) -> #crate_path::Location {
+                    match *self {}
+                }
+                fn type_name(&self) -> &'static str {
+                    match *self {}
+                }
+            }
+            #boxed_impl
+        });
+    }
+
     let has_any_source = variant_infos.iter().any(|v| v.source_field_name.is_some());
 
     let location_match_arms = variant_infos.iter().map(|v| {

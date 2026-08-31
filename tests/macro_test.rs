@@ -225,6 +225,24 @@ fn test_single_variant_enum() {
     assert_eq!(format!("{err}"), "only variant: hello");
 }
 
+// --- An enum with no variants ---
+
+/// An uninhabited error type, which is the shape `core::convert::Infallible`
+/// has: something to put in an associated `type Error: StackError` for an
+/// implementation that cannot fail.
+///
+/// There is nothing to construct, so that this compiles at all is the assertion.
+/// `location()` and `type_name()` have no variant to match on, and the generated
+/// `match` has to be on the place rather than the reference.
+#[suzunari_error]
+enum UninhabitedError {}
+
+#[test]
+fn test_enum_with_no_variants_implements_stack_error() {
+    fn assert_stack_error<E: StackError>() {}
+    assert_stack_error::<UninhabitedError>();
+}
+
 // --- GAP-11: generic struct with where clause ---
 
 #[suzunari_error]
