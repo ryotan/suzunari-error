@@ -490,7 +490,7 @@ fn type_uses_generic_params(ty: &syn::Type, params: &HashSet<Ident>) -> bool {
                 paren
                     .inputs
                     .iter()
-                    .any(|t| type_uses_generic_params(t, params))
+                    .any(|arg| type_uses_generic_params(&arg.ty, params))
                     || matches!(&paren.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
             }
             PathArguments::None => false,
@@ -536,12 +536,12 @@ fn type_uses_generic_params(ty: &syn::Type, params: &HashSet<Ident>) -> bool {
         Type::Paren(type_paren) => type_uses_generic_params(&type_paren.elem, params),
         Type::Group(type_group) => type_uses_generic_params(&type_group.elem, params),
         Type::TraitObject(type_trait_object) => bounds_use(&type_trait_object.bounds, params),
-        Type::BareFn(type_bare_fn) => {
-            type_bare_fn
+        Type::FnPtr(type_fn_ptr) => {
+            type_fn_ptr
                 .inputs
                 .iter()
                 .any(|arg| type_uses_generic_params(&arg.ty, params))
-                || matches!(&type_bare_fn.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
+                || matches!(&type_fn_ptr.output, ReturnType::Type(_, t) if type_uses_generic_params(t, params))
         }
         Type::Ptr(type_ptr) => type_uses_generic_params(&type_ptr.elem, params),
         Type::ImplTrait(type_impl_trait) => bounds_use(&type_impl_trait.bounds, params),
