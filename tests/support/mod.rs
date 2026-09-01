@@ -486,8 +486,12 @@ macro_rules! declare_case {
     // attributes apart without them.
     (
         error: $name:ident,
+        options: { $($options:tt)* },
+        oracle_attrs: { $(#[$oracle:meta])* },
         generics: { $($generics:tt)* },
         concrete: { $($concrete:tt)* },
+        oracle_generics: { $($oracle_generics:tt)* },
+        oracle_concrete: { $($oracle_concrete:tt)* },
         display: $display:literal,
         context: {
             $(
@@ -500,7 +504,7 @@ macro_rules! declare_case {
         // A field carrying `#[serde(skip)]` is read by nothing at all in a
         // fixture this small, which is not a signal worth seeing here.
         #[allow(dead_code)]
-        #[suzunari_error(serialize)]
+        #[suzunari_error($($options)*)]
         #[suzu(display($display))]
         struct $name $($generics)* {
             $(
@@ -511,7 +515,8 @@ macro_rules! declare_case {
             $($metadata)*
         }
 
-        declare_case!(@oracle $name, { $($generics)* }, { $($concrete)* },
+        declare_case!(@oracle $name, { $(#[$oracle])* },
+            { $($oracle_generics)* }, { $($oracle_concrete)* }, { $($concrete)* },
             $( [ $(#[$shared])* ] $field : $ty = $value ),* );
     };
 
@@ -523,8 +528,12 @@ macro_rules! declare_case {
         error: $name:ident,
         variant: $variant:ident,
         others: { $($others:tt)* },
+        options: { $($options:tt)* },
+        oracle_attrs: { $(#[$oracle:meta])* },
         generics: { $($generics:tt)* },
         concrete: { $($concrete:tt)* },
+        oracle_generics: { $($oracle_generics:tt)* },
+        oracle_concrete: { $($oracle_concrete:tt)* },
         display: $display:literal,
         context: {
             $(
@@ -535,7 +544,7 @@ macro_rules! declare_case {
         metadata: { $($metadata:tt)* } $(,)?
     ) => {
         #[allow(dead_code)]
-        #[suzunari_error(serialize)]
+        #[suzunari_error($($options)*)]
         enum $name $($generics)* {
             #[suzu(display($display))]
             $variant {
@@ -549,7 +558,8 @@ macro_rules! declare_case {
             $($others)*
         }
 
-        declare_case!(@oracle $name, { $($generics)* }, { $($concrete)* },
+        declare_case!(@oracle $name, { $(#[$oracle])* },
+            { $($oracle_generics)* }, { $($oracle_concrete)* }, { $($concrete)* },
             $( [ $(#[$shared])* ] $field : $ty = $value ),* );
     };
 
@@ -560,17 +570,19 @@ macro_rules! declare_case {
         error: $name:ident,
         unit_variant: $variant:ident,
         others: { $($others:tt)* },
+        options: { $($options:tt)* },
+        oracle_attrs: { $(#[$oracle:meta])* },
         display: $display:literal $(,)?
     ) => {
         #[allow(dead_code)]
-        #[suzunari_error(serialize)]
+        #[suzunari_error($($options)*)]
         enum $name {
             #[suzu(display($display))]
             $variant,
             $($others)*
         }
 
-        declare_case!(@oracle $name, {}, {},);
+        declare_case!(@oracle $name, { $(#[$oracle])* }, {}, {}, {},);
     };
 
     // No parameters.
@@ -587,8 +599,12 @@ macro_rules! declare_case {
     ) => {
         declare_case! {
             error: $name,
+            options: { serialize },
+            oracle_attrs: { },
             generics: {},
             concrete: {},
+            oracle_generics: {},
+            oracle_concrete: {},
             display: $display,
             context: {
                 $( [ $(#[$shared])* ] [ $(#[$error_only])* ] $field: $ty = $value ),*
@@ -613,7 +629,9 @@ macro_rules! declare_case {
     };
 
     // The hand-written struct and the comparison, shared by every shape above.
-    (@oracle $name:ident, { $($generics:tt)* }, { $($concrete:tt)* },
+    (@oracle $name:ident, { $(#[$oracle:meta])* },
+        { $($oracle_generics:tt)* }, { $($oracle_concrete:tt)* },
+        { $($concrete:tt)* },
         $( [ $(#[$shared:meta])* ] $field:ident : $ty:ty = $value:expr ),*
     ) => {
         mod oracle {
@@ -621,9 +639,17 @@ macro_rules! declare_case {
             #[allow(unused_imports)]
             use super::*;
 
+            // `serialize(rename_all = ...)` reaches the declared fields, so the
+            // struct they are compared against has to carry the same setting.
+            // serde spells it `rename_all_fields` on an enum and `rename_all` on
+            // a struct; this side is always a struct, so a macro that picked the
+            // wrong spelling for an enum shows up as a mismatch here.
+            // The derive comes first: `serde` is its helper attribute, and a
+            // helper written above the derive that introduces it is an error.
             #[allow(dead_code)]
             #[derive(serde::Serialize)]
-            pub struct $name $($generics)* {
+            $(#[$oracle])*
+            pub struct $name $($oracle_generics)* {
                 $(
                     $(#[$shared])*
                     pub $field: $ty,
@@ -631,7 +657,7 @@ macro_rules! declare_case {
             }
         }
 
-        fn expected_context() -> oracle::$name $($concrete)* {
+        fn expected_context() -> oracle::$name $($oracle_concrete)* {
             oracle::$name { $($field: $value,)* }
         }
 

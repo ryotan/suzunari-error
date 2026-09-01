@@ -87,6 +87,21 @@ fn pairs() -> BTreeMap<&'static str, u32> {
     BTreeMap::from([("a", 1), ("b", 2)])
 }
 
+/// Supplies an associated type, so that a field can be typed `T::Key`.
+pub trait Keyed {
+    type Key;
+}
+
+/// What `assoc_param` is instantiated with. Deliberately **not** `Serialize`: a
+/// field typed `T::Key` needs `T::Key: Serialize` and says nothing about `T`, so
+/// an inference bounding the parameter instead would turn this marker away.
+#[derive(Debug)]
+pub struct Marker;
+
+impl Keyed for Marker {
+    type Key = &'static str;
+}
+
 // --- types used as the source ----------------------------------------------
 
 /// A source that is itself opted in, so its own `context` survives nesting.
@@ -175,24 +190,75 @@ FIELD_TYPES = {
     "container_attributed_struct": ("Renamed", 'Renamed { field_name: "x" }'),
     "map_like": ("BTreeMap<&'static str, u32>", "pairs()"),
     "generic_param": ("T", "9u32"),
+    "wrapped_param": ("Option<T>", "Some(9u32)"),
     "borrowed": ("&'a str", '"b"'),
+    "assoc_type": ("T::Key", '"k"'),
 }
 
-# The parameters on the error type, and the instantiation the test uses. A
-# parameter no field uses does not compile, which is why the model ties these to
-# the field type both ways.
-GENERICS = {
-    "none": ("", ""),
-    "type_param": ("<T: ::core::fmt::Debug>", "<u32>"),
-    "lifetime": ("<'a>", "<'static>"),
+# (declaration, where predicate, instantiation) for the parameter a declared
+# field uses. Lifetimes are declared first, as Rust requires.
+#
+# `assoc_param` is the only level needing a where predicate. `derive(Debug)`
+# bounds the parameter and never the associated type, so `T::Key: Debug` has to
+# be written out — for `Serialize` nothing has to be, since both the definition's
+# derive and this crate's inference work it out.
+DECLARED_PARAMS = {
+    "none": (None, None, None),
+    "type_param": ("T: ::core::fmt::Debug", None, "u32"),
+    "lifetime": ("'a", None, "'static"),
+    "assoc_param": (
+        "T: Keyed + ::core::fmt::Debug",
+        "T::Key: ::core::fmt::Debug",
+        "Marker",
+    ),
 }
+
+# The parameter the source field uses. Instantiated with `io::Error`, which is
+# not `Serialize`: bounding it would reject the commonest source there is.
+SOURCE_PARAM = ("U: ::core::error::Error + ::core::fmt::Debug + 'static", "std::io::Error")
+
+
+def generics(levels, with_source):
+    """A parameter list and the instantiation the test uses.
+
+    `with_source` builds the error type's, which carries the source's parameter
+    as well; without it, the hand-written struct's, which declares only the
+    fields and so would not compile with a parameter it never names.
+    """
+    declaration, predicate, concrete = DECLARED_PARAMS[levels["DeclaredParam"]]
+    params = [p for p in (declaration,) if p]
+    args = [a for a in (concrete,) if a]
+    if with_source and levels["Source"] == "generic_source":
+        # Declared after the lifetime, if there is one: Rust requires that order.
+        params.append(SOURCE_PARAM[0])
+        args.append(SOURCE_PARAM[1])
+    if not params:
+        return "", ""
+    where = f" where {predicate}" if predicate else ""
+    return f"<{', '.join(params)}>{where}", f"<{', '.join(args)}>"
+
 
 # `bound` replaces the bound serde would have inferred, so what it says depends
-# on which parameter there is.
+# on which parameter the declared field uses.
 BOUNDS = {
     "type_param": "T: serde::Serialize",
     "lifetime": "&'a str: serde::Serialize",
+    "assoc_param": "T::Key: serde::Serialize",
 }
+
+# UPPERCASE rather than camelCase: the generated field names are single lowercase
+# words, and camelCase would leave every one of them untouched.
+RENAME_CASE = "UPPERCASE"
+
+
+def options(levels):
+    """What goes inside `#[suzunari_error(...)]`, and the oracle's counterpart."""
+    if levels["RenameAll"] == "absent":
+        return "serialize", ""
+    return (
+        f'serialize(rename_all = "{RENAME_CASE}")',
+        f'#[serde(rename_all = "{RENAME_CASE}")]',
+    )
 
 SOURCE_TYPES = {
     "io_error": "std::io::Error",
@@ -201,6 +267,7 @@ SOURCE_TYPES = {
     "boxed": "BoxedStackError",
     "foreign_serialize": "ForeignError",
     "display_error": "LibError",
+    "generic_source": "U",
 }
 
 # The attribute placed on the first declared field. It reaches both the error
@@ -222,7 +289,7 @@ FIELD_ATTRS = {
 def field_attr(levels):
     """The attribute for the first declared field."""
     if levels["FieldAttr"] == "bound":
-        return f'#[serde(bound(serialize = "{BOUNDS[levels["Generics"]]}"))]'
+        return f'#[serde(bound(serialize = "{BOUNDS[levels["DeclaredParam"]]}"))]'
     return FIELD_ATTRS[levels["FieldAttr"]]
 
 LOCATION_FIELD = {
@@ -287,7 +354,7 @@ def selector(levels, ty_name, fields):
 
 
 def body(levels, ty_name, sel):
-    ty_name = ty_name + GENERICS[levels["Generics"]][1]
+    ty_name = ty_name + generics(levels, True)[1]
     source = levels["Source"]
     if source == "none":
         return f'''        fn failing() -> Result<(), {ty_name}> {{
@@ -341,6 +408,17 @@ def body(levels, ty_name, sel):
 
         assert_context_matches(&error);
         assert_eq!(record(&error).field("source").some(), &error_node("lib error"));'''
+    if source == "generic_source":
+        # The parameter is instantiated with `io::Error`, which is not
+        # `Serialize`. That the case compiles at all is half the assertion: a
+        # bound on the source's parameter would have rejected it.
+        return f'''        let error = std::fs::read(MISSING_PATH).context({sel}).unwrap_err();
+
+        assert_context_matches(&error);
+        assert_eq!(
+            record(&error).field("source").some(),
+            &error_node(&io_message())
+        );'''
     raise ValueError(source)
 
 
@@ -352,8 +430,12 @@ OTHER_VARIANT = {
 }
 
 
-def declaration(levels, index, ty_name, generics, concrete, context, metadata):
+def declaration(
+    levels, index, ty_name, generics, concrete,
+    oracle_generics, oracle_concrete, context, metadata,
+):
     """The `declare_case!` invocation for one case."""
+    opts, oracle = options(levels)
     shape = levels["TypeShape"]
     others = OTHER_VARIANT[shape] if levels["EnumHasOtherShape"] == "yes" else ""
 
@@ -364,6 +446,8 @@ def declaration(levels, index, ty_name, generics, concrete, context, metadata):
         error: {ty_name},
         unit_variant: Under,
         others: {{ {others} }},
+        options: {{ {opts} }},
+        oracle_attrs: {{ {oracle} }},
         display: "case {index:02}",
     }}"""
     if shape == "enum_struct_variant":
@@ -371,16 +455,24 @@ def declaration(levels, index, ty_name, generics, concrete, context, metadata):
         error: {ty_name},
         variant: Under,
         others: {{ {others} }},
+        options: {{ {opts} }},
+        oracle_attrs: {{ {oracle} }},
         generics: {{ {generics} }},
         concrete: {{ {concrete} }},
+        oracle_generics: {{ {oracle_generics} }},
+        oracle_concrete: {{ {oracle_concrete} }},
         display: "case {index:02}",
         context: {{ {context} }},
         metadata: {{ {metadata} }},
     }}"""
     return f"""    declare_case! {{
         error: {ty_name},
+        options: {{ {opts} }},
+        oracle_attrs: {{ {oracle} }},
         generics: {{ {generics} }},
         concrete: {{ {concrete} }},
+        oracle_generics: {{ {oracle_generics} }},
+        oracle_concrete: {{ {oracle_concrete} }},
         display: "case {index:02}",
         context: {{ {context} }},
         metadata: {{ {metadata} }},
@@ -399,7 +491,8 @@ def main(model):
     for index, row in enumerate(rows[1:], start=1):
         levels = dict(zip(header, row.split("\t")))
         ty_name = f"Case{index:02}"
-        generics, concrete = GENERICS[levels["Generics"]]
+        generic_params, concrete = generics(levels, True)
+        oracle_params, oracle_concrete = generics(levels, False)
         fields = declared_fields(levels)
         context = ", ".join(
             f"[{shared}] [{error_only}] {name}: {ty} = {value}"
@@ -412,7 +505,10 @@ def main(model):
         )
         summary = ", ".join(f"{k}={v}" for k, v in levels.items() if v != "na")
 
-        decl = declaration(levels, index, ty_name, generics, concrete, context, metadata)
+        decl = declaration(
+            levels, index, ty_name, generic_params, concrete,
+            oracle_params, oracle_concrete, context, metadata,
+        )
         out.append(f'''
 /// {summary}
 mod case_{index:02} {{
