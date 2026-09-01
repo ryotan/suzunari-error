@@ -41,9 +41,19 @@ TypeShape: struct, enum_struct_variant, enum_unit_variant
 # variant shapes handled differently within one definition.
 EnumHasOtherShape: na, yes, no
 
-# Parameters on the error type. Both forms are measured to work under
-# #[suzunari_error]; the serialize path currently rejects them.
-Generics: none, type_param, lifetime
+# The parameter a DECLARED field uses, which is the one that may need a
+# `Serialize` bound. The generator builds the type's parameter list from this
+# and from `Source`, so a case can have both, one, or neither.
+#
+# This used to be a single `Generics` factor tied one-to-one to `FieldType`,
+# which made "the type has a parameter no declared field uses" impossible to
+# express — the very case `serialize_bounds` documents as its reason for not
+# bounding every parameter. Splitting the two apart is what admits it.
+#
+# `assoc_param` cannot be folded into `type_param`: the field type `T::Key` needs
+# `T` bounded by a trait supplying `Key`, and a parameter so bounded cannot be
+# instantiated with the plain scalar the other levels use.
+DeclaredParam: none, type_param, lifetime, assoc_param
 
 # How many fields the type declares. "one" cannot observe field order, which is
 # why "many" exists separately.
@@ -52,11 +62,19 @@ DeclaredFields: zero, one, many
 # The type of the first declared field. Every field type must also be Debug,
 # which #[suzunari_error] requires independently of serde.
 #
-# Missing: a field whose type is an associated type, such as `T::Item` under
-# `T: Iterator`. It is the only shape that makes the error type's `where` clause
-# load-bearing in the definition — measured, dropping the clause changes nothing
-# for any level here.
-FieldType: scalar, option, borrowed, serialize_struct, container_attributed_struct, map_like, generic_param, na
+# Three of these say how a parameter reaches `Serialize`, and the bound inference
+# has to answer each differently:
+#   generic_param  the field IS the parameter        → T: Serialize
+#   wrapped_param  the parameter sits inside a path  → T: Serialize, found by
+#                  descending into the path's arguments rather than at the top
+#   assoc_type     the field is an associated type   → T::Key: Serialize, and
+#                  nothing at all about T
+#
+# `assoc_type` was left out of an earlier version of this model as an exotic case,
+# and that was where the inference turned out to be wrong: a type plain serde
+# accepts was rejected here. It is also the only shape that makes the error type's
+# own `where` clause load-bearing in the definition.
+FieldType: scalar, option, borrowed, serialize_struct, container_attributed_struct, map_like, generic_param, wrapped_param, assoc_type, na
 
 # The serde attribute on the first declared field. Representatives, not the full
 # list: every attribute serde accepts is checked individually in
@@ -73,7 +91,13 @@ FieldAttr: none, rename, skip, skip_serializing_if, serialize_with, flatten, bou
 Location: injected, suzu_named, typed, stack_attr
 
 # What the source field holds, which decides how dispatch resolves it.
-Source: none, io_error, serialize_type, serialize_enum, boxed, foreign_serialize, display_error
+#
+# `generic_source` is the type's second reason to carry a parameter, and the only
+# one that must NOT be bounded: the source is skipped in the definition, so
+# demanding `Serialize` of it would reject `io::Error` — which is what the level
+# instantiates it with. Crossed with a `DeclaredParam`, it is also the only way
+# this model produces a type with two parameters.
+Source: none, io_error, serialize_type, serialize_enum, boxed, foreign_serialize, display_error, generic_source
 
 # How the source field is identified. Codegen must use snafu's own rule, not the
 # field's name. For `display_error` the binding comes from #[suzu(from)], which
@@ -91,6 +115,17 @@ SourceBinding: na, named_source, renamed_with_attr
 # measured and does almost nothing here (17% to 13%), and under the temporary
 # restrictions below it is not even monotonic.
 SourceFalseField: absent, present
+
+# `#[suzunari_error(serialize(rename_all = ...))]`, the one type-level setting
+# this crate re-exposes. It has to reach the declared fields and nothing else,
+# and serde spells it differently by shape — `rename_all` on a struct,
+# `rename_all_fields` on an enum — so picking the spelling is the macro's job and
+# both shapes have to be exercised.
+#
+# The level uses UPPERCASE rather than camelCase: the generated field names are
+# single lowercase words, which camelCase would leave untouched, making the whole
+# factor invisible.
+RenameAll: absent, present
 
 IF [DeclaredFields] = "zero" THEN [FieldType] = "na" AND [FieldAttr] = "na";
 IF [DeclaredFields] <> "zero" THEN [FieldType] <> "na" AND [FieldAttr] <> "na";
@@ -115,13 +150,18 @@ IF [SourceFalseField] = "present" AND [Source] <> "none" THEN
 IF [FieldAttr] = "flatten" THEN
     [FieldType] IN {"serialize_struct", "container_attributed_struct", "map_like"};
 
-# bound replaces an inferred bound, so it is only meaningful with parameters.
-IF [FieldAttr] = "bound" THEN [Generics] <> "none";
+# A field-level bound states what its own field needs, so it takes a parameter
+# that field can reach. The source's parameter is not one: the source is skipped,
+# and the attribute would have nothing to say about it.
+IF [FieldAttr] = "bound" THEN [DeclaredParam] <> "none";
 
-# Both ways round. A parameter no field uses does not compile, so a parameter
-# implies the matching field type just as much as the field type implies the
-# parameter — which also rules out parameters with no declared fields at all.
-IF [FieldType] = "generic_param" THEN [Generics] = "type_param";
-IF [Generics] = "type_param" THEN [FieldType] = "generic_param";
-IF [FieldType] = "borrowed" THEN [Generics] = "lifetime";
-IF [Generics] = "lifetime" THEN [FieldType] = "borrowed";
+# Both ways round, between the declared field and the parameter it uses. A
+# parameter the declared field does not use is not ruled out — that is what
+# `generic_source` is for — but one it does use has to match the field's shape,
+# and a field of that shape has to have the parameter to use.
+IF [FieldType] IN {"generic_param", "wrapped_param"} THEN [DeclaredParam] = "type_param";
+IF [DeclaredParam] = "type_param" THEN [FieldType] IN {"generic_param", "wrapped_param"};
+IF [FieldType] = "borrowed" THEN [DeclaredParam] = "lifetime";
+IF [DeclaredParam] = "lifetime" THEN [FieldType] = "borrowed";
+IF [FieldType] = "assoc_type" THEN [DeclaredParam] = "assoc_param";
+IF [DeclaredParam] = "assoc_param" THEN [FieldType] = "assoc_type";
