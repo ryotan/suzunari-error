@@ -11,14 +11,19 @@
 //! implement `Serialize`, so a bound that is too strict shows up as a failure to
 //! compile rather than as a wrong assertion.
 //!
+//! The payload is checked whole rather than field by field: the key set at each
+//! level, every value, and the absence of `source`. A bound fixed at the cost of
+//! a field quietly leaving the payload would otherwise pass.
+//!
 //! `.build()` is used because these fixtures have no source field: there is no
 //! `Result` to attach a context selector to.
 
 #![cfg(feature = "serde")]
 
-use core::fmt::Debug;
+use core::fmt::{Debug, Display};
 use core::marker::PhantomData;
 use serde::{Serialize, Serializer};
+use serde_json::{Value, json};
 use suzunari_error::*;
 
 /// `Debug`, which `#[suzunari_error]` requires, but deliberately not
@@ -26,6 +31,44 @@ use suzunari_error::*;
 /// error with.
 #[derive(Debug)]
 struct Opaque;
+
+/// The key set of a JSON object, so a level can be checked as a whole rather
+/// than one probe at a time.
+///
+/// A set, not a sequence: `serde_json` holds an object's keys in alphabetical
+/// order, so the payload's own field order is not observable here. That order is
+/// what the recording serializer in the differential suite exists to check.
+fn key_set(value: &Value) -> Vec<&str> {
+    value
+        .as_object()
+        .unwrap_or_else(|| panic!("expected an object, got {value}"))
+        .keys()
+        .map(String::as_str)
+        .collect()
+}
+
+/// Asserts the envelope around `context`: a node with no cause carries exactly
+/// `type`, `message`, `location` and `context`, and `location` points into this
+/// file.
+fn assert_envelope(value: &Value, type_name: &str, message: &str) {
+    assert_eq!(key_set(value), ["context", "location", "message", "type"]);
+    assert_eq!(value["type"], json!(type_name));
+    assert_eq!(value["message"], json!(message));
+
+    assert_eq!(key_set(&value["location"]), ["column", "file", "line"]);
+    let file = value["location"]["file"]
+        .as_str()
+        .expect("file is a string");
+    assert!(
+        file.ends_with("serde_bound_inference.rs"),
+        "location points at {file}"
+    );
+    assert!(value["location"]["line"].as_u64().is_some_and(|n| n > 0));
+    assert!(value["location"]["column"].as_u64().is_some_and(|n| n > 0));
+
+    // Absence matters as much as presence: `source` is omitted, not null.
+    assert!(!value.as_object().expect("an object").contains_key("source"));
+}
 
 // ---------------------------------------------------------------------------
 // A field whose type is an associated type of the parameter
@@ -49,11 +92,11 @@ impl Store for FileStore {
 /// serde's: it bounds the parameter and never the associated type, so the
 /// clause has to be written out.
 #[suzunari_error(serialize)]
-#[suzu(display("no entry for the key"))]
+#[suzu(display("no entry for {key}"))]
 struct NotFound<S>
 where
     S: Store + Debug,
-    S::Key: Debug + Serialize,
+    S::Key: Debug + Display + Serialize,
 {
     key: S::Key,
 }
@@ -68,8 +111,8 @@ fn an_associated_type_field_bounds_the_associated_type() {
     .build();
     let value = serde_json::to_value::<NotFound<FileStore>>(error).unwrap();
 
-    assert_eq!(value["type"], "NotFound");
-    assert_eq!(value["context"]["key"], "k1");
+    assert_envelope(&value, "NotFound", "no entry for k1");
+    assert_eq!(value["context"], json!({ "key": "k1" }));
 }
 
 // ---------------------------------------------------------------------------
@@ -94,8 +137,13 @@ fn a_phantom_data_field_bounds_nothing() {
     .build();
     let value = serde_json::to_value::<Tagged<Opaque>>(error).unwrap();
 
-    assert_eq!(value["type"], "Tagged");
-    assert_eq!(value["context"]["detail"], "boom");
+    assert_envelope(&value, "Tagged", "tagged failure");
+    // The marker still reaches the payload — serialized as unit, which is null
+    // in JSON. Dropping the bound must not drop the field with it.
+    assert_eq!(
+        value["context"],
+        json!({ "marker": null, "detail": "boom" })
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -119,15 +167,25 @@ where
 struct Rejected<T: Debug> {
     #[serde(serialize_with = "as_debug")]
     value: T,
+    reason: &'static str,
 }
 
 #[test]
 fn a_serialize_with_field_bounds_nothing() {
-    let error = RejectedSnafu { value: Opaque }.build();
+    let error = RejectedSnafu {
+        value: Opaque,
+        reason: "unsupported",
+    }
+    .build();
     let value = serde_json::to_value::<Rejected<Opaque>>(error).unwrap();
 
-    assert_eq!(value["type"], "Rejected");
-    assert_eq!(value["context"]["value"], "Opaque");
+    assert_envelope(&value, "Rejected", "rejected the value");
+    // "Opaque" rather than an object: the attribute's function ran, so dropping
+    // the bound did not quietly drop the attribute along with it.
+    assert_eq!(
+        value["context"],
+        json!({ "value": "Opaque", "reason": "unsupported" })
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -155,16 +213,62 @@ impl<T> Serialize for Redacted<T> {
 struct AuthFailed<T: Debug> {
     #[serde(bound = "")]
     credential: Redacted<T>,
+    attempts: u32,
 }
 
 #[test]
 fn a_field_bound_of_the_users_own_replaces_the_inference() {
     let error = AuthFailedSnafu {
         credential: Redacted(Opaque),
+        attempts: 3u32,
     }
     .build();
     let value = serde_json::to_value::<AuthFailed<Opaque>>(error).unwrap();
 
-    assert_eq!(value["type"], "AuthFailed");
-    assert_eq!(value["context"]["credential"], "<redacted>");
+    assert_envelope(&value, "AuthFailed", "authentication failed");
+    assert_eq!(
+        value["context"],
+        json!({ "credential": "<redacted>", "attempts": 3 })
+    );
+}
+
+// ---------------------------------------------------------------------------
+// A parameter no declared field uses
+// ---------------------------------------------------------------------------
+
+/// The parameter is the source's, and the source is skipped in the definition.
+/// Bounding it would reject `io::Error`, which is what this instantiates.
+#[suzunari_error(serialize)]
+#[suzu(display("wrapping {label}"))]
+struct Wrapping<T: Debug + Display, U>
+where
+    U: core::error::Error + Debug + 'static,
+{
+    label: T,
+    source: U,
+}
+
+#[test]
+fn a_parameter_only_the_source_uses_is_not_bounded() {
+    let error: Wrapping<u32, std::io::Error> = std::fs::read("/nonexistent-suzunari-error")
+        .context(WrappingSnafu { label: 7u32 })
+        .unwrap_err();
+    let value = serde_json::to_value(&error).unwrap();
+
+    // A cause is present here, so the envelope carries `source` too.
+    assert_eq!(
+        key_set(&value),
+        ["context", "location", "message", "source", "type"]
+    );
+    assert_eq!(value["type"], json!("Wrapping"));
+    assert_eq!(value["message"], json!("wrapping 7"));
+    assert_eq!(value["context"], json!({ "label": 7 }));
+
+    // The source is not one of ours, so it continues the chain with `message`
+    // alone rather than contributing its own fields.
+    assert_eq!(key_set(&value["source"]), ["message"]);
+    assert_eq!(
+        value["source"]["message"],
+        json!(std::io::Error::from_raw_os_error(2).to_string())
+    );
 }
