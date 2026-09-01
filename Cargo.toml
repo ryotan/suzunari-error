@@ -30,6 +30,13 @@ authors.workspace = true
 rust-version.workspace = true
 readme = "README.md"
 
+# The crate documentation describes the `serde` feature in full — a row in the
+# feature table and a section of its own — but the only public name the feature
+# adds is `impl Serialize for BoxedStackError`, which a default-feature build
+# leaves out. Without this the published docs promise an impl they do not list.
+[package.metadata.docs.rs]
+all-features = true
+
 [features]
 default = ["std"]
 std = ["alloc", "snafu/std"]
