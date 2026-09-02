@@ -115,6 +115,16 @@ mod display_error;
 mod stack_error;
 mod stack_report;
 
+/// How to read a serialized payload back: the data structures a consumer
+/// defines, and schemas for the two shapes the payload takes.
+///
+/// Nothing to import. The module carries documentation, and every example in
+/// it is checked against a real payload.
+#[cfg(feature = "serde")]
+pub mod _payload {
+    #![doc = include_str!("payload.md")]
+}
+
 #[doc(hidden)]
 pub mod __private;
 

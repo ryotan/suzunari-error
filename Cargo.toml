@@ -66,6 +66,10 @@ bincode = { version = "2", features = ["serde"] }
 ciborium = "0.2"
 postcard = { version = "1", features = ["use-std"] }
 rmp-serde = "1"
+# Schema validators, so the definitions in src/payload.md are checked against
+# a real payload rather than left to rot.
+jsonschema = "0.52"
+cddl = "0.10"
 
 # All three use `#[report]`, which needs `std`. Declaring that lets `cargo test
 # --no-default-features` skip them instead of failing to build them.
