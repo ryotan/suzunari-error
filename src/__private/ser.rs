@@ -19,10 +19,22 @@
 //! things, and `type` cannot separate them: an erased node still has a type
 //! name, because the erasure forwards `type_name()` to the value it holds.
 //!
-//! All three are `#[derive(Serialize)]` structs that the adapters below fill in.
-//! Nothing here calls `serialize_struct` by hand: a hand-written impl must also
-//! call `skip_field` for every field it omits, and forgetting that is invisible
-//! in JSON.
+//! # Two emitted shapes, chosen by the format
+//!
+//! The three shapes above tell each other apart by which keys are present, which
+//! only works where the format carries field names. A format that does not —
+//! where a reader advances by type and has to know the field count in advance —
+//! gets one uniform shape instead, with the absent parts written as `None`.
+//!
+//! [`Serializer::is_human_readable`] makes the choice. serde's own impls use it
+//! the same way, and every binary format measured reports `false`: a
+//! self-describing binary format therefore gets the uniform shape too, which
+//! costs it a few entries it could have done without.
+//!
+//! Only the choice is written by hand; both shapes are derived. Nothing here
+//! calls `serialize_struct` directly: a hand-written impl must also call
+//! `skip_field` for every field it omits, and forgetting that is invisible in
+//! JSON.
 
 use crate::{Location, StackError};
 use core::error::Error;
@@ -77,11 +89,16 @@ struct LocationDef<'a> {
 
 /// Bridges the [`Location`] alias — which is itself a reference — to
 /// [`LocationDef`], whose generated `serialize` takes `&core::panic::Location`.
-fn serialize_location<S: Serializer>(
-    location: &Location,
-    serializer: S,
-) -> Result<S::Ok, S::Error> {
-    LocationDef::serialize(location, serializer)
+///
+/// A named type rather than a `serialize_with` function, because the compact
+/// shapes carry a location and the uniform one carries `Option<_>`; a
+/// `serialize_with` would have to be written twice, once per level of `Option`.
+struct LocationValue(Location);
+
+impl Serialize for LocationValue {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        LocationDef::serialize(self.0, serializer)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -94,21 +111,41 @@ fn serialize_location<S: Serializer>(
 /// it declares no fields of its own — and making that a type-level fact is what
 /// keeps it from being conflated with [`BoxedStackErrorNode`], where the fields
 /// exist but are unreachable.
-#[derive(Serialize)]
 pub struct StackErrorNode<M, C, Src> {
     /// `StackError::type_name()` — `"Type"` or `"Enum::Variant"`.
-    #[serde(rename = "type")]
     pub type_name: &'static str,
     /// The error's `Display` output.
     pub message: M,
     /// Where the error was constructed.
-    #[serde(serialize_with = "serialize_location")]
     pub location: Location,
     /// The type's declared fields.
     pub context: C,
     /// The next node in the chain. `None` when there is no cause.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<Src>,
+}
+
+impl<M: Serialize, C: Serialize, Src: Serialize> Serialize for StackErrorNode<M, C, Src> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if serializer.is_human_readable() {
+            CompactStackNode {
+                type_name: self.type_name,
+                message: &self.message,
+                location: LocationValue(self.location),
+                context: &self.context,
+                source: self.source.as_ref(),
+            }
+            .serialize(serializer)
+        } else {
+            UniformNode {
+                type_name: Some(self.type_name),
+                message: &self.message,
+                location: Some(LocationValue(self.location)),
+                context: Some(&self.context),
+                source: self.source.as_ref(),
+            }
+            .serialize(serializer)
+        }
+    }
 }
 
 /// Phase 1 node for an error reached through a type-erased boundary.
@@ -116,31 +153,150 @@ pub struct StackErrorNode<M, C, Src> {
 /// Identical to [`StackErrorNode`] minus `context`: only `&dyn StackError` is
 /// available, so the declared fields cannot be read. It carries no type
 /// parameters because both the message and the continuation are fixed by that.
-#[derive(Serialize)]
 pub struct BoxedStackErrorNode<'a> {
     /// `StackError::type_name()`, forwarded from the value behind the erasure —
     /// so this is the wrapped error's name, never the wrapper's.
-    #[serde(rename = "type")]
     pub type_name: &'static str,
     /// The error's `Display` output.
     pub message: Message<'a, dyn StackError + 'a>,
     /// Where the error was constructed.
-    #[serde(serialize_with = "serialize_location")]
     pub location: Location,
     /// The next node in the chain. `None` when there is no cause.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<NextNode<'a>>,
 }
 
+impl Serialize for BoxedStackErrorNode<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if serializer.is_human_readable() {
+            CompactErasedNode {
+                type_name: self.type_name,
+                message: &self.message,
+                location: LocationValue(self.location),
+                source: self.source.as_ref(),
+            }
+            .serialize(serializer)
+        } else {
+            UniformNode {
+                type_name: Some(self.type_name),
+                message: &self.message,
+                location: Some(LocationValue(self.location)),
+                // The fields exist but are unreachable, which the uniform shape
+                // says the same way a node with no fields at all would. The
+                // distinction JSON draws by omitting the key is lost here; a
+                // reader of a fixed layout has no key to look for either way.
+                context: NO_CONTEXT,
+                source: self.source.as_ref(),
+            }
+            .serialize(serializer)
+        }
+    }
+}
+
 /// Phase 2 node: a plain [`Error`] tail, with no location information.
-#[derive(Serialize)]
 pub struct ErrorNode<'a> {
     /// The error's `Display` output.
     pub message: Message<'a, dyn Error + 'static>,
     /// The next node in the chain. `None` when there is no cause.
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub source: Option<DynError<'a>>,
 }
+
+impl Serialize for ErrorNode<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        if serializer.is_human_readable() {
+            CompactPlainNode {
+                message: &self.message,
+                source: self.source.as_ref(),
+            }
+            .serialize(serializer)
+        } else {
+            UniformNode {
+                type_name: None,
+                message: &self.message,
+                location: None,
+                context: NO_CONTEXT,
+                source: self.source.as_ref(),
+            }
+            .serialize(serializer)
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Emitted shapes
+// ---------------------------------------------------------------------------
+//
+// The nodes above decide which of these to fill in; these are what actually
+// reach the serializer. Both sets are derived. Nothing here calls
+// `serialize_struct` by hand: a hand-written impl must also call `skip_field`
+// for every field it omits, and forgetting that is invisible in JSON.
+//
+// Each carries the `rename` its node had, so the struct name in the data model
+// is the node's name and not the shape's. Self-describing formats such as JSON
+// discard struct names, which is why this kind of leak survives until a
+// `Token`-level comparison catches it.
+
+/// What a [`StackErrorNode`] emits to a self-describing format.
+#[derive(Serialize)]
+#[serde(rename = "StackErrorNode")]
+struct CompactStackNode<'a, M, C, Src> {
+    #[serde(rename = "type")]
+    type_name: &'static str,
+    message: &'a M,
+    location: LocationValue,
+    context: &'a C,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<&'a Src>,
+}
+
+/// What a [`BoxedStackErrorNode`] emits to a self-describing format.
+#[derive(Serialize)]
+#[serde(rename = "BoxedStackErrorNode")]
+struct CompactErasedNode<'a, M, Src> {
+    #[serde(rename = "type")]
+    type_name: &'static str,
+    message: &'a M,
+    location: LocationValue,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<&'a Src>,
+}
+
+/// What an [`ErrorNode`] emits to a self-describing format.
+#[derive(Serialize)]
+#[serde(rename = "ErrorNode")]
+struct CompactPlainNode<'a, M, Src> {
+    message: &'a M,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    source: Option<&'a Src>,
+}
+
+/// What every node emits to a format that is not self-describing.
+///
+/// One shape for all three, with the absent parts as `None`. A format with no
+/// field names cannot express a key that is sometimes missing: a reader advances
+/// by type, so it has to know how many fields to expect before it reads them.
+/// Every `Option` here writes its own discriminant, which is exactly what such a
+/// reader needs.
+///
+/// Making the three shapes identical also settles the phase boundary. `NextNode`
+/// is `untagged`, so its variants contribute no discriminant of their own — but
+/// with one shape they no longer need to, because both variants lay out the same
+/// five fields. A reader tells them apart by `type` being absent.
+#[derive(Serialize)]
+#[serde(rename = "StackErrorNode")]
+struct UniformNode<'a, M, C, Src> {
+    #[serde(rename = "type")]
+    type_name: Option<&'static str>,
+    message: &'a M,
+    location: Option<LocationValue>,
+    context: Option<&'a C>,
+    source: Option<&'a Src>,
+}
+
+/// `context` for a node that has none, at the type the uniform shape expects.
+///
+/// The type parameter has to be inhabited for `Serialize` to be satisfied even
+/// though no value of it is ever written.
+const NO_CONTEXT: Option<&()> = None;
 
 /// Which node shape the chain continues with, when only a trait object is
 /// available to decide.
