@@ -6,6 +6,7 @@
 
 #![cfg(feature = "serde")]
 
+use serde_test::Configure;
 use suzunari_error::*;
 
 #[suzunari_error]
@@ -101,7 +102,7 @@ fn omits_source_when_there_is_no_cause() {
     let boxed = BoxedStackError::new(leaf().unwrap_err());
     let location = boxed.location();
     serde_test::assert_ser_tokens(
-        &boxed,
+        &boxed.readable(),
         &[
             serde_test::Token::Struct {
                 name: "BoxedStackErrorNode",
@@ -140,7 +141,7 @@ fn node_struct_names_and_field_counts() {
     let location = boxed.location();
 
     serde_test::assert_ser_tokens(
-        &boxed,
+        &boxed.readable(),
         &[
             serde_test::Token::Struct {
                 name: "BoxedStackErrorNode",
@@ -172,6 +173,76 @@ fn node_struct_names_and_field_counts() {
             },
             serde_test::Token::Str("message"),
             serde_test::Token::Str("No such file or directory (os error 2)"),
+            serde_test::Token::StructEnd,
+            serde_test::Token::StructEnd,
+        ],
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The shape a format without field names gets
+// ---------------------------------------------------------------------------
+
+/// Every node emits the same five fields, so a reader that advances by type
+/// rather than by name knows the layout before it starts.
+///
+/// The compact side has to be asserted separately: `assert_ser_tokens` requires
+/// a `Configure` marker precisely because the two representations differ, so a
+/// test that only marks itself `readable` leaves this one unmeasured.
+#[test]
+fn every_node_has_the_same_five_fields_without_field_names() {
+    let boxed = BoxedStackError::new(read_error());
+    let location = boxed.location();
+
+    serde_test::assert_ser_tokens(
+        &boxed.compact(),
+        &[
+            // The erased node. `context` is `None` — the fields exist but
+            // cannot be read — and the count is 5 rather than the 4 a
+            // self-describing format sees.
+            serde_test::Token::Struct {
+                name: "StackErrorNode",
+                len: 5,
+            },
+            serde_test::Token::Str("type"),
+            serde_test::Token::Some,
+            serde_test::Token::Str("ReadError"),
+            serde_test::Token::Str("message"),
+            serde_test::Token::Str("read failed for /nonexistent-suzunari-error"),
+            serde_test::Token::Str("location"),
+            serde_test::Token::Some,
+            serde_test::Token::Struct {
+                name: "Location",
+                len: 3,
+            },
+            serde_test::Token::Str("file"),
+            serde_test::Token::Str(location.file()),
+            serde_test::Token::Str("line"),
+            serde_test::Token::U32(location.line()),
+            serde_test::Token::Str("column"),
+            serde_test::Token::U32(location.column()),
+            serde_test::Token::StructEnd,
+            serde_test::Token::Str("context"),
+            serde_test::Token::None,
+            serde_test::Token::Str("source"),
+            serde_test::Token::Some,
+            // The phase 2 tail, in the same shape: `type` and `location` are
+            // `None` because a plain `Error` has neither, and that is what tells
+            // a reader the phase changed — no key needs to be missing for it.
+            serde_test::Token::Struct {
+                name: "StackErrorNode",
+                len: 5,
+            },
+            serde_test::Token::Str("type"),
+            serde_test::Token::None,
+            serde_test::Token::Str("message"),
+            serde_test::Token::Str("No such file or directory (os error 2)"),
+            serde_test::Token::Str("location"),
+            serde_test::Token::None,
+            serde_test::Token::Str("context"),
+            serde_test::Token::None,
+            serde_test::Token::Str("source"),
+            serde_test::Token::None,
             serde_test::Token::StructEnd,
             serde_test::Token::StructEnd,
         ],
