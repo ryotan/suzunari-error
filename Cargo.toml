@@ -58,6 +58,14 @@ serde_json = "1.0"
 # Token-level comparison: catches struct names and field counts that a JSON
 # string comparison hides. Requires std.
 serde_test = "1.0"
+# One format per shape of the serde ecosystem, so that a conclusion rests on the
+# format's properties rather than on one crate's quirks. Two carry field names
+# (ciborium, rmp-serde) and two do not (bincode, postcard); serde_json above is
+# the self-describing text case.
+bincode = { version = "2", features = ["serde"] }
+ciborium = "0.2"
+postcard = { version = "1", features = ["use-std"] }
+rmp-serde = "1"
 
 # All three use `#[report]`, which needs `std`. Declaring that lets `cargo test
 # --no-default-features` skip them instead of failing to build them.
