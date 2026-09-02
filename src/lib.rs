@@ -66,6 +66,9 @@
 //!   `message` alone, whatever else it can serialize. Its own `Serialize` never
 //!   replaces the node, which would drop everything below it
 //!
+//! Those omissions are how a format carrying field names says "absent"; see
+//! *Formats without field names* for the rest.
+//!
 //! A declared field's own `#[serde(...)]` applies as it would on a struct
 //! derived directly. `#[serde(...)]` on the type or on a variant is refused; the
 //! one setting worth having is available as
@@ -75,6 +78,17 @@
 //! **The payload carries file paths, line numbers and every message in the
 //! chain.** That is the point of it, and it means the payload is diagnostic
 //! detail: decide deliberately before sending one across a trust boundary.
+//!
+//! ## Formats without field names
+//!
+//! The shape above tells its three kinds of node apart by which keys are
+//! present, which only works where the format carries field names. A format
+//! that reports [`is_human_readable() == false`](serde::Serializer::is_human_readable)
+//! — every binary format — receives a uniform shape instead, where every node
+//! carries the same five keys and an absent part is written as `null`.
+//!
+//! [`_payload`] has the data structures to read either shape back, and schemas
+//! to check a payload against.
 //!
 //! # `#[suzu(...)]` Attribute
 //!
