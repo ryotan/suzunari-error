@@ -26,7 +26,7 @@ jobs:
       - name: Harden Runner
         # New workflow — audit first to baseline expected egress, then switch to block once we have a
         # sample of real runs (same rollout process used for the other workflows in this repo).
-        uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
 
