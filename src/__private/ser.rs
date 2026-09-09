@@ -4,34 +4,36 @@
 //! covered by semver guarantees. It exists solely for generated code and for
 //! this crate's own `Serialize` impls.
 //!
-//! # Node shapes
+//! # Three kinds of node
 //!
-//! The payload mirrors [`StackReport`](crate::StackReport)'s two phases, so the
-//! human-readable and machine-readable outputs show the same information:
+//! What a node can say depends on what is reachable at that level of the chain,
+//! which is the same thing that decides what [`StackReport`](crate::StackReport)
+//! can print there:
 //!
-//! - [`StackErrorNode`] — phase 1, concrete type known: `type`, `message`,
+//! - [`StackErrorNode`] — the concrete type is known: `type`, `message`,
 //!   `location`, `context`.
-//! - [`BoxedStackErrorNode`] — phase 1, reached through a type-erased boundary:
-//!   the same minus `context`, because the declared fields are unreachable.
-//! - [`ErrorNode`] — phase 2, a plain [`Error`] tail: `message` only.
+//! - [`TypeErasedStackErrorNode`] — only `&dyn StackError` is available, so the same
+//!   minus `context`: the declared fields cannot be read.
+//! - [`PlainErrorNode`] — not a `StackError` at all, so `message` alone.
 //!
 //! The split is deliberate. An absent `context` and an empty one mean different
 //! things, and `type` cannot separate them: an erased node still has a type
 //! name, because the erasure forwards `type_name()` to the value it holds.
 //!
-//! # Two emitted shapes, chosen by the format
+//! # Two shapes to emit them in
 //!
-//! The three shapes above tell each other apart by which keys are present, which
-//! only works where the format carries field names. A format that does not —
-//! where a reader advances by type and has to know the field count in advance —
-//! gets one uniform shape instead, with the absent parts written as `None`.
+//! The three tell each other apart by which keys are present, which only works
+//! where the format carries field names. So each has a sparse shape for those
+//! formats — `SparseStackError`, `SparseTypeErasedStackError`, `SparsePlainError` —
+//! and all three share `UniformError` for the rest, where every key is written
+//! and an absent one carries `None`.
 //!
 //! [`Serializer::is_human_readable`] makes the choice. serde's own impls use it
 //! the same way, and every binary format measured reports `false`: a
 //! self-describing binary format therefore gets the uniform shape too, which
 //! costs it a few entries it could have done without.
 //!
-//! Only the choice is written by hand; both shapes are derived. Nothing here
+//! Only the choice is written by hand; every shape is derived. Nothing here
 //! calls `serialize_struct` directly: a hand-written impl must also call
 //! `skip_field` for every field it omits, and forgetting that is invisible in
 //! JSON.
@@ -72,10 +74,9 @@ impl<E: ?Sized + Display> Serialize for Message<'_, E> {
 /// through `file()` / `line()` / `column()`, which is what `getter` is for.
 ///
 /// The `rename` is required. A def's own identifier is what reaches
-/// `serialize_struct` as the struct name, so without it the payload's data
-/// model would carry `LocationDef`. Self-describing formats such as JSON
-/// discard struct names, which is why this kind of leak survives until a
-/// `Token`-level comparison catches it.
+/// `serialize_struct` as the struct name, so without it the data model would
+/// carry `LocationDef`. No data format measured writes that name out, so only
+/// this crate's own test serializers would ever see the mistake.
 #[derive(Serialize)]
 #[serde(remote = "core::panic::Location", rename = "Location")]
 struct LocationDef<'a> {
@@ -90,12 +91,12 @@ struct LocationDef<'a> {
 /// Bridges the [`Location`] alias — which is itself a reference — to
 /// [`LocationDef`], whose generated `serialize` takes `&core::panic::Location`.
 ///
-/// A named type rather than a `serialize_with` function, because the compact
+/// A named type rather than a `serialize_with` function, because the sparse
 /// shapes carry a location and the uniform one carries `Option<_>`; a
 /// `serialize_with` would have to be written twice, once per level of `Option`.
-struct LocationValue(Location);
+struct SerializedLocation(Location);
 
-impl Serialize for LocationValue {
+impl Serialize for SerializedLocation {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         LocationDef::serialize(self.0, serializer)
     }
@@ -109,7 +110,7 @@ impl Serialize for LocationValue {
 ///
 /// `context` is not optional here. A concrete type always has one — empty when
 /// it declares no fields of its own — and making that a type-level fact is what
-/// keeps it from being conflated with [`BoxedStackErrorNode`], where the fields
+/// keeps it from being conflated with [`TypeErasedStackErrorNode`], where the fields
 /// exist but are unreachable.
 pub struct StackErrorNode<M, C, Src> {
     /// `StackError::type_name()` — `"Type"` or `"Enum::Variant"`.
@@ -127,19 +128,19 @@ pub struct StackErrorNode<M, C, Src> {
 impl<M: Serialize, C: Serialize, Src: Serialize> Serialize for StackErrorNode<M, C, Src> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         if serializer.is_human_readable() {
-            CompactStackNode {
+            SparseStackError {
                 type_name: self.type_name,
                 message: &self.message,
-                location: LocationValue(self.location),
+                location: SerializedLocation(self.location),
                 context: &self.context,
                 source: self.source.as_ref(),
             }
             .serialize(serializer)
         } else {
-            UniformNode {
+            UniformError {
                 type_name: Some(self.type_name),
                 message: &self.message,
-                location: Some(LocationValue(self.location)),
+                location: Some(SerializedLocation(self.location)),
                 context: Some(&self.context),
                 source: self.source.as_ref(),
             }
@@ -153,7 +154,7 @@ impl<M: Serialize, C: Serialize, Src: Serialize> Serialize for StackErrorNode<M,
 /// Identical to [`StackErrorNode`] minus `context`: only `&dyn StackError` is
 /// available, so the declared fields cannot be read. It carries no type
 /// parameters because both the message and the continuation are fixed by that.
-pub struct BoxedStackErrorNode<'a> {
+pub struct TypeErasedStackErrorNode<'a> {
     /// `StackError::type_name()`, forwarded from the value behind the erasure —
     /// so this is the wrapped error's name, never the wrapper's.
     pub type_name: &'static str,
@@ -165,21 +166,21 @@ pub struct BoxedStackErrorNode<'a> {
     pub source: Option<NextNode<'a>>,
 }
 
-impl Serialize for BoxedStackErrorNode<'_> {
+impl Serialize for TypeErasedStackErrorNode<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         if serializer.is_human_readable() {
-            CompactErasedNode {
+            SparseTypeErasedStackError {
                 type_name: self.type_name,
                 message: &self.message,
-                location: LocationValue(self.location),
+                location: SerializedLocation(self.location),
                 source: self.source.as_ref(),
             }
             .serialize(serializer)
         } else {
-            UniformNode {
+            UniformError {
                 type_name: Some(self.type_name),
                 message: &self.message,
-                location: Some(LocationValue(self.location)),
+                location: Some(SerializedLocation(self.location)),
                 // The fields exist but are unreachable, which the uniform shape
                 // says the same way a node with no fields at all would. The
                 // distinction JSON draws by omitting the key is lost here; a
@@ -193,23 +194,23 @@ impl Serialize for BoxedStackErrorNode<'_> {
 }
 
 /// Phase 2 node: a plain [`Error`] tail, with no location information.
-pub struct ErrorNode<'a> {
+pub struct PlainErrorNode<'a> {
     /// The error's `Display` output.
     pub message: Message<'a, dyn Error + 'static>,
     /// The next node in the chain. `None` when there is no cause.
     pub source: Option<DynError<'a>>,
 }
 
-impl Serialize for ErrorNode<'_> {
+impl Serialize for PlainErrorNode<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         if serializer.is_human_readable() {
-            CompactPlainNode {
+            SparsePlainError {
                 message: &self.message,
                 source: self.source.as_ref(),
             }
             .serialize(serializer)
         } else {
-            UniformNode {
+            UniformError {
                 type_name: None,
                 message: &self.message,
                 location: None,
@@ -230,40 +231,45 @@ impl Serialize for ErrorNode<'_> {
 // `serialize_struct` by hand: a hand-written impl must also call `skip_field`
 // for every field it omits, and forgetting that is invisible in JSON.
 //
-// Each carries the `rename` its node had, so the struct name in the data model
-// is the node's name and not the shape's. Self-describing formats such as JSON
-// discard struct names, which is why this kind of leak survives until a
-// `Token`-level comparison catches it.
+// The sparse three are renamed so that what reaches the serializer names the
+// node kind rather than the encoding, which is this module's business and not a
+// reader's. `UniformError` needs no rename: one struct serves all three kinds,
+// and that is what its own name says.
+//
+// No data format measured writes a struct name out — not JSON, and not the
+// binary ones either. What observes these names is this crate's own test
+// serializers: the token comparison, and the fixed-buffer one the core-only tier
+// uses, which records the name so that a wrong one cannot pass unnoticed.
 
 /// What a [`StackErrorNode`] emits to a self-describing format.
 #[derive(Serialize)]
-#[serde(rename = "StackErrorNode")]
-struct CompactStackNode<'a, M, C, Src> {
+#[serde(rename = "StackError")]
+struct SparseStackError<'a, M, C, Src> {
     #[serde(rename = "type")]
     type_name: &'static str,
     message: &'a M,
-    location: LocationValue,
+    location: SerializedLocation,
     context: &'a C,
     #[serde(skip_serializing_if = "Option::is_none")]
     source: Option<&'a Src>,
 }
 
-/// What a [`BoxedStackErrorNode`] emits to a self-describing format.
+/// What a [`TypeErasedStackErrorNode`] emits to a self-describing format.
 #[derive(Serialize)]
-#[serde(rename = "BoxedStackErrorNode")]
-struct CompactErasedNode<'a, M, Src> {
+#[serde(rename = "TypeErasedStackError")]
+struct SparseTypeErasedStackError<'a, M, Src> {
     #[serde(rename = "type")]
     type_name: &'static str,
     message: &'a M,
-    location: LocationValue,
+    location: SerializedLocation,
     #[serde(skip_serializing_if = "Option::is_none")]
     source: Option<&'a Src>,
 }
 
-/// What an [`ErrorNode`] emits to a self-describing format.
+/// What an [`PlainErrorNode`] emits to a self-describing format.
 #[derive(Serialize)]
-#[serde(rename = "ErrorNode")]
-struct CompactPlainNode<'a, M, Src> {
+#[serde(rename = "PlainError")]
+struct SparsePlainError<'a, M, Src> {
     message: &'a M,
     #[serde(skip_serializing_if = "Option::is_none")]
     source: Option<&'a Src>,
@@ -282,12 +288,11 @@ struct CompactPlainNode<'a, M, Src> {
 /// with one shape they no longer need to, because both variants lay out the same
 /// five fields. A reader tells them apart by `type` being absent.
 #[derive(Serialize)]
-#[serde(rename = "StackErrorNode")]
-struct UniformNode<'a, M, C, Src> {
+struct UniformError<'a, M, C, Src> {
     #[serde(rename = "type")]
     type_name: Option<&'static str>,
     message: &'a M,
-    location: Option<LocationValue>,
+    location: Option<SerializedLocation>,
     context: Option<&'a C>,
     source: Option<&'a Src>,
 }
@@ -316,14 +321,14 @@ pub enum NextNode<'a> {
 // Trait-object adapters
 // ---------------------------------------------------------------------------
 
-/// Serializes a `&dyn StackError` as a [`BoxedStackErrorNode`] and walks the
+/// Serializes a `&dyn StackError` as a [`TypeErasedStackErrorNode`] and walks the
 /// chain. The concrete type is not available, so there is no `context` to emit.
 pub struct DynStackError<'a>(pub &'a dyn StackError);
 
 impl Serialize for DynStackError<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let error = self.0;
-        BoxedStackErrorNode {
+        TypeErasedStackErrorNode {
             type_name: error.type_name(),
             message: Message(error),
             location: error.location(),
@@ -333,12 +338,12 @@ impl Serialize for DynStackError<'_> {
     }
 }
 
-/// Serializes a `&dyn Error` as an [`ErrorNode`], following `Error::source()`.
+/// Serializes a `&dyn Error` as an [`PlainErrorNode`], following `Error::source()`.
 pub struct DynError<'a>(pub &'a (dyn Error + 'static));
 
 impl Serialize for DynError<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        ErrorNode {
+        PlainErrorNode {
             message: Message(self.0),
             source: self.0.source().map(DynError),
         }
@@ -372,7 +377,7 @@ fn next_node(error: &dyn StackError) -> Option<NextNode<'_>> {
 ///
 /// `Serialize` is a supertrait because the specialized branch calls the type's
 /// own impl; a type that cannot serialize itself must take the fallback path.
-pub trait SerializeAsNode: Serialize {}
+pub trait NodeShaped: Serialize {}
 
 // ---------------------------------------------------------------------------
 // Source dispatch — autoref specialization on the marker
@@ -383,7 +388,7 @@ pub trait SerializeAsNode: Serialize {}
 /// Generated code calls
 /// `(&&SourceNodeResolver(&self.source)).source_node()`. Method resolution
 /// tries the specialized impl first — its target carries one more `&` — and
-/// reaches the fallback only when the field's type is not [`SerializeAsNode`].
+/// reaches the fallback only when the field's type is not [`NodeShaped`].
 ///
 /// This is the trait-based form of the autoref specialization the parent module
 /// already uses for `stack_source()`. The `Deref`-based form cannot work here:
@@ -400,7 +405,7 @@ pub trait ResolveSourceNode {
     fn source_node(&self) -> Self::Node;
 }
 
-impl<'a, T: SerializeAsNode> ResolveSourceNode for &SourceNodeResolver<'a, T> {
+impl<'a, T: NodeShaped> ResolveSourceNode for &SourceNodeResolver<'a, T> {
     type Node = &'a T;
 
     fn source_node(&self) -> Self::Node {
@@ -432,7 +437,7 @@ impl<'a, T: Error + 'static> ResolveSourceNodeFallback for SourceNodeResolver<'a
 
 #[cfg(feature = "alloc")]
 mod alloc_impls {
-    use super::{DynStackError, Serialize, SerializeAsNode, Serializer};
+    use super::{DynStackError, NodeShaped, Serialize, Serializer};
     use crate::BoxedStackError;
 
     impl Serialize for BoxedStackError {
@@ -443,5 +448,5 @@ mod alloc_impls {
 
     // The type is erased, so no node it produces carries `context`, but
     // `stack_source()` is still callable — the chain is not truncated here.
-    impl SerializeAsNode for BoxedStackError {}
+    impl NodeShaped for BoxedStackError {}
 }

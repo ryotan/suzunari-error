@@ -127,7 +127,7 @@ impl Record {
 /// A phase 2 node: `message`, and nothing else.
 pub fn error_node(message: &str) -> Record {
     Record::Struct {
-        name: "ErrorNode",
+        name: "PlainError",
         announced_len: 1,
         fields: vec![("message", Record::Str(message.to_owned()))],
     }

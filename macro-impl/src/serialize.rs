@@ -366,7 +366,7 @@ pub(crate) fn generate_serialize_impl(
                 }
             }
 
-            impl #impl_generics #ser::SerializeAsNode for #name #ty_generics #outer_where {}
+            impl #impl_generics #ser::NodeShaped for #name #ty_generics #outer_where {}
         };
     })
 }

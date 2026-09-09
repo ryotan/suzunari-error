@@ -71,7 +71,7 @@ fn context_object_does_not_leak_the_definition_name() {
         &error.readable(),
         &[
             serde_test::Token::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 len: 5,
             },
             serde_test::Token::Str("type"),
@@ -104,7 +104,7 @@ fn context_object_does_not_leak_the_definition_name() {
             serde_test::Token::Str("source"),
             serde_test::Token::Some,
             serde_test::Token::Struct {
-                name: "ErrorNode",
+                name: "PlainError",
                 len: 1,
             },
             serde_test::Token::Str("message"),
@@ -207,7 +207,7 @@ fn empty_context_is_distinct_from_an_erased_one() {
         &error.readable(),
         &[
             serde_test::Token::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 len: 4,
             },
             serde_test::Token::Str("type"),
@@ -258,7 +258,7 @@ fn declared_fields_reach_context_without_field_names() {
         &error.compact(),
         &[
             serde_test::Token::Struct {
-                name: "StackErrorNode",
+                name: "UniformError",
                 len: 5,
             },
             serde_test::Token::Str("type"),
@@ -296,7 +296,7 @@ fn declared_fields_reach_context_without_field_names() {
             // The phase 2 tail: `type` and `location` absent as values, not as
             // keys, so the field count matches every other node.
             serde_test::Token::Struct {
-                name: "StackErrorNode",
+                name: "UniformError",
                 len: 5,
             },
             serde_test::Token::Str("type"),
