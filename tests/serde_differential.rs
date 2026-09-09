@@ -228,7 +228,7 @@ mod source_is_boxed {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));

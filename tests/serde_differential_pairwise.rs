@@ -315,7 +315,7 @@ mod case_04 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -356,7 +356,7 @@ mod case_05 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -400,7 +400,7 @@ mod case_06 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -475,7 +475,7 @@ mod case_08 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -517,7 +517,7 @@ mod case_09 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -594,7 +594,7 @@ mod case_11 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -638,7 +638,7 @@ mod case_12 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -967,7 +967,7 @@ mod case_21 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));
@@ -1076,7 +1076,7 @@ mod case_24 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));
@@ -1184,7 +1184,7 @@ mod case_27 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));
@@ -1367,7 +1367,7 @@ mod case_32 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -1539,7 +1539,7 @@ mod case_37 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));
@@ -1652,7 +1652,7 @@ mod case_40 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));
@@ -1694,7 +1694,7 @@ mod case_41 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -1738,7 +1738,7 @@ mod case_42 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -1782,7 +1782,7 @@ mod case_43 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));
@@ -1826,7 +1826,7 @@ mod case_44 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -1980,7 +1980,7 @@ mod case_48 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));
@@ -2024,7 +2024,7 @@ mod case_49 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -2068,7 +2068,7 @@ mod case_50 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -2107,7 +2107,7 @@ mod case_51 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -2216,7 +2216,7 @@ mod case_54 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -2260,7 +2260,7 @@ mod case_55 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));
@@ -2336,7 +2336,7 @@ mod case_57 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -2593,7 +2593,7 @@ mod case_64 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -2634,7 +2634,7 @@ mod case_65 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));
@@ -2880,7 +2880,7 @@ mod case_72 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));
@@ -2994,7 +2994,7 @@ mod case_75 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -3071,7 +3071,7 @@ mod case_77 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -3295,7 +3295,7 @@ mod case_83 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -3334,7 +3334,7 @@ mod case_84 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "StackErrorNode",
+                name: "StackError",
                 ..
             }
         ));
@@ -3377,7 +3377,7 @@ mod case_85 {
         assert!(matches!(
             recorded.field("source").some(),
             Record::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 ..
             }
         ));

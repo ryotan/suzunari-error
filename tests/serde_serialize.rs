@@ -105,7 +105,7 @@ fn omits_source_when_there_is_no_cause() {
         &boxed.readable(),
         &[
             serde_test::Token::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 len: 3,
             },
             serde_test::Token::Str("type"),
@@ -144,7 +144,7 @@ fn node_struct_names_and_field_counts() {
         &boxed.readable(),
         &[
             serde_test::Token::Struct {
-                name: "BoxedStackErrorNode",
+                name: "TypeErasedStackError",
                 len: 4,
             },
             serde_test::Token::Str("type"),
@@ -168,7 +168,7 @@ fn node_struct_names_and_field_counts() {
             // non-self-describing format would encode a discriminant here.
             serde_test::Token::Some,
             serde_test::Token::Struct {
-                name: "ErrorNode",
+                name: "PlainError",
                 len: 1,
             },
             serde_test::Token::Str("message"),
@@ -201,7 +201,7 @@ fn every_node_has_the_same_five_fields_without_field_names() {
             // cannot be read — and the count is 5 rather than the 4 a
             // self-describing format sees.
             serde_test::Token::Struct {
-                name: "StackErrorNode",
+                name: "UniformError",
                 len: 5,
             },
             serde_test::Token::Str("type"),
@@ -230,7 +230,7 @@ fn every_node_has_the_same_five_fields_without_field_names() {
             // `None` because a plain `Error` has neither, and that is what tells
             // a reader the phase changed — no key needs to be missing for it.
             serde_test::Token::Struct {
-                name: "StackErrorNode",
+                name: "UniformError",
                 len: 5,
             },
             serde_test::Token::Str("type"),

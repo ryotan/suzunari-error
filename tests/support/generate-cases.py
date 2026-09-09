@@ -379,7 +379,7 @@ def body(levels, ty_name, sel):
             "serialize_enum": "inner_enum_error()",
             "boxed": "BoxedStackError::new(inner_error())",
         }[source]
-        node = "BoxedStackErrorNode" if source == "boxed" else "StackErrorNode"
+        node = "TypeErasedStackError" if source == "boxed" else "StackError"
         return f'''        let cause = {cause};
         let standalone = record(&cause);
         let error = Err::<(), _>(cause).context({sel}).unwrap_err();

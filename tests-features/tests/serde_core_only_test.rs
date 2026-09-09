@@ -58,7 +58,7 @@ fn the_payload_is_written_without_an_allocator() {
     let written = canonical(&mut bytes, &lookup_error()).expect("fits");
     let text = core::str::from_utf8(written).expect("utf-8");
 
-    assert!(text.starts_with("S\"StackErrorNode\"(4){"), "{text}");
+    assert!(text.starts_with("S\"StackError\"(4){"), "{text}");
     assert!(text.contains("type=\"LookupError\""), "{text}");
     assert!(text.contains("message=\"lookup failed for k\""), "{text}");
     assert!(text.contains("context=S\"LookupError\"(2){"), "{text}");
