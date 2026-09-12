@@ -12,6 +12,7 @@ Built on [SNAFU](https://docs.rs/snafu), inspired by [Error Handling for Large R
 - **`Location`** — Memory-efficient location structure compatible with SNAFU's implicit context.
 - **`DisplayError<E>`** — Adapter to wrap external types that implement `Debug + Display` but not `Error`, making them usable as snafu `source` fields.
 - **`BoxedStackError`** — Type-erased `StackError` wrapper for uniform error handling across module boundaries (requires `alloc`).
+- **`#[suzunari_error(serialize)]`** — Opt-in `Serialize` impl that emits the whole error chain: type name, message, location and declared fields at every level (requires `serde`).
 - **`#![no_std]` compatible** — Works in core-only, `alloc`, and `std` environments via feature flags.
 
 ## Usage
@@ -183,6 +184,35 @@ struct HashError {
 }
 ```
 
+### `#[suzunari_error(serialize)]` — The error chain as structured data
+
+With the `serde` feature, the generated `impl Serialize` emits the whole chain:
+
+```rust
+#[suzunari_error(serialize)]
+#[suzu(display("fetch failed for {uri}"))]
+struct FetchError {
+    uri: String,
+    source: std::io::Error,
+}
+```
+
+```json
+{
+  "type": "FetchError",
+  "message": "fetch failed for /foo",
+  "location": { "file": "src/fetch.rs", "line": 12, "column": 9 },
+  "context": { "uri": "/foo" },
+  "source": { "message": "No such file or directory (os error 2)" }
+}
+```
+
+`context` holds the declared fields. A cause from outside this crate contributes `message` alone. A format that carries no field names — every binary format — receives a uniform shape where all five keys are always written and an absent part is `null`.
+
+> **The payload carries file paths and every message in the chain.** Decide deliberately before sending one across a trust boundary.
+
+See the `_payload` module docs for the structures to read either shape back, plus a JSON Schema and a CDDL.
+
 ## `#[suzu(...)]` vs `#[snafu(...)]`
 
 `#[suzu(...)]` is a superset of `#[snafu(...)]`. All snafu keywords (`display`, `source`, `implicit`, etc.) work inside `#[suzu(...)]` and are passed through to snafu. Additionally, `#[suzu(...)]` supports `from` and `location` extensions.
@@ -195,15 +225,18 @@ When using `#[suzunari_error]`, prefer `#[suzu(...)]` over `#[snafu(...)]` for c
 |---------|---------|-------------|
 | `std`   | Yes     | Enables `alloc` + `snafu/std` + `StackReport`'s `Termination` impl + `#[report]` macro |
 | `alloc` | No      | Enables `BoxedStackError` and `From<T> for BoxedStackError` macro generation |
+| `serde` | No      | Enables `#[suzunari_error(serialize)]` |
 | _(none)_ | —      | Core-only: `Location`, `StackError`, `StackReport` (formatting only), `DisplayError` |
 
 > **Note:** `StackReport` itself uses only `core::fmt` and is available in all tiers. Only the `Termination` impl (for use as `main()` return type) and `#[report]` require `std`.
+
+> **Note:** `serde` does not imply `alloc` — it works in all three tiers.
 
 For `no_std` usage, disable default features:
 
 ```toml
 [dependencies]
-suzunari-error = { version = "0.1", default-features = false }
+suzunari-error = { version = "0.3", default-features = false }
 ```
 
 ## Why suzunari-error?
