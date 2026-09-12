@@ -42,8 +42,7 @@
 //! # Serialization
 //!
 //! With the `serde` feature, `#[suzunari_error(serialize)]` generates an
-//! `impl Serialize` that emits the error chain as a nested payload, carrying the
-//! same levels [`StackReport`] prints:
+//! `impl Serialize` that emits the error chain as a nested payload:
 //!
 //! ```json
 //! {
@@ -56,36 +55,27 @@
 //! ```
 //!
 //! - `type` is the type's bare name, without type arguments: `LookupError<u32>`
-//!   and `LookupError<String>` both serialize as `"LookupError"`. It comes from
-//!   [`StackError::type_name()`], which the derive emits as a string literal
+//!   and `LookupError<String>` both serialize as `"LookupError"`
 //! - `context` holds the type's own declared fields, and is present even when
-//!   there are none. It is absent only where the concrete type was erased —
-//!   through [`BoxedStackError`] — and the fields cannot be read
+//!   there are none. It is absent only behind [`BoxedStackError`], where the
+//!   concrete type is gone
 //! - `source` is omitted when there is no cause
-//! - A cause that is not one of this crate's types continues the chain with
-//!   `message` alone, whatever else it can serialize. Its own `Serialize` never
-//!   replaces the node, which would drop everything below it
-//!
-//! Those omissions are how a format carrying field names says "absent"; see
-//! *Formats without field names* for the rest.
+//! - A cause that is not one of this crate's types contributes `message` alone
 //!
 //! A declared field's own `#[serde(...)]` applies as it would on a struct
-//! derived directly. `#[serde(...)]` on the type or on a variant is refused; the
-//! one setting worth having is available as
-//! `#[suzunari_error(serialize(rename_all = "camelCase"))]`, which renames the
-//! declared fields and nothing else.
+//! derived directly. `#[serde(...)]` on the type or on a variant is refused;
+//! `#[suzunari_error(serialize(rename_all = "camelCase"))]` renames the declared
+//! fields and nothing else.
 //!
 //! **The payload carries file paths, line numbers and every message in the
-//! chain.** That is the point of it, and it means the payload is diagnostic
-//! detail: decide deliberately before sending one across a trust boundary.
+//! chain.** Decide deliberately before sending one across a trust boundary.
 //!
 //! ## Formats without field names
 //!
-//! The shape above tells its three kinds of node apart by which keys are
-//! present, which only works where the format carries field names. A format
+//! Those omissions only work where the format carries field names. A format
 //! that reports [`is_human_readable() == false`](serde::Serializer::is_human_readable)
-//! — every binary format — receives a uniform shape instead, where every node
-//! carries the same five keys and an absent part is written as `null`.
+//! — every binary format — receives a uniform shape, where every error node
+//! carries the same five keys and an absent part is `null`.
 //!
 //! [`_payload`] has the data structures to read either shape back, and schemas
 //! to check a payload against.

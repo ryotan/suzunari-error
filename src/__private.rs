@@ -17,8 +17,11 @@ use crate::display_error::DisplayError;
 use core::error::Error;
 use core::fmt::{Debug, Display};
 
+// Named for what it builds, not for what it does. `ser` would collide with
+// `serde::ser`, which is a different module reachable from this one through the
+// re-export just below.
 #[cfg(feature = "serde")]
-pub mod ser;
+pub mod payload;
 
 // Generated code refers to serde through this re-export, never a bare `::serde`,
 // so downstream crates don't need serde as a direct dependency.
