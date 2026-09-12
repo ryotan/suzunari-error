@@ -63,8 +63,13 @@ pub trait StackError: Error {
     /// - Structs: `"StructName"`
     /// - Enum variants: `"EnumName::VariantName"`
     ///
-    /// Generic type parameters are not included. This is intended for display
-    /// purposes only — do not parse or match against it programmatically.
+    /// Generic type parameters are not included, so `Lookup<u32>` and
+    /// `Lookup<String>` both answer `"Lookup"`.
+    ///
+    /// Without `serde`, this is for display only — do not parse or match
+    /// against it programmatically. **With `serde` it is the payload's
+    /// `type`**, which a consumer matches on, so renaming a type or a variant
+    /// changes the wire format.
     #[must_use]
     fn type_name(&self) -> &'static str;
 
