@@ -41,3 +41,17 @@ suzunari-error-macro-impl.workspace = true
 
 [dev-dependencies]
 trybuild = "=1.0.120"
+
+# All three use `#[report]`, which needs `std`. Declaring that lets `cargo test
+# --no-default-features` skip them instead of failing to build them.
+[[example]]
+name = "basic"
+required-features = ["std"]
+
+[[example]]
+name = "boxed_error"
+required-features = ["std"]
+
+[[example]]
+name = "display_error"
+required-features = ["std"]
