@@ -1,6 +1,6 @@
 //! `#[suzunari_error(serialize)]` — generates `impl Serialize` for an error type.
 //!
-//! The payload is the envelope described in `__private::ser`: metadata at the
+//! The payload is the envelope described in `__private::payload`: metadata at the
 //! top level, the type's own declared fields nested under `context`.
 //!
 //! # Why a serde `remote` definition
@@ -262,7 +262,7 @@ pub(crate) fn generate_serialize_impl(
 
     let name = &input.ident;
     let serde = quote! { #crate_path::__private::serde };
-    let ser = quote! { #crate_path::__private::ser };
+    let payload = quote! { #crate_path::__private::payload };
     // `#[serde(crate = ...)]` takes a string, so the path is spelled twice.
     let serde_str = quote!(#serde).to_string();
 
@@ -275,9 +275,9 @@ pub(crate) fn generate_serialize_impl(
     let node = |source: TokenStream| {
         quote! {
             #serde::Serialize::serialize(
-                &#ser::StackErrorNode {
+                &#payload::StackErrorNode {
                     type_name: <Self as #crate_path::StackError>::type_name(self),
-                    message: #ser::Message(self),
+                    message: #payload::SerializeDisplay(self),
                     location: <Self as #crate_path::StackError>::location(self),
                     context: #adapter(self),
                     source: #source,
@@ -293,7 +293,7 @@ pub(crate) fn generate_serialize_impl(
     let resolve = |binding: &Ident| {
         quote! {
             ::core::option::Option::Some(
-                (&&#ser::SourceNodeResolver(#binding)).source_node()
+                (&&#payload::SourceErrorNodeResolver(#binding)).source_error_node()
             )
         }
     };
@@ -359,14 +359,14 @@ pub(crate) fn generate_serialize_impl(
                 where
                     __S: #serde::Serializer,
                 {
-                    use #ser::ResolveSourceNode as _;
-                    use #ser::ResolveSourceNodeFallback as _;
+                    use #payload::ResolveSourceErrorNode as _;
+                    use #payload::ResolveSourceErrorNodeFallback as _;
 
                     #dispatch
                 }
             }
 
-            impl #impl_generics #ser::NodeShaped for #name #ty_generics #outer_where {}
+            impl #impl_generics #payload::SerializeErrorNode for #name #ty_generics #outer_where {}
         };
     })
 }

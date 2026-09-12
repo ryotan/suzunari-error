@@ -17,7 +17,7 @@
 //! every binary format measured here reports `false` — including the two that
 //! carry field names. So CBOR and MessagePack receive the uniform shape as well,
 //! which costs them a few entries they could have done without. That is the
-//! price of a single, safe default; see the note in `__private::ser`.
+//! price of a single, safe default; see the note in `__private::payload`.
 
 #![cfg(feature = "serde")]
 
@@ -88,40 +88,40 @@ struct ReadContext {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
-struct FetchNode {
+struct FetchErrorNode {
     #[serde(rename = "type")]
     type_name: Option<String>,
     message: String,
     location: Option<Loc>,
     context: Option<FetchContext>,
-    source: Option<Box<ReadNode>>,
+    source: Option<Box<ReadErrorNode>>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
-struct ReadNode {
+struct ReadErrorNode {
     #[serde(rename = "type")]
     type_name: Option<String>,
     message: String,
     location: Option<Loc>,
     context: Option<ReadContext>,
-    source: Option<Box<TailNode>>,
+    source: Option<Box<TailErrorNode>>,
 }
 
 /// The phase 2 tail. `type` and `location` are `None` because a plain `Error`
 /// has neither, and `context` because there are no readable fields — none of
 /// which the reader has to discover, since the layout is the same as above.
 #[derive(Debug, Deserialize, PartialEq)]
-struct TailNode {
+struct TailErrorNode {
     #[serde(rename = "type")]
     type_name: Option<String>,
     message: String,
     location: Option<Loc>,
     context: Option<()>,
-    source: Option<Box<TailNode>>,
+    source: Option<Box<TailErrorNode>>,
 }
 
 /// Asserts everything the payload should carry, at every level.
-fn assert_chain(node: &FetchNode) {
+fn assert_chain(node: &FetchErrorNode) {
     assert_eq!(node.type_name.as_deref(), Some("FetchError"));
     assert_eq!(node.message, "fetch failed for /foo");
     assert_eq!(
@@ -200,7 +200,7 @@ fn only_the_text_format_asks_for_the_readable_shape() {
 fn bincode_round_trips() {
     let config = bincode::config::standard();
     let bytes = bincode::serde::encode_to_vec(fetch_error(), config).unwrap();
-    let (node, consumed): (FetchNode, usize) =
+    let (node, consumed): (FetchErrorNode, usize) =
         bincode::serde::decode_from_slice(&bytes, config).unwrap();
 
     // The whole stream is accounted for. A layout the reader guessed wrong would
@@ -214,7 +214,7 @@ fn bincode_round_trips() {
 #[test]
 fn postcard_round_trips() {
     let bytes = postcard::to_allocvec(&fetch_error()).unwrap();
-    let node: FetchNode = postcard::from_bytes(&bytes).unwrap();
+    let node: FetchErrorNode = postcard::from_bytes(&bytes).unwrap();
 
     assert_chain(&node);
 }
@@ -225,7 +225,7 @@ fn postcard_round_trips() {
 #[test]
 fn messagepack_round_trips() {
     let bytes = rmp_serde::to_vec(&fetch_error()).unwrap();
-    let node: FetchNode = rmp_serde::from_slice(&bytes).unwrap();
+    let node: FetchErrorNode = rmp_serde::from_slice(&bytes).unwrap();
 
     assert_chain(&node);
 }
@@ -235,7 +235,7 @@ fn messagepack_round_trips() {
 fn cbor_round_trips() {
     let mut bytes = Vec::new();
     ciborium::into_writer(&fetch_error(), &mut bytes).unwrap();
-    let node: FetchNode = ciborium::from_reader(&bytes[..]).unwrap();
+    let node: FetchErrorNode = ciborium::from_reader(&bytes[..]).unwrap();
 
     assert_chain(&node);
 }

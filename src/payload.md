@@ -15,12 +15,12 @@ The payload takes one of two shapes, chosen by
 
 | Shape | Fields | Formats |
 |---|---|---|
-| Readable | Keys are omitted where they do not apply | JSON, and other text formats |
-| Uniform | Every node carries the same five keys, absent parts as `null` | Every binary format |
+| Sparse | Keys are omitted where they do not apply | JSON, and other text formats |
+| Uniform | Every error node carries the same five keys, absent parts as `null` | Every binary format |
 
-The readable shape tells its three kinds of node apart by which keys are present:
-a phase 2 tail has no `type`, and a node whose concrete type was erased has no
-`context`. That only works where the format carries field names.
+The sparse shape tells its three kinds of error node apart by which keys are
+present: a phase 2 tail has no `type`, and an error node whose concrete type was
+erased has no `context`. That only works where the format carries field names.
 
 The uniform shape exists for formats where it does not. A reader of a fixed
 layout advances by type and has to know how many fields to expect before it reads
@@ -30,9 +30,9 @@ which therefore receive the uniform shape as well.
 
 ## Data structures
 
-One per level, because `context` differs at each. Every node carries the same five
-fields in the uniform shape, so the structures differ only in the two types they
-name.
+One per level, because `context` differs at each. Every error node carries the
+same five fields in the uniform shape, so the structures differ only in the two
+types they name.
 
 ```
 # #[cfg(feature = "serde")]
@@ -62,13 +62,13 @@ struct Location {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
-struct FetchNode {
+struct FetchErrorNode {
     #[serde(rename = "type")]
     type_name: Option<String>,
     message: String,
     location: Option<Location>,
     context: Option<FetchContext>,
-    source: Option<Box<ReadNode>>,
+    source: Option<Box<ReadErrorNode>>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -77,13 +77,13 @@ struct FetchContext {
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
-struct ReadNode {
+struct ReadErrorNode {
     #[serde(rename = "type")]
     type_name: Option<String>,
     message: String,
     location: Option<Location>,
     context: Option<ReadContext>,
-    source: Option<Box<TailNode>>,
+    source: Option<Box<TailErrorNode>>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -94,26 +94,26 @@ struct ReadContext {
 /// The phase 2 tail. `type`, `location` and `context` are `None` because a plain
 /// `Error` has none of them — which is how a reader knows the phase changed.
 #[derive(Debug, Deserialize, PartialEq)]
-struct TailNode {
+struct TailErrorNode {
     #[serde(rename = "type")]
     type_name: Option<String>,
     message: String,
     location: Option<Location>,
     context: Option<()>,
-    source: Option<Box<TailNode>>,
+    source: Option<Box<TailErrorNode>>,
 }
 
 // Only the call differs. The data structures above are the same for every
 // format, and so is what comes out of them.
-let from_postcard: FetchNode = postcard::from_bytes(&postcard_bytes)?;
+let from_postcard: FetchErrorNode = postcard::from_bytes(&postcard_bytes)?;
 
 let config = bincode::config::standard();
-let (from_bincode, _): (FetchNode, usize) =
+let (from_bincode, _): (FetchErrorNode, usize) =
     bincode::serde::decode_from_slice(&bincode_bytes, config)?;
 
-let from_messagepack: FetchNode = rmp_serde::from_slice(&msgpack_bytes)?;
+let from_messagepack: FetchErrorNode = rmp_serde::from_slice(&msgpack_bytes)?;
 
-let from_cbor: FetchNode = ciborium::from_reader(&cbor_bytes[..])?;
+let from_cbor: FetchErrorNode = ciborium::from_reader(&cbor_bytes[..])?;
 
 assert_eq!(from_postcard.type_name.as_deref(), Some("FetchError"));
 assert_eq!(
@@ -130,10 +130,10 @@ assert_eq!(from_postcard, from_cbor);
 ```
 
 
-## JSON Schema — the readable shape
+## JSON Schema — the sparse shape
 
-For a consumer reading JSON, in any language. The three kinds of node appear as a
-`oneOf`, since which keys are present is what tells them apart.
+For a consumer reading JSON, in any language. The three kinds of error node appear
+as a `oneOf`, since which keys are present is what tells them apart.
 
 ```
 # #[cfg(feature = "serde")]
@@ -211,8 +211,8 @@ assert!(validator.is_valid(&payload));
 
 ## CDDL — the uniform shape
 
-For a consumer reading CBOR. One rule covers every node, because every node has
-the same five entries.
+For a consumer reading CBOR. One rule covers every error node, because every error
+node has the same five entries.
 
 The `=> ` spelling is deliberate: the `cddl` crate misreads a nested map written
 with the `key: value` shorthand.
