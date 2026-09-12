@@ -22,12 +22,19 @@ struct FetchError {
     source: BoxedStackError,
 }
 
+/// The `io::Error` is built rather than read from the filesystem. A real one is
+/// worded by the platform — "No such file or directory (os error 2)" on Unix,
+/// "The system cannot find the file specified. (os error 2)" on Windows — and
+/// the token assertions below compare the tail's message exactly.
 fn read_error() -> ReadError {
-    std::fs::read("/nonexistent-suzunari-error")
-        .context(ReadSnafu {
-            path: "/nonexistent-suzunari-error",
-        })
-        .unwrap_err()
+    Err::<(), _>(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "no such file",
+    ))
+    .context(ReadSnafu {
+        path: "/nonexistent-suzunari-error",
+    })
+    .unwrap_err()
 }
 
 /// A `StackError` followed by a plain `Error` tail: phase 1 then phase 2.
@@ -55,7 +62,7 @@ fn serializes_stack_error_then_plain_error_tail() {
 
     // Phase 2: the io::Error tail carries a message and nothing else.
     let tail = &value["source"];
-    assert!(tail["message"].as_str().unwrap().contains("os error 2"));
+    assert_eq!(tail["message"], "no such file");
     assert!(tail.get("type").is_none());
     assert!(tail.get("location").is_none());
     assert!(tail.get("source").is_none());
@@ -71,12 +78,7 @@ fn serializes_nested_stack_errors() {
     assert_eq!(value["type"], "FetchError");
     assert_eq!(value["source"]["type"], "ReadError");
     assert!(value["source"]["location"]["line"].is_number());
-    assert!(
-        value["source"]["source"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("os error 2")
-    );
+    assert_eq!(value["source"]["source"]["message"], "no such file");
 }
 
 /// An error with no cause omits `source` rather than emitting null.
@@ -172,7 +174,7 @@ fn node_struct_names_and_field_counts() {
                 len: 1,
             },
             serde_test::Token::Str("message"),
-            serde_test::Token::Str("No such file or directory (os error 2)"),
+            serde_test::Token::Str("no such file"),
             serde_test::Token::StructEnd,
             serde_test::Token::StructEnd,
         ],
@@ -236,7 +238,7 @@ fn every_node_has_the_same_five_fields_without_field_names() {
             serde_test::Token::Str("type"),
             serde_test::Token::None,
             serde_test::Token::Str("message"),
-            serde_test::Token::Str("No such file or directory (os error 2)"),
+            serde_test::Token::Str("no such file"),
             serde_test::Token::Str("location"),
             serde_test::Token::None,
             serde_test::Token::Str("context"),

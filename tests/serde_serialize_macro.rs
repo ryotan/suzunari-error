@@ -23,13 +23,20 @@ struct RequestError {
     source: LookupError,
 }
 
+/// The `io::Error` is built rather than read from the filesystem. A real one is
+/// worded by the platform — "No such file or directory (os error 2)" on Unix,
+/// "The system cannot find the file specified. (os error 2)" on Windows — and
+/// the token assertions below compare the tail's message exactly.
 fn lookup_error() -> LookupError {
-    std::fs::read("/nonexistent-suzunari-error")
-        .context(LookupSnafu {
-            key: "k",
-            attempts: 3u32,
-        })
-        .unwrap_err()
+    Err::<(), _>(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        "no such file",
+    ))
+    .context(LookupSnafu {
+        key: "k",
+        attempts: 3u32,
+    })
+    .unwrap_err()
 }
 
 /// The opted-in type carries its declared fields under `context`, and the
@@ -50,12 +57,7 @@ fn declared_fields_appear_under_context() {
     assert!(value["context"].get("location").is_none());
 
     // A non-Serialize source still serializes, via the fallback branch.
-    assert!(
-        value["source"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("os error 2")
-    );
+    assert_eq!(value["source"]["message"], "no such file");
     assert!(value["source"].get("context").is_none());
 }
 
@@ -108,7 +110,7 @@ fn context_object_does_not_leak_the_definition_name() {
                 len: 1,
             },
             serde_test::Token::Str("message"),
-            serde_test::Token::Str("No such file or directory (os error 2)"),
+            serde_test::Token::Str("no such file"),
             serde_test::Token::StructEnd,
             serde_test::Token::StructEnd,
         ],
@@ -134,12 +136,7 @@ fn nested_serialize_source_keeps_its_context() {
     assert_eq!(inner["context"]["key"], "k");
     assert_eq!(inner["context"]["attempts"], 3);
     assert!(inner["location"]["line"].is_number());
-    assert!(
-        inner["source"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("os error 2")
-    );
+    assert_eq!(inner["source"]["message"], "no such file");
 }
 
 /// A foreign error that happens to derive `Serialize` must not be inlined raw:
@@ -302,7 +299,7 @@ fn declared_fields_reach_context_without_field_names() {
             serde_test::Token::Str("type"),
             serde_test::Token::None,
             serde_test::Token::Str("message"),
-            serde_test::Token::Str("No such file or directory (os error 2)"),
+            serde_test::Token::Str("no such file"),
             serde_test::Token::Str("location"),
             serde_test::Token::None,
             serde_test::Token::Str("context"),
