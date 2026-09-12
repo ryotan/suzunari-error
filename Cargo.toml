@@ -1,6 +1,6 @@
 [workspace.package]
 description = "A highly traceable and noise-free error system that propagates error locations as error contexts and minimizes information output to the log"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 repository = "https://github.com/ryotan/suzunari-error"
 license = "MIT OR Apache-2.0"
@@ -17,7 +17,7 @@ quote = "1.0"
 syn = "3.0"
 # Workspace local crates
 suzunari-error = { path = ".", default-features = false }
-suzunari-error-macro-impl = { version = "0.2.0", path = "./macro-impl", default-features = false }
+suzunari-error-macro-impl = { version = "0.3.0", path = "./macro-impl", default-features = false }
 
 [package]
 name = "suzunari-error"
