@@ -51,6 +51,7 @@ locked = false
 act = "0.2.89"
 age = "1.3.2"
 bun = "1.4.2"
+"github:taiki-e/cargo-hack" = "v0.6.45"
 cosign = "3.1.3"
 gh = "2.100.0"
 ghalint = "1.5.6"
