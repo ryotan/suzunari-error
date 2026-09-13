@@ -11,7 +11,7 @@
 //! a macro driven by factor levels, a handful of hand-written cases stay behind
 //! to keep watch on the macro's own assembly.
 
-#![cfg(feature = "serde")]
+#![cfg(all(feature = "serde", feature = "std"))]
 
 #[macro_use]
 mod support;

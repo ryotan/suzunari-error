@@ -22,7 +22,7 @@
 //! file when the serde dependency moves, and re-read the list above from
 //! `serde_derive`'s source.
 
-#![cfg(feature = "serde")]
+#![cfg(all(feature = "serde", feature = "std"))]
 
 mod support;
 

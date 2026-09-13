@@ -4,7 +4,7 @@
 //! shapes and the chain walk. Because the concrete type is erased here, no node
 //! carries `context` — that arrives with `#[suzunari_error(serialize)]`.
 
-#![cfg(feature = "serde")]
+#![cfg(all(feature = "serde", feature = "std"))]
 
 use serde_test::Configure;
 use suzunari_error::*;

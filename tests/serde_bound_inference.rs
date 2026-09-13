@@ -18,7 +18,7 @@
 //! `.build()` is used because these fixtures have no source field: there is no
 //! `Result` to attach a context selector to.
 
-#![cfg(feature = "serde")]
+#![cfg(all(feature = "serde", feature = "std"))]
 
 use core::fmt::{Debug, Display};
 use core::marker::PhantomData;
