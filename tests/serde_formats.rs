@@ -19,7 +19,7 @@
 //! which costs them a few entries they could have done without. That is the
 //! price of a single, safe default; see the note in `__private::payload`.
 
-#![cfg(feature = "serde")]
+#![cfg(all(feature = "serde", feature = "std"))]
 
 use serde::{Deserialize, Serialize, Serializer};
 use suzunari_error::*;

@@ -40,7 +40,7 @@ HEADER = '''//! Pairwise cases, generated from `tests/support/differential-cases
 //! `metadata` wrong, every case here moves together and still agrees; the
 //! hand-written ones do not.
 
-#![cfg(feature = "serde")]
+#![cfg(all(feature = "serde", feature = "std"))]
 
 #[macro_use]
 mod support;

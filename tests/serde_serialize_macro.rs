@@ -3,7 +3,7 @@
 //!
 //! Structs only for now; enums, attribute transplanting and `rename_all` follow.
 
-#![cfg(feature = "serde")]
+#![cfg(all(feature = "serde", feature = "std"))]
 
 use serde_test::Configure;
 use suzunari_error::*;
