@@ -158,7 +158,7 @@ mod custom_location_name {
 //
 // Two rules cover them all. When the field's type is one of ours, the nested
 // result must equal serializing that value on its own. When it is not, the
-// chain continues as a phase 2 node carrying only a message — and for a foreign
+// chain continues with a node carrying only a message — and for a foreign
 // type that happens to derive `Serialize`, the nested result must specifically
 // *not* be its own serialization, or its fields would have replaced the node.
 // ---------------------------------------------------------------------------

@@ -37,7 +37,7 @@ fn read_error() -> ReadError {
     .unwrap_err()
 }
 
-/// A `StackError` followed by a plain `Error` tail: phase 1 then phase 2.
+/// A `StackError` whose cause is a plain `Error`: locations stop at the cause.
 #[test]
 fn serializes_stack_error_then_plain_error_tail() {
     let boxed = BoxedStackError::new(read_error());
@@ -60,7 +60,7 @@ fn serializes_stack_error_then_plain_error_tail() {
     // The concrete type is erased by BoxedStackError, so `path` is unreachable.
     assert!(value.get("context").is_none());
 
-    // Phase 2: the io::Error tail carries a message and nothing else.
+    // The io::Error tail carries a message and nothing else.
     let tail = &value["source"];
     assert_eq!(tail["message"], "no such file");
     assert!(tail.get("type").is_none());
@@ -228,9 +228,9 @@ fn every_node_has_the_same_five_fields_without_field_names() {
             serde_test::Token::None,
             serde_test::Token::Str("source"),
             serde_test::Token::Some,
-            // The phase 2 tail, in the same shape: `type` and `location` are
-            // `None` because a plain `Error` has neither, and that is what tells
-            // a reader the phase changed — no key needs to be missing for it.
+            // The tail, in the same shape: `type` and `location` are `None`
+            // because a plain `Error` has neither, and that is what tells a
+            // reader the locations stopped — no key needs to be missing for it.
             serde_test::Token::Struct {
                 name: "UniformError",
                 len: 5,
