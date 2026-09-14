@@ -124,7 +124,8 @@ impl Record {
     }
 }
 
-/// A phase 2 node: `message`, and nothing else.
+/// A node for a cause that does not implement `StackError`: `message`, and
+/// nothing else.
 pub fn error_node(message: &str) -> Record {
     Record::Struct {
         name: "PlainError",

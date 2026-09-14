@@ -104,7 +104,7 @@ impl Serialize for SerializeLocation {
 // Error node shapes
 // ---------------------------------------------------------------------------
 
-/// Phase 1 error node for an error whose concrete type is known.
+/// Error node for an error whose concrete type is known.
 ///
 /// `context` is not optional here. A concrete type always has one — empty when
 /// it declares no fields of its own — and making that a type-level fact is what
@@ -147,7 +147,7 @@ impl<M: Serialize, C: Serialize, Src: Serialize> Serialize for StackErrorNode<M,
     }
 }
 
-/// Phase 1 error node for an error reached through a type-erased boundary.
+/// Error node for an error reached through a type-erased boundary.
 ///
 /// Identical to [`StackErrorNode`] minus `context`: only `&dyn StackError` is
 /// available, so the declared fields cannot be read. It carries no type
@@ -191,7 +191,8 @@ impl Serialize for TypeErasedStackErrorNode<'_> {
     }
 }
 
-/// Phase 2 error node: a plain [`Error`] tail, with no location information.
+/// Error node for a cause that does not implement `StackError`: a plain
+/// [`Error`], with no location information.
 pub struct PlainErrorNode<'a> {
     /// The error's `Display` output.
     pub message: SerializeDisplay<'a, dyn Error + 'static>,
@@ -278,7 +279,7 @@ struct SparsePlainError<'a, M, Src> {
 /// Every `Option` here writes its own discriminant, which is exactly what such a
 /// reader needs.
 ///
-/// Making the three shapes identical also settles the phase boundary.
+/// Making the three shapes identical also settles where the locations stop.
 /// `NextErrorNode` is `untagged`, so its variants contribute no discriminant of
 /// their own — but with one shape they no longer need to, because both variants
 /// lay out the same five fields. A reader tells them apart by `type` being
@@ -308,9 +309,9 @@ const NO_CONTEXT: Option<&()> = None;
 #[derive(Serialize)]
 #[serde(untagged)]
 pub enum NextErrorNode<'a> {
-    /// The cause implements `StackError`; phase 1 continues.
+    /// The cause implements `StackError`, so the walk keeps its location.
     Stack(DynStackError<'a>),
-    /// The cause is a plain `Error`; phase 2 begins.
+    /// The cause is a plain `Error`, so only `Error::source()` is left below.
     Plain(DynError<'a>),
 }
 
@@ -349,10 +350,10 @@ impl Serialize for DynError<'_> {
 }
 
 /// Continues the chain, preferring `stack_source()` so that nested levels keep
-/// their location. Falls back to `Error::source()` for the phase 2 tail.
+/// their location. Falls back to `Error::source()` once `stack_source()` runs out.
 ///
 /// This mirrors `StackReport`'s traversal exactly; the two outputs must not
-/// disagree about where the phase boundary lands.
+/// disagree about where the locations stop.
 fn next_error_node(error: &dyn StackError) -> Option<NextErrorNode<'_>> {
     if let Some(stack) = error.stack_source() {
         return Some(NextErrorNode::Stack(DynStackError(stack)));
@@ -413,8 +414,8 @@ impl<'a, T: SerializeErrorNode> ResolveSourceErrorNode for &SourceErrorNodeResol
     }
 }
 
-/// Fallback branch: the field is a plain `Error`, so the chain continues as
-/// phase 2 and every level below it keeps only its `Display` output.
+/// Fallback branch: the field is a plain `Error`, so it and every level below
+/// it keep only their `Display` output.
 pub trait ResolveSourceErrorNodeFallback {
     /// What the `source` key serializes as.
     type ErrorNode: Serialize;

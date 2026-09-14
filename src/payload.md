@@ -1,9 +1,16 @@
 # Reading the payload
 
+The payload is a chain of **error nodes**, one per level of the error chain. Each
+carries `type`, `message`, `location`, `context` and `source`; `source` holds the
+next one, and the last has none.
+
+`context` holds the type's **declared fields**: the fields it declares itself,
+other than the one holding the source and the one holding the location.
+
 This crate implements `Serialize` and not `Deserialize`. The payload is data to
-read, not an error to rebuild: `context` is a different shape at every level of a
-chain, and a tail that was an `io::Error` cannot be reconstructed from the message
-it left behind.
+read, not an error to rebuild: `context` is a different shape at every level, and
+an `io::Error` at the end of a chain cannot be reconstructed from the message it
+left behind.
 
 A consumer therefore defines its own data structures and reads into those. What
 follows is what those look like, and how to check a payload against a schema.
@@ -19,8 +26,10 @@ The payload takes one of two shapes, chosen by
 | Uniform | Every error node carries the same five keys, absent parts as `null` | Every binary format |
 
 The sparse shape tells its three kinds of error node apart by which keys are
-present: a phase 2 tail has no `type`, and an error node whose concrete type was
-erased has no `context`. That only works where the format carries field names.
+present: a cause that does not implement `StackError` has no `type`, and nor does
+anything below it, since only `Error::source()` is left to follow. An error node
+whose concrete type was erased has no `context`. That only works where the format
+carries field names.
 
 The uniform shape exists for formats where it does not. A reader of a fixed
 layout advances by type and has to know how many fields to expect before it reads
@@ -83,7 +92,7 @@ struct ReadErrorNode {
     message: String,
     location: Option<Location>,
     context: Option<ReadContext>,
-    source: Option<Box<TailErrorNode>>,
+    source: Option<Box<PlainErrorNode>>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -91,16 +100,16 @@ struct ReadContext {
     path: String,
 }
 
-/// The phase 2 tail. `type`, `location` and `context` are `None` because a plain
-/// `Error` has none of them — which is how a reader knows the phase changed.
+/// A cause that does not implement `StackError`. `type`, `location` and
+/// `context` are `None` because a plain `Error` has none of them.
 #[derive(Debug, Deserialize, PartialEq)]
-struct TailErrorNode {
+struct PlainErrorNode {
     #[serde(rename = "type")]
     type_name: Option<String>,
     message: String,
     location: Option<Location>,
     context: Option<()>,
-    source: Option<Box<TailErrorNode>>,
+    source: Option<Box<PlainErrorNode>>,
 }
 
 // Only the call differs. The data structures above are the same for every
@@ -162,7 +171,7 @@ let schema = serde_json::json!({
             "oneOf": [
                 { "$ref": "#/$defs/stack" },
                 { "$ref": "#/$defs/erased" },
-                { "$ref": "#/$defs/tail" }
+                { "$ref": "#/$defs/plain" }
             ]
         },
         "stack": {
@@ -188,7 +197,7 @@ let schema = serde_json::json!({
             "required": ["type", "message", "location"],
             "additionalProperties": false
         },
-        "tail": {
+        "plain": {
             "type": "object",
             "properties": {
                 "message": { "type": "string" },

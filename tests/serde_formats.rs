@@ -104,20 +104,21 @@ struct ReadErrorNode {
     message: String,
     location: Option<Loc>,
     context: Option<ReadContext>,
-    source: Option<Box<TailErrorNode>>,
+    source: Option<Box<PlainErrorNode>>,
 }
 
-/// The phase 2 tail. `type` and `location` are `None` because a plain `Error`
-/// has neither, and `context` because there are no readable fields — none of
-/// which the reader has to discover, since the layout is the same as above.
+/// A cause that does not implement `StackError`. `type` and `location` are
+/// `None` because a plain `Error` has neither, and `context` because there are
+/// no readable fields — none of which the reader has to discover, since the
+/// layout is the same as above.
 #[derive(Debug, Deserialize, PartialEq)]
-struct TailErrorNode {
+struct PlainErrorNode {
     #[serde(rename = "type")]
     type_name: Option<String>,
     message: String,
     location: Option<Loc>,
     context: Option<()>,
-    source: Option<Box<TailErrorNode>>,
+    source: Option<Box<PlainErrorNode>>,
 }
 
 /// Asserts everything the payload should carry, at every level.
@@ -255,8 +256,8 @@ fn json_omits_rather_than_writing_null() {
 
     let tail = &value["source"]["source"];
     assert_eq!(tail["message"], serde_json::json!(io_message()));
-    // Absent, not null: the phase 2 tail has no type, location or context, and
-    // no cause below it.
+    // Absent, not null: the tail has no type, location or context, and no cause
+    // below it.
     let tail = tail.as_object().expect("an object");
     assert_eq!(tail.keys().collect::<Vec<_>>(), ["message"]);
 

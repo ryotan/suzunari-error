@@ -240,8 +240,8 @@ fn empty_context_is_distinct_from_an_erased_one() {
 }
 
 /// The declared fields still reach `context` where the format has no field
-/// names — as `Some`, alongside the `None`s that stand in for what an erased or
-/// phase 2 node lacks.
+/// names — as `Some`, alongside the `None`s that stand in for what an erased
+/// node, or one for a plain `Error`, lacks.
 ///
 /// Asserted separately from the readable side: `assert_ser_tokens` demands a
 /// `Configure` marker because the representations differ, so marking the other
@@ -290,8 +290,8 @@ fn declared_fields_reach_context_without_field_names() {
             serde_test::Token::StructEnd,
             serde_test::Token::Str("source"),
             serde_test::Token::Some,
-            // The phase 2 tail: `type` and `location` absent as values, not as
-            // keys, so the field count matches every other node.
+            // The tail: `type` and `location` absent as values, not as keys,
+            // so the field count matches every other node.
             serde_test::Token::Struct {
                 name: "UniformError",
                 len: 5,
