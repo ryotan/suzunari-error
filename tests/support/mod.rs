@@ -503,7 +503,7 @@ macro_rules! declare_case {
         metadata: { $($metadata:tt)* } $(,)?
     ) => {
         // A field carrying `#[serde(skip)]` is read by nothing at all in a
-        // fixture this small, which is not a signal worth seeing here.
+        // fixture this small.
         #[allow(dead_code)]
         #[suzunari_error($($options)*)]
         #[suzu(display($display))]
@@ -566,7 +566,7 @@ macro_rules! declare_case {
 
     // An enum whose variant under test is a unit variant. It declares nothing
     // and takes no source, so `context` comes out empty — the same as a struct
-    // that declares nothing, which is the point of covering it.
+    // that declares nothing.
     (
         error: $name:ident,
         unit_variant: $variant:ident,

@@ -30,10 +30,6 @@ authors.workspace = true
 rust-version.workspace = true
 readme = "README.md"
 
-# The crate documentation describes the `serde` feature in full — a row in the
-# feature table and a section of its own — but the only public name the feature
-# adds is `impl Serialize for BoxedStackError`, which a default-feature build
-# leaves out. Without this the published docs promise an impl they do not list.
 [package.metadata.docs.rs]
 all-features = true
 
@@ -41,8 +37,6 @@ all-features = true
 default = ["std"]
 std = ["alloc", "snafu/std"]
 alloc = ["snafu/alloc", "suzunari-error-macro-impl/alloc"]
-# Does not imply alloc: the BoxedStackError impl is confined to the alloc tier
-# only because the type is.
 serde = ["dep:serde", "suzunari-error-macro-impl/serde"]
 
 [dependencies]
@@ -55,19 +49,11 @@ serde = { version = "1.0", default-features = false, optional = true, features =
 [dev-dependencies]
 trybuild = "=1.0.120"
 serde_json = "1.0"
-# Token-level comparison: catches struct names and field counts that a JSON
-# string comparison hides. Requires std.
 serde_test = "1.0"
-# One format per shape of the serde ecosystem, so that a conclusion rests on the
-# format's properties rather than on one crate's quirks. Two carry field names
-# (ciborium, rmp-serde) and two do not (bincode, postcard); serde_json above is
-# the self-describing text case.
 bincode = { version = "2", features = ["serde"] }
 ciborium = "0.2"
 postcard = { version = "1", features = ["use-std"] }
 rmp-serde = "1"
-# Schema validators, so the definitions in src/payload.md are checked against
-# a real payload rather than left to rot.
 jsonschema = "0.52"
 cddl = "0.10"
 

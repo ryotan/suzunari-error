@@ -4,36 +4,12 @@
 //! covered by semver guarantees. It exists solely for generated code and for
 //! this crate's own `Serialize` impls.
 //!
-//! # Three kinds of error node
+//! Three kinds of error node — [`StackErrorNode`], [`TypeErasedStackErrorNode`]
+//! and [`PlainErrorNode`] — each with a sparse shape for formats that carry
+//! field names, and a shared `UniformError` for the rest.
+//! [`Serializer::is_human_readable`] chooses between them.
 //!
-//! What an error node can say depends on what is reachable at that level of the
-//! chain, which is the same thing that decides what
-//! [`StackReport`](crate::StackReport) can print there:
-//!
-//! - [`StackErrorNode`] — the concrete type is known: `type`, `message`,
-//!   `location`, `context`.
-//! - [`TypeErasedStackErrorNode`] — only `&dyn StackError` is available, so the same
-//!   minus `context`: the declared fields cannot be read.
-//! - [`PlainErrorNode`] — not a `StackError` at all, so `message` alone.
-//!
-//! An absent `context` and an empty one mean different things, and `type`
-//! cannot separate them: an erased error node still has a type name, because
-//! the erasure forwards `type_name()` to the value it holds.
-//!
-//! # Two shapes to emit them in
-//!
-//! The three tell each other apart by which keys are present, which only works
-//! where the format carries field names. So each has a sparse shape for those
-//! formats — `SparseStackError`, `SparseTypeErasedStackError`, `SparsePlainError` —
-//! and all three share `UniformError` for the rest, where every key is written
-//! and an absent one carries `None`.
-//!
-//! [`Serializer::is_human_readable`] makes the choice. serde's own impls use it
-//! the same way, and every binary format measured reports `false`: a
-//! self-describing binary format therefore gets the uniform shape too, at the
-//! cost of a few entries.
-//!
-//! Only the choice is written by hand; every shape is derived. A hand-written
+//! Only that choice is written by hand; every shape is derived. A hand-written
 //! impl must also call `skip_field` for every field it omits, and forgetting
 //! that is invisible in JSON.
 
@@ -113,13 +89,9 @@ impl Serialize for SerializeLocation {
 pub struct StackErrorNode<M, C, Src> {
     /// `StackError::type_name()` — `"Type"` or `"Enum::Variant"`.
     pub type_name: &'static str,
-    /// The error's `Display` output.
     pub message: M,
-    /// Where the error was constructed.
     pub location: Location,
-    /// The type's declared fields.
     pub context: C,
-    /// The next error node in the chain. `None` when there is no cause.
     pub source: Option<Src>,
 }
 
@@ -156,11 +128,8 @@ pub struct TypeErasedStackErrorNode<'a> {
     /// `StackError::type_name()`, forwarded from the value behind the erasure —
     /// so this is the wrapped error's name, never the wrapper's.
     pub type_name: &'static str,
-    /// The error's `Display` output.
     pub message: SerializeDisplay<'a, dyn StackError + 'a>,
-    /// Where the error was constructed.
     pub location: Location,
-    /// The next error node in the chain. `None` when there is no cause.
     pub source: Option<NextErrorNode<'a>>,
 }
 
@@ -194,9 +163,7 @@ impl Serialize for TypeErasedStackErrorNode<'_> {
 /// Error node for a cause that does not implement `StackError`: a plain
 /// [`Error`], with no location information.
 pub struct PlainErrorNode<'a> {
-    /// The error's `Display` output.
     pub message: SerializeDisplay<'a, dyn Error + 'static>,
-    /// The next error node in the chain. `None` when there is no cause.
     pub source: Option<DynError<'a>>,
 }
 
@@ -399,10 +366,8 @@ pub struct SourceErrorNodeResolver<'a, T>(pub &'a T);
 /// Specialized branch: the field's own `Serialize` impl already emits an error
 /// node, so nested levels keep their `context`.
 pub trait ResolveSourceErrorNode {
-    /// What the `source` key serializes as.
     type ErrorNode: Serialize;
 
-    /// Resolves the wrapped source field to its error node.
     fn source_error_node(&self) -> Self::ErrorNode;
 }
 
@@ -417,10 +382,8 @@ impl<'a, T: SerializeErrorNode> ResolveSourceErrorNode for &SourceErrorNodeResol
 /// Fallback branch: the field is a plain `Error`, so it and every level below
 /// it keep only their `Display` output.
 pub trait ResolveSourceErrorNodeFallback {
-    /// What the `source` key serializes as.
     type ErrorNode: Serialize;
 
-    /// Resolves the wrapped source field to its error node.
     fn source_error_node(&self) -> Self::ErrorNode;
 }
 

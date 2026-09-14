@@ -4,11 +4,12 @@
 //! covered by semver guarantees. It exists solely for generated code emitted
 //! by `#[derive(StackError)]` and `#[suzunari_error]`.
 //!
-//! Uses the **autoref specialization** technique to conditionally resolve
-//! trait-dependent behavior at compile time. When a source type implements
-//! the target trait, the inherent method takes priority via autoref.
-//! Otherwise, `Deref` coercion kicks in, calling the fallback method.
-//! This avoids requiring trait bounds on source types in generated code.
+//! Two forms of autoref specialization are used here. `stack_source()` uses the
+//! `Deref`-based form: the inherent method wins when `T: StackError`, otherwise
+//! `Deref` reaches the fallback. The `source` field in `payload` uses a
+//! trait-based form instead, because its fallback has to borrow the value and a
+//! `Deref` target cannot. Both avoid requiring trait bounds on source types in
+//! generated code.
 //!
 //! See: <https://github.com/dtolnay/case-studies/blob/master/autoref-specialization/README.md>
 
@@ -17,9 +18,6 @@ use crate::display_error::DisplayError;
 use core::error::Error;
 use core::fmt::{Debug, Display};
 
-// Named for what it builds, not for what it does. `ser` would collide with
-// `serde::ser`, which is a different module reachable from this one through the
-// re-export just below.
 #[cfg(feature = "serde")]
 pub mod payload;
 
