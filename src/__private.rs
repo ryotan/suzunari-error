@@ -30,9 +30,8 @@ pub use serde;
 // StackSourceResolver — resolves StackError::stack_source()
 // ---------------------------------------------------------------------------
 
-/// Wraps a reference and resolves to the inherent `resolve()` method
-/// when `T: StackError`, or falls back via `Deref` → `NotStackErrorFallback`
-/// when `T` does not implement `StackError`.
+/// Wraps a source field so `resolve()` reaches either the inherent method below
+/// or [`NotStackErrorFallback`].
 pub struct StackSourceResolver<'a, T: ?Sized>(pub &'a T);
 
 impl<'a, T: StackError> StackSourceResolver<'a, T> {
@@ -42,7 +41,7 @@ impl<'a, T: StackError> StackSourceResolver<'a, T> {
     }
 }
 
-/// Fallback target via Deref. Always returns `None`.
+/// Reached by `Deref` when `T` does not implement `StackError`.
 pub struct NotStackErrorFallback;
 
 impl NotStackErrorFallback {
@@ -68,8 +67,7 @@ impl<T: ?Sized> core::ops::Deref for StackSourceResolver<'_, T> {
 
 /// Creates a [`DisplayError`] with an explicit `get_source` resolver.
 ///
-/// Called exclusively by `#[suzunari_error]` macro-generated code.
-/// Use [`DisplayError::new`] in application code.
+/// [`DisplayError::new`] is the one to use outside generated code.
 #[must_use]
 pub fn display_error_with_get_source<E: Debug + Display>(
     error: E,
@@ -82,11 +80,8 @@ pub fn display_error_with_get_source<E: Debug + Display>(
 // DisplayErrorSourceResolver — resolves get_source fn for DisplayError
 // ---------------------------------------------------------------------------
 
-/// Resolves the `get_source` function pointer for [`DisplayError`](crate::DisplayError).
-///
-/// Uses the same Deref-based autoref specialization as `StackSourceResolver`.
-/// When `T: Error + 'static`, the inherent `get_source_fn()` takes priority.
-/// Otherwise, Deref falls back to `DisplayErrorSourceFallback`.
+/// Resolves the `get_source` function pointer for [`DisplayError`](crate::DisplayError),
+/// the same way [`StackSourceResolver`] resolves `stack_source()`.
 ///
 /// The fallback's `get_source_fn` has a method-level generic `<T>`, so callers
 /// must provide an explicit type annotation for inference to succeed:
@@ -103,12 +98,10 @@ impl<T: Error + 'static> DisplayErrorSourceResolver<'_, T> {
     }
 }
 
-/// Fallback target via Deref. Returns a `get_source` fn that always yields `None`.
+/// Reached by `Deref` when `T` does not implement `Error`.
 pub struct DisplayErrorSourceFallback;
 
 impl DisplayErrorSourceFallback {
-    // The generic `<T>` here requires callers to provide a type annotation
-    // so the compiler can infer which `T` to use.
     #[must_use]
     pub fn get_source_fn<T>(&self) -> fn(&T) -> Option<&(dyn Error + 'static)> {
         |_| None
