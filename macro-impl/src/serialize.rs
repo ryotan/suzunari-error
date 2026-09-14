@@ -266,8 +266,7 @@ pub(crate) fn generate_serialize_impl(
     // `#[serde(crate = ...)]` takes a string, so the path is spelled twice.
     let serde_str = quote!(#serde).to_string();
 
-    // Both the definition's derive and the two impls written here have to agree
-    // on these, so they are worked out once and handed to each.
+    // The definition's derive and the two impls written here have to agree on these.
     let bounds = serialize_bounds(input, &shapes, &serde)?;
     let context_items = context_definition(&shapes, input, options, &serde, &serde_str, &bounds);
     let adapter = format_ident!("__SuzuContext");
@@ -449,8 +448,7 @@ fn context_definition(
     // serde spells the same intent differently by shape: on a struct
     // `rename_all` renames fields, on an enum it renames variants — which
     // `untagged` never emits — and `rename_all_fields` renames the fields.
-    // Measured. The option stays one spelling; picking serde's is this macro's
-    // job, and there is nothing else in the payload it could mean.
+    // The option stays one spelling; picking serde's is this macro's job.
     let rename_struct = options
         .rename_all
         .as_ref()
