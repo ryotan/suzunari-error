@@ -15,10 +15,11 @@ use syn::{
 
 /// Implementation of `#[suzunari_error]`.
 ///
-/// Three-step pipeline:
+/// Four steps:
 /// 1. `process_suzu_attrs` — rewrites `#[suzu(...)]` to `#[snafu(...)]` + `#[stack(...)]`
 /// 2. `resolve_and_inject_location` — ensures every struct/variant has exactly one location field
 /// 3. Emit `#[derive(Debug, Snafu, StackError)]` wrapping the rewritten input
+/// 4. With `serialize`, emit the `Serialize` impl and strip the serde attributes
 pub(crate) fn suzunari_error_impl(
     args: TokenStream,
     stream: TokenStream,
