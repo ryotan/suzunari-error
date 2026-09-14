@@ -10,7 +10,14 @@ default = []
 test-std = ["suzunari-error/std", "test-alloc"]
 test-alloc = ["suzunari-error/alloc"]
 test-core-only = []
+# Adds serde to whichever tier is selected. serde itself is taken without
+# default features, so in the core-only tier it has no allocator either — which
+# is the only place `collect_str` has no default implementation.
+test-serde = ["suzunari-error/serde", "dep:serde"]
 
 [dependencies]
 suzunari-error = { path = "..", default-features = false }
 snafu = { workspace = true, features = ["rust_1_81"] }
+serde = { version = "1.0", default-features = false, optional = true, features = [
+  "derive",
+] }

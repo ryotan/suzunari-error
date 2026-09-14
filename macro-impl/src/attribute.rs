@@ -1,21 +1,30 @@
 use crate::helper::{
     LocationLookup, combine_errors, ensure_snafu_implicit, get_crate_path, lookup_location_field,
 };
-use crate::suzu_attr;
-use proc_macro2::TokenStream;
+use crate::{serialize, suzu_attr};
+use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
+use syn::parse::Parser;
 use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
-use syn::token::Colon;
-use syn::{Data, DeriveInput, Error, Field, FieldModifiers, Fields, FieldsNamed, Visibility};
+use syn::token::{Colon, Comma};
+use syn::{
+    Data, DeriveInput, Error, Expr, ExprLit, Field, FieldModifiers, Fields, FieldsNamed, Lit,
+    LitStr, Meta, MetaList, Visibility,
+};
 
 /// Implementation of `#[suzunari_error]`.
 ///
-/// Three-step pipeline:
+/// Four steps:
 /// 1. `process_suzu_attrs` — rewrites `#[suzu(...)]` to `#[snafu(...)]` + `#[stack(...)]`
 /// 2. `resolve_and_inject_location` — ensures every struct/variant has exactly one location field
 /// 3. Emit `#[derive(Debug, Snafu, StackError)]` wrapping the rewritten input
-pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Error> {
+/// 4. With `serialize`, emit the `Serialize` impl and strip the serde attributes
+pub(crate) fn suzunari_error_impl(
+    args: TokenStream,
+    stream: TokenStream,
+) -> Result<TokenStream, Error> {
+    let options = Options::parse(args)?;
     let mut input: DeriveInput = syn::parse2(stream)?;
     let crate_path = get_crate_path("suzunari-error");
     // Reject unions early — before process_suzu_attrs, so the error message
@@ -86,10 +95,107 @@ pub(crate) fn suzunari_error_impl(stream: TokenStream) -> Result<TokenStream, Er
         #[snafu(crate_root(#snafu_path))]
     };
 
+    // Step 4: Optional Serialize generation, from the already-resolved fields.
+    // The serde attributes are read here and then removed: they belong to the
+    // generated definition, and the error type itself has no Serialize derive
+    // to accept them.
+    let serialize_impl = if options.serialize {
+        let generated = serialize::generate_serialize_impl(&input, &crate_path, &options)?;
+        serialize::strip_serde_attrs(&mut input);
+        generated
+    } else {
+        quote! {}
+    };
+
     Ok(quote! {
         #derive_attribute
         #input
+        #serialize_impl
     })
+}
+
+/// Options accepted by `#[suzunari_error(...)]` itself, as opposed to the
+/// `#[suzu(...)]` attributes that appear on the type and its fields.
+#[derive(Default)]
+pub(crate) struct Options {
+    serialize: bool,
+    /// The case to convert declared field names to.
+    ///
+    /// Re-exposed here rather than read from a type-level `#[serde(...)]`,
+    /// which is rejected: the generated definition is a different container
+    /// than the one the user annotated. It is the only renaming there is —
+    /// `type` comes from `type_name()`, and the envelope's own keys are fixed.
+    pub(crate) rename_all: Option<LitStr>,
+}
+
+impl Options {
+    fn parse(args: TokenStream) -> Result<Self, Error> {
+        let mut options = Self::default();
+        if args.is_empty() {
+            return Ok(options);
+        }
+
+        let metas = Punctuated::<Meta, Comma>::parse_terminated
+            .parse2(args)
+            .map_err(|_| {
+                Error::new(
+                    Span::call_site(),
+                    "#[suzunari_error] expects a comma-separated option list; \
+                     the only option is `serialize`",
+                )
+            })?;
+
+        let errors = metas
+            .iter()
+            .filter_map(|meta| match meta {
+                Meta::Path(path) if path.is_ident("serialize") => {
+                    options.serialize = true;
+                    None
+                }
+                Meta::List(list) if list.path.is_ident("serialize") => {
+                    options.serialize = true;
+                    options.parse_serialize(list).err()
+                }
+                _ => Some(Error::new(
+                    meta.span(),
+                    "unknown #[suzunari_error] option; the only option is `serialize`. \
+                     Field- and type-level configuration goes in #[suzu(...)]",
+                )),
+            })
+            .collect();
+        combine_errors(errors)?;
+
+        Ok(options)
+    }
+
+    /// The arguments inside `serialize(...)`.
+    fn parse_serialize(&mut self, list: &MetaList) -> Result<(), Error> {
+        let metas = list.parse_args_with(Punctuated::<Meta, Comma>::parse_terminated)?;
+
+        let errors = metas
+            .iter()
+            .filter_map(|meta| match meta {
+                Meta::NameValue(pair) if pair.path.is_ident("rename_all") => match &pair.value {
+                    Expr::Lit(ExprLit {
+                        lit: Lit::Str(value),
+                        ..
+                    }) => {
+                        self.rename_all = Some(value.clone());
+                        None
+                    }
+                    other => Some(Error::new(
+                        other.span(),
+                        "`rename_all` takes a string, such as \"camelCase\"",
+                    )),
+                },
+                _ => Some(Error::new(
+                    meta.span(),
+                    "unknown `serialize` argument; the only one is `rename_all`",
+                )),
+            })
+            .collect();
+        combine_errors(errors)
+    }
 }
 
 /// Location resolution flow for a single struct/variant.

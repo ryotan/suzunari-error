@@ -418,7 +418,7 @@ fn test_stack_error_source_returns_some_for_stack_source() {
     );
 }
 
-// --- GAP-01: 3+ level deep StackError chain with phase transition ---
+// --- GAP-01: 3+ level deep StackError chain ending in a plain Error ---
 
 #[suzunari_error]
 #[suzu(display("level 3"))]
@@ -460,14 +460,14 @@ fn test_deep_stack_chain_numbering() {
     let file = file!();
     let report = format!("{:?}", StackReport::from(err));
 
-    // Phase 1 (StackError chain with locations):
+    // Sources with a location, through stack_source():
     // Error: Level1Error (top-level)
     // 1| Level2Error
     // 2| Level3Error
     assert!(report.contains(&format!("Error: Level1Error: level 1, at {file}:")));
     assert!(report.contains(&format!("1| Level2Error: level 2, at {file}:")));
     assert!(report.contains(&format!("2| Level3Error: level 3, at {file}:")));
-    // Phase 2 (plain Error chain without location):
+    // What is left below, through Error::source(), without a location:
     // 3| No such file or directory (os error 2)
     assert!(report.contains("3| "));
 }

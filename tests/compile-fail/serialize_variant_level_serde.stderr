@@ -1,0 +1,5 @@
+error: #[serde(rename = ...)] on a variant is not supported. The name reaches the payload as `type`, which comes from StackError::type_name() and is not renameable
+ --> tests/compile-fail/serialize_variant_level_serde.rs:5:5
+  |
+5 |     #[serde(rename = "Renamed")]
+  |     ^

@@ -33,7 +33,52 @@
 //! |---------|---------|----------|
 //! | `std`   | Yes     | `alloc` + [`StackReport`]'s [`Termination`](std::process::Termination) impl + [`#[report]`](macro@report) macro |
 //! | `alloc` | via `std` | [`BoxedStackError`] + `From<T> for BoxedStackError` generation |
+//! | `serde` | No      | `impl Serialize` for types opted in with [`#[suzunari_error(serialize)]`](macro@suzunari_error), and for [`BoxedStackError`] |
 //! | _(none)_ | —      | Core-only: [`Location`], [`StackError`], [`StackReport`] (formatting only), [`DisplayError`] |
+//!
+//! `serde` does not imply `alloc`: the [`BoxedStackError`] impl is confined to
+//! that tier only because the type is.
+//!
+//! # Serialization
+//!
+//! With the `serde` feature, `#[suzunari_error(serialize)]` generates an
+//! `impl Serialize` that emits the error chain as a nested payload:
+//!
+//! ```json
+//! {
+//!   "type": "FetchError",
+//!   "message": "fetch failed for /foo",
+//!   "location": { "file": "src/fetch.rs", "line": 12, "column": 9 },
+//!   "context": { "uri": "/foo" },
+//!   "source": { "message": "No such file or directory (os error 2)" }
+//! }
+//! ```
+//!
+//! - `type` is the type's bare name, without type arguments: `LookupError<u32>`
+//!   and `LookupError<String>` both serialize as `"LookupError"`
+//! - `context` holds the type's own declared fields, and is present even when
+//!   there are none. It is absent only behind [`BoxedStackError`], where the
+//!   concrete type is gone
+//! - `source` is omitted when there is no cause
+//! - A cause that is not one of this crate's types contributes `message` alone
+//!
+//! A declared field's own `#[serde(...)]` applies as it would on a struct
+//! derived directly. `#[serde(...)]` on the type or on a variant is refused;
+//! `#[suzunari_error(serialize(rename_all = "camelCase"))]` renames the declared
+//! fields and nothing else.
+//!
+//! **The payload carries file paths, line numbers and every message in the
+//! chain.** Decide deliberately before sending one across a trust boundary.
+//!
+//! ## Formats without field names
+//!
+//! Those omissions only work where the format carries field names. A format
+//! that reports [`is_human_readable() == false`](serde::Serializer::is_human_readable)
+//! — every binary format — receives a uniform shape, where every error node
+//! carries the same five keys and an absent part is `null`.
+//!
+//! [`_payload`] has the data structures to read either shape back, and schemas
+//! to check a payload against.
 //!
 //! # `#[suzu(...)]` Attribute
 //!
@@ -73,6 +118,16 @@ extern crate std;
 mod display_error;
 mod stack_error;
 mod stack_report;
+
+/// How to read a serialized payload back: the data structures a consumer
+/// defines, and schemas for the two shapes the payload takes.
+///
+/// Nothing to import. The module carries documentation, and every example in
+/// it is checked against a real payload.
+#[cfg(feature = "serde")]
+pub mod _payload {
+    #![doc = include_str!("payload.md")]
+}
 
 #[doc(hidden)]
 pub mod __private;

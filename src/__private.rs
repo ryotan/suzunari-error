@@ -4,11 +4,12 @@
 //! covered by semver guarantees. It exists solely for generated code emitted
 //! by `#[derive(StackError)]` and `#[suzunari_error]`.
 //!
-//! Uses the **autoref specialization** technique to conditionally resolve
-//! trait-dependent behavior at compile time. When a source type implements
-//! the target trait, the inherent method takes priority via autoref.
-//! Otherwise, `Deref` coercion kicks in, calling the fallback method.
-//! This avoids requiring trait bounds on source types in generated code.
+//! Two forms of autoref specialization are used here. `stack_source()` uses the
+//! `Deref`-based form: the inherent method wins when `T: StackError`, otherwise
+//! `Deref` reaches the fallback. The `source` field in `payload` uses a
+//! trait-based form instead, because its fallback has to borrow the value and a
+//! `Deref` target cannot. Both avoid requiring trait bounds on source types in
+//! generated code.
 //!
 //! See: <https://github.com/dtolnay/case-studies/blob/master/autoref-specialization/README.md>
 
@@ -17,13 +18,20 @@ use crate::display_error::DisplayError;
 use core::error::Error;
 use core::fmt::{Debug, Display};
 
+#[cfg(feature = "serde")]
+pub mod payload;
+
+// Generated code refers to serde through this re-export, never a bare `::serde`,
+// so downstream crates don't need serde as a direct dependency.
+#[cfg(feature = "serde")]
+pub use serde;
+
 // ---------------------------------------------------------------------------
 // StackSourceResolver — resolves StackError::stack_source()
 // ---------------------------------------------------------------------------
 
-/// Wraps a reference and resolves to the inherent `resolve()` method
-/// when `T: StackError`, or falls back via `Deref` → `NotStackErrorFallback`
-/// when `T` does not implement `StackError`.
+/// Wraps a source field so `resolve()` reaches either the inherent method below
+/// or [`NotStackErrorFallback`].
 pub struct StackSourceResolver<'a, T: ?Sized>(pub &'a T);
 
 impl<'a, T: StackError> StackSourceResolver<'a, T> {
@@ -33,7 +41,7 @@ impl<'a, T: StackError> StackSourceResolver<'a, T> {
     }
 }
 
-/// Fallback target via Deref. Always returns `None`.
+/// Reached by `Deref` when `T` does not implement `StackError`.
 pub struct NotStackErrorFallback;
 
 impl NotStackErrorFallback {
@@ -59,8 +67,7 @@ impl<T: ?Sized> core::ops::Deref for StackSourceResolver<'_, T> {
 
 /// Creates a [`DisplayError`] with an explicit `get_source` resolver.
 ///
-/// Called exclusively by `#[suzunari_error]` macro-generated code.
-/// Use [`DisplayError::new`] in application code.
+/// [`DisplayError::new`] is the one to use outside generated code.
 #[must_use]
 pub fn display_error_with_get_source<E: Debug + Display>(
     error: E,
@@ -73,11 +80,8 @@ pub fn display_error_with_get_source<E: Debug + Display>(
 // DisplayErrorSourceResolver — resolves get_source fn for DisplayError
 // ---------------------------------------------------------------------------
 
-/// Resolves the `get_source` function pointer for [`DisplayError`](crate::DisplayError).
-///
-/// Uses the same Deref-based autoref specialization as `StackSourceResolver`.
-/// When `T: Error + 'static`, the inherent `get_source_fn()` takes priority.
-/// Otherwise, Deref falls back to `DisplayErrorSourceFallback`.
+/// Resolves the `get_source` function pointer for [`DisplayError`](crate::DisplayError),
+/// the same way [`StackSourceResolver`] resolves `stack_source()`.
 ///
 /// The fallback's `get_source_fn` has a method-level generic `<T>`, so callers
 /// must provide an explicit type annotation for inference to succeed:
@@ -94,12 +98,10 @@ impl<T: Error + 'static> DisplayErrorSourceResolver<'_, T> {
     }
 }
 
-/// Fallback target via Deref. Returns a `get_source` fn that always yields `None`.
+/// Reached by `Deref` when `T` does not implement `Error`.
 pub struct DisplayErrorSourceFallback;
 
 impl DisplayErrorSourceFallback {
-    // The generic `<T>` here requires callers to provide a type annotation
-    // so the compiler can infer which `T` to use.
     #[must_use]
     pub fn get_source_fn<T>(&self) -> fn(&T) -> Option<&(dyn Error + 'static)> {
         |_| None

@@ -13,6 +13,7 @@ proc-macro = true
 
 [features]
 alloc = []
+serde = []
 
 [dependencies]
 proc-macro2.workspace = true

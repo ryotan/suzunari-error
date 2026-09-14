@@ -147,7 +147,7 @@ impl Display for StackReportFormatter<'_> {
 
         let mut index = 1;
 
-        // Phase 1: StackError chain (with location)
+        // Sources reachable through `stack_source()`, which carry a location
         let mut current_stack: &dyn StackError = error;
         while let Some(next) = current_stack.stack_source() {
             // Invariant: stack_source() implies source() (StackError is a sub-chain of Error).
@@ -170,7 +170,7 @@ impl Display for StackReportFormatter<'_> {
             current_stack = next;
         }
 
-        // Phase 2: Error chain (without location)
+        // What is left below, through `Error::source()`, which carries none
         let mut current_error = current_stack.source();
         while let Some(e) = current_error {
             write!(f, "\n  {index}| {e}")?;
