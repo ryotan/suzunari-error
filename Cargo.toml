@@ -40,7 +40,7 @@ snafu = { workspace = true, features = ["rust_1_81"] }
 suzunari-error-macro-impl.workspace = true
 
 [dev-dependencies]
-trybuild = "=1.0.120"
+trybuild = "=1.0.121"
 
 # All three use `#[report]`, which needs `std`. Declaring that lets `cargo test
 # --no-default-features` skip them instead of failing to build them.
