@@ -59,7 +59,7 @@ pinact = "4.1.1"
 prek = "0.5.2"
 slsa-verifier = "2.7.1"
 sops = "3.13.3"
-zizmor = "1.30.0"
+zizmor = "1.30.1"
 
 [env]
 _.file = ".config/local/.credentials.enc.yaml"
