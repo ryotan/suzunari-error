@@ -54,7 +54,7 @@ bincode = { version = "2", features = ["serde"] }
 ciborium = "0.2"
 postcard = { version = "1", features = ["use-std"] }
 rmp-serde = "1"
-jsonschema = "0.52"
+jsonschema = "0.56"
 cddl = "0.10"
 
 # All three use `#[report]`, which needs `std`. Declaring that lets `cargo test
