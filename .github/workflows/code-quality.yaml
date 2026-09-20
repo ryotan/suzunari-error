@@ -63,9 +63,14 @@ jobs:
         run: echo "::add-matcher::.github/problem-matchers.json"
 
       - name: Install cargo-hack
-        uses: taiki-e/install-action@3f74d7c16a4242f1c95561e98edc25d36adb4375 # v2.87.12
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        env:
+          # mise ignores `paranoid` outside the global config, so CI asks for it with this variable.
+          # See .config/mise/config.toml.
+          MISE_PARANOID: 'true'
         with:
-          tool: cargo-hack@0.6.45
+          version: '2026.9.7'
+          install_args: 'github:taiki-e/cargo-hack'
 
       - name: Check formatting
         id: fmt
