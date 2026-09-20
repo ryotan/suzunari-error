@@ -46,10 +46,11 @@ A snafu-based error handling library with automatic location tracking. `#![no_st
 
 ### Core Concepts
 
-- **`Location`** — Wrapper around `core::panic::Location`. Uses `#[track_caller]` + snafu's `GenerateImplicitData` to automatically capture error origin
+- **`Location`** — Type alias for `&'static core::panic::Location<'static>`, defined in `src/lib.rs` (the same alias snafu 0.9 exposes as `snafu::Location`). Not a wrapper struct. Populated automatically by `#[snafu(implicit)]` via snafu's `GenerateImplicitData` impl, which calls `core::panic::Location::caller()` under `#[track_caller]`
 - **`StackError` trait** — Extends `Error` with `location()`, `type_name()`, `stack_source()`, and `depth()`. Use `StackReport` to format error chains with location info
 - **`BoxedStackError`** — Wrapper around `Box<dyn StackError + Send + Sync>` for uniform handling of heterogeneous errors (requires alloc)
 - **`DisplayError<E>`** — Adapter that wraps `Debug + Display` types (without `Error` impl) into `core::error::Error`
+- **`#[suzunari_error(serialize)]`** — Opt-in `impl Serialize` emitting the whole chain as error nodes: `type`, `message`, `location`, `context`, `source` at every level (requires `serde`). See `src/payload.md`
 
 ### Macro Crate (`macro-impl/`)
 
@@ -65,6 +66,7 @@ Key source files in `macro-impl/src/`:
 - `derive.rs` — `derive(StackError)` implementation
 - `report.rs` — `#[report]` implementation
 - `helper.rs` — Shared utilities (`lookup_location_field`, `find_location_field`, `find_source_field`, `combine_errors`, etc.)
+- `serialize.rs` — `#[suzunari_error(serialize)]` codegen: the context definition, the source-field dispatch, and the serde bound inference
 
 The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc")` controls whether `From<T> for BoxedStackError` impl is generated.
 
@@ -95,11 +97,13 @@ Attribute ownership: each attribute is consumed by a specific macro.
 
 - `std` (default) → `alloc` + `snafu/std` + `StackReport` `Termination` impl + `#[report]` macro. Note: `StackReport` itself uses only `core::fmt` and is available in all tiers; only `Termination` impl and `#[report]` require `std`
 - `alloc` → `snafu/alloc` + `BoxedStackError` + macro generates `From<T> for BoxedStackError`
+- `serde` → `#[suzunari_error(serialize)]` and `impl Serialize for BoxedStackError`. Does not imply `alloc`: it works in all three tiers
 
 ### Test Structure
 
 - `tests/` — Integration tests (assumes std feature)
-- `tests-features/` — Feature-tier compile checks and integration tests. Uses `test-std` / `test-alloc` / `test-core-only` features to test each tier independently
+- `tests-features/` — Feature-tier compile checks and integration tests. Uses `test-std` / `test-alloc` / `test-core-only` features to test each tier independently, each with and without `test-serde`
+- `tests/serde_differential_pairwise.rs` is generated. Regenerate with `python3 tests/support/generate-cases.py tests/support/differential-cases.pict > tests/serde_differential_pairwise.rs`, then `cargo fmt --all`. `pict` comes from Homebrew, not mise
 
 ## Coding Philosophy
 
@@ -130,4 +134,4 @@ This is a **personal library**, not targeting broad crates.io discoverability. B
 
 ## Toolchain
 
-Rust 1.85.1 (pinned in `rust-toolchain.toml`). Edition 2024.
+Rust 1.98.1 (pinned in `rust-toolchain.toml`). Edition 2024. The crate's MSRV is 1.85 (`rust-version` in `Cargo.toml`).
