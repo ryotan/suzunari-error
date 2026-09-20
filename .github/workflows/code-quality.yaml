@@ -8,6 +8,11 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Superseded pushes to a PR branch are cancelled; runs on main are left to finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # Default-deny token permissions; the lint job below does not need anything more than read access to clone the
 # repository.
 permissions:
@@ -21,6 +26,8 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
+    # The slowest matrix leg observed is under 5 minutes; 30 absorbs a cold cache.
+    timeout-minutes: 30
     steps:
       - name: Harden Runner
         # Block unexpected egress and process activity on the runner. The allowed-endpoints list below was
@@ -43,7 +50,9 @@ jobs:
             *.blob.core.windows.net:443
             *.githubusercontent.com:443
 
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Setup Rust toolchain
         uses: step-security/setup-rust-toolchain@f547b7511b1e8f8d1cda8ef9f27bc365e7761fee # v2.0.0
