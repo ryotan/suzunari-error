@@ -1,0 +1,11 @@
+error: #[serde(getter = ...)] cannot be used here: serde accepts it only inside a remote definition, so it would apply to the generated definition and not to this type
+ --> tests/compile-fail/serialize_field_serde.rs:8:13
+  |
+8 |     #[serde(getter = "get")]
+  |             ^^^^^^
+
+error: #[serde(...)] on the source or location field is ignored: both belong to the metadata level, not to `context`
+  --> tests/compile-fail/serialize_field_serde.rs:11:5
+   |
+11 |     #[serde(rename = "cause")]
+   |     ^

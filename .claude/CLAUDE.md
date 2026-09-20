@@ -30,24 +30,14 @@ Types: `feature/`, `fix/`, `hotfix/`, `release/`, `chore/`
 ## Build & Test Commands
 
 ```bash
-# Build (all features)
-cargo build --all-features
+# Same as CI: every feature combination across the workspace
+cargo hack --workspace --feature-powerset clippy --all-targets -- -D warnings
+cargo hack --workspace --feature-powerset test
+cargo fmt --all -- --check
 
-# Test (all features — same as CI)
-cargo test --all-features
-
-# Run a single test
+# A single test
 cargo test <test_name>
 cargo test --package suzunari-error <test_name>
-
-# Lint (same as CI)
-cargo fmt --all -- --check
-cargo clippy --all-targets --all-features -- -D warnings
-
-# Feature-tier tests (tests-features crate)
-cargo test -p suzunari-error-feature-tests --features test-std
-cargo test -p suzunari-error-feature-tests --features test-alloc
-cargo test -p suzunari-error-feature-tests --no-default-features --features test-core-only  # core-only
 ```
 
 ## Architecture

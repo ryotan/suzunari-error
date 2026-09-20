@@ -1,0 +1,11 @@
+error: #[serde(...)] on the type is not supported. To rename the declared fields, write #[suzunari_error(serialize(rename_all = "..."))] instead
+ --> tests/compile-fail/serialize_type_level_serde.rs:5:1
+  |
+5 | #[serde(rename_all = "camelCase")]
+  | ^
+
+error: #[serde(...)] on the type is not supported: the definition generated from it is a different container, where the attribute would either change the payload or do nothing. Field-level attributes are carried over; renaming is available as #[suzunari_error(serialize(rename_all = "..."))]
+  --> tests/compile-fail/serialize_type_level_serde.rs:13:1
+   |
+13 | #[serde(deny_unknown_fields)]
+   | ^

@@ -1,0 +1,11 @@
+error: unknown `serialize` argument; the only one is `rename_all`
+ --> tests/compile-fail/serialize_unknown_option.rs:3:28
+  |
+3 | #[suzunari_error(serialize(unknown = "x"))]
+  |                            ^^^^^^^
+
+error: `rename_all` takes a string, such as "camelCase"
+ --> tests/compile-fail/serialize_unknown_option.rs:9:41
+  |
+9 | #[suzunari_error(serialize(rename_all = 3))]
+  |                                         ^
