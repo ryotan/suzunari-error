@@ -1,0 +1,96 @@
+name: 'Workflow Lint'
+
+# Keeps the workflows clean under zizmor, ghalint and pinact.
+#
+# The linters read only the workflows. The mise files are in the path filters because they pin the
+# linter versions.
+on:
+  push:
+    branches:
+      - main
+    paths: &lint-paths
+      - '.github/workflows/**'
+      - '.config/mise/config.toml'
+      - '.config/mise/mise.lock'
+  pull_request:
+    branches:
+      - main
+    paths: *lint-paths
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Superseded pushes to a PR branch are cancelled; runs on main are left to finish.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Default-deny token permissions; this workflow only reads the repository.
+permissions:
+  contents: read
+
+jobs:
+  workflow-lint:
+    name: 'Workflow Lint'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Harden Runner
+        # Monitor in audit mode, then switch `egress-policy` to `block` after baselining
+        # (expected: api.github.com, github.com, objects.githubusercontent.com, mise.jdx.dev).
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install the linters
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        env:
+          # mise ignores `paranoid` outside the global config, so CI asks for it with this variable.
+          # See .config/mise/config.toml.
+          MISE_PARANOID: 'true'
+        with:
+          # The project config pins tools for local development; only these three are needed here.
+          install_args: 'ghalint pinact zizmor'
+          # .config/mise/config.toml applies this delay to tools; here it applies to the mise release.
+          minimum_release_age: '7d'
+
+      - name: ghalint
+        id: ghalint
+        run: ghalint run
+        continue-on-error: true
+
+      - name: zizmor
+        id: zizmor
+        # The default persona reports nothing on these files; auditor is what they were cleaned against.
+        run: zizmor --persona=auditor .github/workflows/
+        continue-on-error: true
+
+      - name: pinact
+        id: pinact
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: pinact run --check .github/workflows/*.yaml
+        continue-on-error: true
+
+      - name: Report results
+        if: always()
+        shell: bash
+        env:
+          RESULTS: |
+            ghalint=${{ steps.ghalint.outcome }}
+            zizmor=${{ steps.zizmor.outcome }}
+            pinact=${{ steps.pinact.outcome }}
+        run: |
+          failed=0
+          while IFS='=' read -r name outcome; do
+            [ -z "$name" ] && continue
+            if [ "$outcome" = "failure" ]; then
+              echo "::error::$name failed"
+              failed=1
+            fi
+          done <<< "$RESULTS"
+          if [ "$failed" -eq 1 ]; then
+            exit 1
+          fi
+          echo "All steps succeeded."
