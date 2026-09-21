@@ -62,3 +62,43 @@ jobs:
         run: cargo publish -p suzunari-error
         env:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
+
+  github-release:
+    name: GitHub Release
+    # A separate job, not a step in crates-io: a failed release can then be re-run without repeating
+    # `cargo publish`, which fails once the version is on crates.io. It also keeps `contents: write`
+    # out of the job holding the crates.io OIDC token.
+    needs: crates-io
+    # workflow_dispatch can run this from a branch, where there is no tag to release.
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Releases live under `contents` and there is no narrower scope.
+    timeout-minutes: 5
+    steps:
+      - name: Harden Runner
+        # Monitor in audit mode, then switch `egress-policy` to `block` after baselining
+        # (expected: api.github.com).
+        uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # This job does not check out, so gh has no git remote to resolve the repository from.
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          # `gh release create` cannot put text above the generated notes, so they are fetched here
+          # and the crates.io link prepended.
+          notes="$(gh api --method POST "repos/${GH_REPO}/releases/generate-notes" \
+            -f "tag_name=${TAG}" --jq '.body')"
+          {
+            printf 'Available on crates.io: [`suzunari-error` %s](https://crates.io/crates/suzunari-error/%s)\n\n' \
+              "$version" "$version"
+            printf '%s\n' "$notes"
+          } > release-notes.md
+          gh release create "$TAG" --verify-tag --title "$TAG" --notes-file release-notes.md
