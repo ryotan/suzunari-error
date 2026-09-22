@@ -26,11 +26,14 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden Runner
-        # Monitor and (in audit mode) report unexpected egress and process activity on the runner during
-        # publish. Switch `egress-policy` to `block` after baselining (expected: crates.io, GitHub OIDC).
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            crates.io:443
+            index.crates.io:443
+            static.crates.io:443
+            static.rust-lang.org:443
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -77,11 +80,10 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Harden Runner
-        # Monitor in audit mode, then switch `egress-policy` to `block` after baselining
-        # (expected: api.github.com).
+        # gh reaches only api.github.com, which Harden-Runner allows by default.
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
-          egress-policy: audit
+          egress-policy: block
 
       - name: Create the release
         env:
