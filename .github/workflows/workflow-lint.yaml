@@ -33,10 +33,15 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Harden Runner
-        # Audit first; switch `egress-policy` to `block` once the egress has been baselined.
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
-          egress-policy: audit
+          egress-policy: block
+          allowed-endpoints: >
+            api.github.com:443
+            github.com:443
+            mise.jdx.dev:443
+            *.actions.githubusercontent.com:443
+            *.githubusercontent.com:443
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
