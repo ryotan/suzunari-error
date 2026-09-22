@@ -1,7 +1,7 @@
 #![cfg(feature = "std")]
 
 #[test]
-fn compile_fail() {
+fn test_compile_fail() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/report_*.rs");
     t.compile_fail("tests/compile-fail/derive_*.rs");
@@ -14,7 +14,7 @@ fn compile_fail() {
 /// instead, with a different message.
 #[cfg(feature = "serde")]
 #[test]
-fn compile_fail_serde() {
+fn test_compile_fail_serde() {
     let t = trybuild::TestCases::new();
     t.compile_fail("tests/compile-fail/serialize_*.rs");
 }

@@ -178,7 +178,7 @@ mod case_01 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -220,7 +220,7 @@ mod case_02 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -259,7 +259,7 @@ mod case_03 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -301,7 +301,7 @@ mod case_04 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -340,7 +340,7 @@ mod case_05 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_enum_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -383,7 +383,7 @@ mod case_06 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -425,7 +425,7 @@ mod case_07 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(Case07Snafu { source: 9u32 })
             .unwrap_err();
@@ -458,7 +458,7 @@ mod case_08 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_enum_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -500,7 +500,7 @@ mod case_09 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -544,7 +544,7 @@ mod case_10 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: Detail { code: 3 },
@@ -580,7 +580,7 @@ mod case_11 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_enum_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -621,7 +621,7 @@ mod case_12 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -665,7 +665,7 @@ mod case_13 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -707,7 +707,7 @@ mod case_14 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause).context(UnderSnafu).unwrap_err();
@@ -742,7 +742,7 @@ mod case_15 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(Case15Snafu { source: "k" })
             .unwrap_err();
@@ -775,7 +775,7 @@ mod case_16 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = Err::<(), _>(LibError)
             .context(UnderSnafu { label: pairs() })
             .unwrap_err();
@@ -808,7 +808,7 @@ mod case_17 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = Err::<(), _>(LibError)
             .context(UnderSnafu {
                 label: "b",
@@ -844,7 +844,7 @@ mod case_18 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case18<Marker>> {
             ensure!(
                 false,
@@ -882,7 +882,7 @@ mod case_19 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: Some(9u32),
@@ -918,7 +918,7 @@ mod case_20 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = Err::<(), _>(LibError)
             .context(UnderSnafu {
                 source: Detail { code: 3 },
@@ -953,7 +953,7 @@ mod case_21 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = BoxedStackError::new(inner_error());
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -994,7 +994,7 @@ mod case_22 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH).context(UnderSnafu).unwrap_err();
 
         assert_context_matches(&error);
@@ -1025,7 +1025,7 @@ mod case_23 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -1064,7 +1064,7 @@ mod case_24 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = BoxedStackError::new(inner_error());
         let standalone = record(&cause);
         let error = Err::<(), _>(cause).context(Case24Snafu).unwrap_err();
@@ -1103,7 +1103,7 @@ mod case_25 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu { source: "k" })
             .unwrap_err();
@@ -1134,7 +1134,7 @@ mod case_26 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(Case26Snafu { source: pairs() })
             .unwrap_err();
@@ -1167,7 +1167,7 @@ mod case_27 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = BoxedStackError::new(inner_error());
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -1211,7 +1211,7 @@ mod case_28 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: Some(7u32),
@@ -1247,7 +1247,7 @@ mod case_29 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = Err::<(), _>(LibError)
             .context(UnderSnafu { source: "l" })
             .unwrap_err();
@@ -1278,7 +1278,7 @@ mod case_30 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(Case30Snafu { source: "b" })
             .unwrap_err();
@@ -1311,7 +1311,7 @@ mod case_31 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -1350,7 +1350,7 @@ mod case_32 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -1394,7 +1394,7 @@ mod case_33 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: Some(9u32),
@@ -1428,7 +1428,7 @@ mod case_34 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = Err::<(), _>(LibError)
             .context(Case34Snafu {
                 label: Renamed { field_name: "x" },
@@ -1462,7 +1462,7 @@ mod case_35 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(Case35Snafu { source: "l" })
             .unwrap_err();
@@ -1493,7 +1493,7 @@ mod case_36 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case36> {
             ensure!(false, Case36Snafu { source: Some(7u32) });
             Ok(())
@@ -1525,7 +1525,7 @@ mod case_37 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = BoxedStackError::new(inner_error());
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -1566,7 +1566,7 @@ mod case_38 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = Err::<(), _>(LibError)
             .context(UnderSnafu {
                 label: 9u32,
@@ -1602,7 +1602,7 @@ mod case_39 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = Err::<(), _>(LibError)
             .context(UnderSnafu {
                 label: Some(7u32),
@@ -1638,7 +1638,7 @@ mod case_40 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = BoxedStackError::new(inner_error());
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -1677,7 +1677,7 @@ mod case_41 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -1721,7 +1721,7 @@ mod case_42 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_enum_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -1765,7 +1765,7 @@ mod case_43 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = BoxedStackError::new(inner_error());
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -1809,7 +1809,7 @@ mod case_44 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_enum_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -1853,7 +1853,7 @@ mod case_45 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: pairs(),
@@ -1889,7 +1889,7 @@ mod case_46 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case46> {
             ensure!(
                 false,
@@ -1927,7 +1927,7 @@ mod case_47 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = Err::<(), _>(LibError)
             .context(UnderSnafu {
                 label: Some(9u32),
@@ -1963,7 +1963,7 @@ mod case_48 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = BoxedStackError::new(inner_error());
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -2007,7 +2007,7 @@ mod case_49 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_enum_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -2051,7 +2051,7 @@ mod case_50 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_enum_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -2095,7 +2095,7 @@ mod case_51 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_enum_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause).context(UnderSnafu).unwrap_err();
@@ -2134,7 +2134,7 @@ mod case_52 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = Err::<(), _>(LibError)
             .context(UnderSnafu { label: "k" })
             .unwrap_err();
@@ -2167,7 +2167,7 @@ mod case_53 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: Renamed { field_name: "x" },
@@ -2202,7 +2202,7 @@ mod case_54 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_enum_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -2243,7 +2243,7 @@ mod case_55 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = BoxedStackError::new(inner_error());
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -2287,7 +2287,7 @@ mod case_56 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case56<u32>> {
             ensure!(false, UnderSnafu { label: Some(9u32) });
             Ok(())
@@ -2319,7 +2319,7 @@ mod case_57 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_enum_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -2363,7 +2363,7 @@ mod case_58 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH).context(UnderSnafu).unwrap_err();
 
         assert_context_matches(&error);
@@ -2394,7 +2394,7 @@ mod case_59 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu { label: Some(7u32) })
             .unwrap_err();
@@ -2427,7 +2427,7 @@ mod case_60 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: "b",
@@ -2463,7 +2463,7 @@ mod case_61 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: Detail { code: 3 },
@@ -2499,7 +2499,7 @@ mod case_62 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -2541,7 +2541,7 @@ mod case_63 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case63> {
             ensure!(
                 false,
@@ -2579,7 +2579,7 @@ mod case_64 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -2620,7 +2620,7 @@ mod case_65 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = BoxedStackError::new(inner_error());
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -2661,7 +2661,7 @@ mod case_66 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case66<'static>> {
             ensure!(
                 false,
@@ -2693,7 +2693,7 @@ mod case_67 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case67> {
             ensure!(false, UnderSnafu);
             Ok(())
@@ -2725,7 +2725,7 @@ mod case_68 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = Err::<(), _>(LibError).context(UnderSnafu).unwrap_err();
 
         assert_context_matches(&error);
@@ -2756,7 +2756,7 @@ mod case_69 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: "l",
@@ -2792,7 +2792,7 @@ mod case_70 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -2831,7 +2831,7 @@ mod case_71 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: Renamed { field_name: "x" },
@@ -2866,7 +2866,7 @@ mod case_72 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = BoxedStackError::new(inner_error());
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -2907,7 +2907,7 @@ mod case_73 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case73> {
             ensure!(
                 false,
@@ -2945,7 +2945,7 @@ mod case_74 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case74<u32>> {
             ensure!(false, UnderSnafu { source: 9u32 });
             Ok(())
@@ -2977,7 +2977,7 @@ mod case_75 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -3021,7 +3021,7 @@ mod case_76 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: Detail { code: 3 },
@@ -3057,7 +3057,7 @@ mod case_77 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -3098,7 +3098,7 @@ mod case_78 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = Err::<(), _>(LibError)
             .context(UnderSnafu {
                 label: pairs(),
@@ -3134,7 +3134,7 @@ mod case_79 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let error = std::fs::read(MISSING_PATH)
             .context(UnderSnafu {
                 label: 9u32,
@@ -3170,7 +3170,7 @@ mod case_80 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case80<u32>> {
             ensure!(false, UnderSnafu { source: 9u32 });
             Ok(())
@@ -3202,7 +3202,7 @@ mod case_81 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case81<u32>> {
             ensure!(
                 false,
@@ -3240,7 +3240,7 @@ mod case_82 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -3281,7 +3281,7 @@ mod case_83 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -3322,7 +3322,7 @@ mod case_84 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = inner_error();
         let standalone = record(&cause);
         let error = Err::<(), _>(cause).context(UnderSnafu).unwrap_err();
@@ -3361,7 +3361,7 @@ mod case_85 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = BoxedStackError::new(inner_error());
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -3404,7 +3404,7 @@ mod case_86 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case86<'static>> {
             ensure!(false, UnderSnafu { label: "b" });
             Ok(())
@@ -3436,7 +3436,7 @@ mod case_87 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case87> {
             ensure!(
                 false,
@@ -3468,7 +3468,7 @@ mod case_88 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case88> {
             ensure!(false, UnderSnafu);
             Ok(())
@@ -3498,7 +3498,7 @@ mod case_89 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause)
@@ -3540,7 +3540,7 @@ mod case_90 {
     }
 
     #[test]
-    fn matches_the_hand_written_equivalent() {
+    fn test_matches_the_hand_written_equivalent() {
         fn failing() -> Result<(), Case90> {
             ensure!(false, UnderSnafu { source: pairs() });
             Ok(())

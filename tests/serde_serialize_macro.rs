@@ -42,7 +42,7 @@ fn lookup_error() -> LookupError {
 /// The opted-in type carries its declared fields under `context`, and the
 /// non-`Serialize` `source` field stays out of them.
 #[test]
-fn declared_fields_appear_under_context() {
+fn test_declared_fields_appear_under_context() {
     let value = serde_json::to_value(lookup_error()).unwrap();
 
     assert_eq!(value["type"], "LookupError");
@@ -65,7 +65,7 @@ fn declared_fields_appear_under_context() {
 /// identifier as its struct name. JSON discards struct names, so this leak is
 /// only visible at the `Token` level.
 #[test]
-fn context_object_does_not_leak_the_definition_name() {
+fn test_context_object_does_not_leak_the_definition_name() {
     let error = lookup_error();
     let location = error.location();
 
@@ -120,7 +120,7 @@ fn context_object_does_not_leak_the_definition_name() {
 /// A source that is itself an opted-in type keeps its own `context`. This is
 /// what the type-erased walk cannot do, and the reason dispatch is specialized.
 #[test]
-fn nested_serialize_source_keeps_its_context() {
+fn test_nested_serialize_source_keeps_its_context() {
     let value = serde_json::to_value(
         Err::<(), _>(lookup_error())
             .context(RequestSnafu { endpoint: "/v1" })
@@ -142,7 +142,7 @@ fn nested_serialize_source_keeps_its_context() {
 /// A foreign error that happens to derive `Serialize` must not be inlined raw:
 /// dispatch keys on the crate's marker, not on `Serialize`.
 #[test]
-fn foreign_serialize_source_is_not_inlined() {
+fn test_foreign_serialize_source_is_not_inlined() {
     #[derive(Debug, serde::Serialize)]
     struct ForeignError {
         code: u32,
@@ -181,7 +181,7 @@ fn foreign_serialize_source_is_not_inlined() {
 /// fields exist but are unreachable. `type` cannot carry that distinction: an
 /// erased node still has one, because `BoxedStackError` forwards `type_name()`.
 #[test]
-fn empty_context_is_distinct_from_an_erased_one() {
+fn test_empty_context_is_distinct_from_an_erased_one() {
     #[suzunari_error(serialize)]
     #[suzu(display("bare"))]
     struct BareError {}
@@ -247,7 +247,7 @@ fn empty_context_is_distinct_from_an_erased_one() {
 /// `Configure` marker because the representations differ, so marking the other
 /// tests `readable` would otherwise leave this shape unmeasured.
 #[test]
-fn declared_fields_reach_context_without_field_names() {
+fn test_declared_fields_reach_context_without_field_names() {
     let error = lookup_error();
     let location = error.location();
 

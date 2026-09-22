@@ -31,7 +31,7 @@ mod declared_fields_with_source {
     }
 
     #[test]
-    fn context_matches_a_directly_written_struct() {
+    fn test_context_matches_a_directly_written_struct() {
         let error = std::fs::read("/nonexistent-suzunari-error")
             .context(LookupSnafu {
                 key: "k",
@@ -75,7 +75,7 @@ mod declared_fields_without_source {
     }
 
     #[test]
-    fn context_matches_a_directly_written_struct() {
+    fn test_context_matches_a_directly_written_struct() {
         let error = validate().unwrap_err();
 
         let expected = oracle::ValidationError {
@@ -104,7 +104,7 @@ mod no_declared_fields_with_source {
     }
 
     #[test]
-    fn context_matches_a_directly_written_struct() {
+    fn test_context_matches_a_directly_written_struct() {
         let error = std::fs::read("/nonexistent-suzunari-error")
             .context(WrapSnafu)
             .unwrap_err();
@@ -142,7 +142,7 @@ mod custom_location_name {
     }
 
     #[test]
-    fn context_matches_a_directly_written_struct() {
+    fn test_context_matches_a_directly_written_struct() {
         let error = fail().unwrap_err();
 
         let expected = oracle::CustomLocationError {
@@ -185,7 +185,7 @@ mod source_is_a_serialize_type {
     }
 
     #[test]
-    fn nesting_matches_serializing_the_source_on_its_own() {
+    fn test_nesting_matches_serializing_the_source_on_its_own() {
         let cause = inner().unwrap_err();
         let standalone = record(&cause);
         let outer = Err::<(), _>(cause).context(OuterSnafu).unwrap_err();
@@ -216,7 +216,7 @@ mod source_is_boxed {
     }
 
     #[test]
-    fn nesting_matches_serializing_the_source_on_its_own() {
+    fn test_nesting_matches_serializing_the_source_on_its_own() {
         let boxed = BoxedStackError::new(inner().unwrap_err());
         let standalone = record(&boxed);
         let outer = Err::<(), _>(boxed).context(OuterSnafu).unwrap_err();
@@ -246,7 +246,7 @@ mod source_is_a_foreign_error {
     }
 
     #[test]
-    fn the_chain_continues_as_a_phase_two_node() {
+    fn test_the_chain_continues_as_a_phase_two_node() {
         let error = std::fs::read("/nonexistent-suzunari-error")
             .context(ReadSnafu)
             .unwrap_err();
@@ -283,7 +283,7 @@ mod source_is_a_foreign_serialize_type {
     }
 
     #[test]
-    fn the_foreign_impl_does_not_replace_the_node() {
+    fn test_the_foreign_impl_does_not_replace_the_node() {
         let cause = ForeignError { code: 7 };
         let standalone = record(&cause);
         let error = Err::<(), _>(cause).context(WrapSnafu).unwrap_err();
@@ -320,7 +320,7 @@ mod source_is_a_display_error {
     }
 
     #[test]
-    fn the_chain_continues_as_a_phase_two_node() {
+    fn test_the_chain_continues_as_a_phase_two_node() {
         let error = Err::<(), _>(LibError).context(AdaptSnafu).unwrap_err();
 
         assert_eq!(
@@ -346,7 +346,7 @@ mod no_source {
     }
 
     #[test]
-    fn the_key_is_absent_rather_than_null() {
+    fn test_the_key_is_absent_rather_than_null() {
         let record = record(&leaf().unwrap_err());
         let Record::Struct { fields, .. } = &record else {
             panic!("expected a struct record");
@@ -410,7 +410,7 @@ mod declared_field_is_a_serialize_struct {
     }
 
     #[test]
-    fn it_nests_through_its_own_impl() {
+    fn test_it_nests_through_its_own_impl() {
         let error = reject().unwrap_err();
 
         let expected = oracle::RejectedError {
@@ -495,7 +495,7 @@ mod container_attributes_on_a_nested_struct {
     }
 
     #[test]
-    fn they_apply_exactly_as_they_would_on_their_own() {
+    fn test_they_apply_exactly_as_they_would_on_their_own() {
         let error = fail().unwrap_err();
         let (renamed, wrapped) = parts();
 
@@ -546,7 +546,7 @@ mod source_named_field_that_is_not_the_source {
     }
 
     #[test]
-    fn the_declared_one_stays_in_context_and_the_renamed_one_continues_the_chain() {
+    fn test_the_declared_one_stays_in_context_and_the_renamed_one_continues_the_chain() {
         let error = std::fs::read("/nonexistent-suzunari-error")
             .context(BothSnafu {
                 source: "not-an-error".to_owned(),
@@ -612,7 +612,7 @@ mod rename_all {
     }
 
     #[test]
-    fn it_renames_declared_fields_only() {
+    fn test_it_renames_declared_fields_only() {
         let recorded = record(&struct_error());
         let context = recorded.field("context");
 
@@ -630,7 +630,7 @@ mod rename_all {
     }
 
     #[test]
-    fn an_enum_renames_variant_fields_not_variants() {
+    fn test_an_enum_renames_variant_fields_not_variants() {
         fn read() -> Result<(), EnumError> {
             ensure!(false, ReadFailedSnafu { file_path: "/p" });
             Ok(())
@@ -691,7 +691,7 @@ mod parameter_bounds {
     struct NotSerialize;
 
     #[test]
-    fn a_parameter_only_the_source_uses_needs_none() {
+    fn test_a_parameter_only_the_source_uses_needs_none() {
         let error = std::fs::read("/nonexistent-suzunari-error")
             .context(WrapSnafu)
             .unwrap_err();
@@ -705,7 +705,7 @@ mod parameter_bounds {
     }
 
     #[test]
-    fn a_skipped_declared_field_needs_none_either() {
+    fn test_a_skipped_declared_field_needs_none_either() {
         fn failing() -> Result<(), SkipError<NotSerialize>> {
             ensure!(
                 false,
