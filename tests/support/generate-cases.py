@@ -517,7 +517,7 @@ mod case_{index:02} {{
 {decl}
 
     #[test]
-    fn matches_the_hand_written_equivalent() {{
+    fn test_matches_the_hand_written_equivalent() {{
 {body(levels, ty_name, selector(levels, ty_name, fields))}
     }}
 }}''')

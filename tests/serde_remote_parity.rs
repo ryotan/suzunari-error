@@ -79,7 +79,7 @@ macro_rules! parity {
             }
 
             #[test]
-            fn survives_the_remote_definition() {
+            fn test_survives_the_remote_definition() {
                 let direct = Direct {
                     $field: $value,
                     other: 1,
@@ -250,7 +250,7 @@ mod borrow {
     }
 
     #[test]
-    fn survives_the_remote_definition() {
+    fn test_survives_the_remote_definition() {
         let direct = Direct {
             value: "v",
             other: 1,
@@ -317,7 +317,7 @@ mod remote_within_remote {
     }
 
     #[test]
-    fn survives_the_remote_definition() {
+    fn test_survives_the_remote_definition() {
         let direct = Direct {
             value: Foreign { n: 9 },
             other: 1,

@@ -39,7 +39,7 @@ fn read_error() -> ReadError {
 
 /// A `StackError` whose cause is a plain `Error`: locations stop at the cause.
 #[test]
-fn serializes_stack_error_then_plain_error_tail() {
+fn test_serializes_stack_error_then_plain_error_tail() {
     let boxed = BoxedStackError::new(read_error());
     let value = serde_json::to_value(&boxed).unwrap();
 
@@ -70,7 +70,7 @@ fn serializes_stack_error_then_plain_error_tail() {
 
 /// Two `StackError` levels: the chain must not truncate at the erased boundary.
 #[test]
-fn serializes_nested_stack_errors() {
+fn test_serializes_nested_stack_errors() {
     let inner = BoxedStackError::new(read_error());
     let outer = Err::<(), _>(inner).context(FetchSnafu).unwrap_err();
     let value = serde_json::to_value(BoxedStackError::new(outer)).unwrap();
@@ -83,7 +83,7 @@ fn serializes_nested_stack_errors() {
 
 /// An error with no cause omits `source` rather than emitting null.
 #[test]
-fn omits_source_when_there_is_no_cause() {
+fn test_omits_source_when_there_is_no_cause() {
     #[suzunari_error]
     #[suzu(display("no cause"))]
     struct LeafError {}
@@ -138,7 +138,7 @@ fn omits_source_when_there_is_no_cause() {
 /// that the two node shapes stay distinguishable rather than one reusing the
 /// other's struct name for a different field set.
 #[test]
-fn node_struct_names_and_field_counts() {
+fn test_node_struct_names_and_field_counts() {
     let boxed = BoxedStackError::new(read_error());
     let location = boxed.location();
 
@@ -192,7 +192,7 @@ fn node_struct_names_and_field_counts() {
 /// a `Configure` marker precisely because the two representations differ, so a
 /// test that only marks itself `readable` leaves this one unmeasured.
 #[test]
-fn every_node_has_the_same_five_fields_without_field_names() {
+fn test_every_node_has_the_same_five_fields_without_field_names() {
     let boxed = BoxedStackError::new(read_error());
     let location = boxed.location();
 

@@ -104,7 +104,7 @@ where
 /// `FileStore` is not `Serialize`; its `Key` is. Inferring `S: Serialize` here
 /// rules out every marker type anyone would write.
 #[test]
-fn an_associated_type_field_bounds_the_associated_type() {
+fn test_an_associated_type_field_bounds_the_associated_type() {
     let error = NotFoundSnafu {
         key: "k1".to_string(),
     }
@@ -129,7 +129,7 @@ struct Tagged<T: Debug> {
 }
 
 #[test]
-fn a_phantom_data_field_bounds_nothing() {
+fn test_a_phantom_data_field_bounds_nothing() {
     let error = TaggedSnafu {
         marker: PhantomData,
         detail: "boom".to_string(),
@@ -171,7 +171,7 @@ struct Rejected<T: Debug> {
 }
 
 #[test]
-fn a_serialize_with_field_bounds_nothing() {
+fn test_a_serialize_with_field_bounds_nothing() {
     let error = RejectedSnafu {
         value: Opaque,
         reason: "unsupported",
@@ -217,7 +217,7 @@ struct AuthFailed<T: Debug> {
 }
 
 #[test]
-fn a_field_bound_of_the_users_own_replaces_the_inference() {
+fn test_a_field_bound_of_the_users_own_replaces_the_inference() {
     let error = AuthFailedSnafu {
         credential: Redacted(Opaque),
         attempts: 3u32,
@@ -249,7 +249,7 @@ where
 }
 
 #[test]
-fn a_parameter_only_the_source_uses_is_not_bounded() {
+fn test_a_parameter_only_the_source_uses_is_not_bounded() {
     let error: Wrapping<u32, std::io::Error> = std::fs::read("/nonexistent-suzunari-error")
         .context(WrappingSnafu { label: 7u32 })
         .unwrap_err();

@@ -53,7 +53,7 @@ fn lookup_error() -> LookupError {
 /// The whole payload, so that `message` — and with it `collect_str` — is on the
 /// path.
 #[test]
-fn the_payload_is_written_without_an_allocator() {
+fn test_the_payload_is_written_without_an_allocator() {
     let mut bytes = [0u8; 512];
     let written = canonical(&mut bytes, &lookup_error()).expect("fits");
     let text = core::str::from_utf8(written).expect("utf-8");
@@ -68,7 +68,7 @@ fn the_payload_is_written_without_an_allocator() {
 
 /// The same comparison the other tiers make, byte for byte.
 #[test]
-fn context_matches_a_directly_written_struct() {
+fn test_context_matches_a_directly_written_struct() {
     let error = lookup_error();
     let expected = oracle::LookupError {
         key: "k",
@@ -98,7 +98,7 @@ fn context_matches_a_directly_written_struct() {
 /// truncated bytes and compare equal, which would leave the comparison passing
 /// on nothing.
 #[test]
-fn a_buffer_that_is_too_small_fails() {
+fn test_a_buffer_that_is_too_small_fails() {
     let mut bytes = [0u8; 8];
     assert_eq!(
         canonical(&mut bytes, &lookup_error()).unwrap_err(),

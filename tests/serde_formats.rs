@@ -173,7 +173,7 @@ impl Serialize for Probe {
 /// Text is human-readable; every binary format here is not — including the two
 /// that carry field names and could have taken the compact shape.
 #[test]
-fn only_the_text_format_asks_for_the_readable_shape() {
+fn test_only_the_text_format_asks_for_the_readable_shape() {
     assert_eq!(serde_json::to_string(&Probe).unwrap(), "true");
 
     let config = bincode::config::standard();
@@ -198,7 +198,7 @@ fn only_the_text_format_asks_for_the_readable_shape() {
 /// field set, because a reader advances by type and has to know how many fields
 /// to expect before it reads them.
 #[test]
-fn bincode_round_trips() {
+fn test_bincode_round_trips() {
     let config = bincode::config::standard();
     let bytes = bincode::serde::encode_to_vec(fetch_error(), config).unwrap();
     let (node, consumed): (FetchErrorNode, usize) =
@@ -213,7 +213,7 @@ fn bincode_round_trips() {
 /// The same properties as bincode, in a format built for embedded targets — so
 /// the conclusion does not rest on one crate's encoding choices.
 #[test]
-fn postcard_round_trips() {
+fn test_postcard_round_trips() {
     let bytes = postcard::to_allocvec(&fetch_error()).unwrap();
     let node: FetchErrorNode = postcard::from_bytes(&bytes).unwrap();
 
@@ -224,7 +224,7 @@ fn postcard_round_trips() {
 /// `is_human_readable() == false` and receives the uniform one, which it reads
 /// just as well.
 #[test]
-fn messagepack_round_trips() {
+fn test_messagepack_round_trips() {
     let bytes = rmp_serde::to_vec(&fetch_error()).unwrap();
     let node: FetchErrorNode = rmp_serde::from_slice(&bytes).unwrap();
 
@@ -233,7 +233,7 @@ fn messagepack_round_trips() {
 
 /// The other self-describing binary format, for the same reason.
 #[test]
-fn cbor_round_trips() {
+fn test_cbor_round_trips() {
     let mut bytes = Vec::new();
     ciborium::into_writer(&fetch_error(), &mut bytes).unwrap();
     let node: FetchErrorNode = ciborium::from_reader(&bytes[..]).unwrap();
@@ -251,7 +251,7 @@ fn cbor_round_trips() {
 /// a format that never needed it — the mirrors above would not even deserialize
 /// from this payload, because three of their fields have no key to read.
 #[test]
-fn json_omits_rather_than_writing_null() {
+fn test_json_omits_rather_than_writing_null() {
     let value = serde_json::to_value(fetch_error()).unwrap();
 
     let tail = &value["source"]["source"];
