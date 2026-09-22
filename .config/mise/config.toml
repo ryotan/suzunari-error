@@ -35,6 +35,7 @@ disable_backends = [
 
 # mise.lock enforcement:
 #   lockfile → write checksums + provenance to mise.lock
+#   locked   → require matching lockfile entries for installation
 #   paranoid → re-verify SLSA / GitHub attestations on every install. Not declared here: mise treats
 #              `paranoid` as a security ratchet (mise 2026.x+) and silently ignores it in non-global
 #              configs, so any value here would be a misleading no-op. Local dev inherits the setting
