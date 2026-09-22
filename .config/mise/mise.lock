@@ -256,7 +256,10 @@ provenance = "cosign"
 [[tools.gh]]
 version = "2.101.0"
 backend = "aqua:cli/cli"
-specifiers = ["2.100.0"]
+specifiers = [
+    "2.100.0",
+    "2.101.0",
+]
 
 [tools.gh."platforms.linux-arm64"]
 checksum = "sha256:b57e8063f18862647c9d22727c32e9da1b963f8bf9db648fe123a6975695640f"
