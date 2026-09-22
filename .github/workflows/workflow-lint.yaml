@@ -37,11 +37,10 @@ jobs:
         with:
           egress-policy: block
           allowed-endpoints: >
-            api.github.com:443
-            github.com:443
             mise.jdx.dev:443
-            *.actions.githubusercontent.com:443
-            *.githubusercontent.com:443
+            mise-versions.jdx.dev:443
+            release-assets.githubusercontent.com:443
+            tuf-repo-cdn.sigstore.dev:443
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -56,6 +55,7 @@ jobs:
         with:
           version: '2026.9.9'
           install_args: 'ghalint pinact zizmor'
+          cache_key_prefix: mise-v2
 
       - name: ghalint
         id: ghalint
