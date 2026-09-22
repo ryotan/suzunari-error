@@ -70,7 +70,7 @@ jobs:
           # See .config/mise/config.toml.
           MISE_PARANOID: 'true'
         with:
-          version: '2026.9.7'
+          version: '2026.9.9'
           install_args: 'github:taiki-e/cargo-hack'
 
       - name: Check formatting
