@@ -43,6 +43,17 @@ disable_backends = [
 #              set `MISE_PARANOID=true` via workflow env.
 lockfile = true
 locked = true
+# Local development (macos-arm64) and the CI runners (linux-x64, macos-arm64, windows-x64), plus the
+# x64 variants that bun always records
+lockfile_platforms = [
+  "macos-arm64",
+  "linux-x64",
+  "linux-x64-baseline",
+  "linux-x64-musl",
+  "linux-x64-musl-baseline",
+  "windows-x64",
+  "windows-x64-baseline",
+]
 
 [tools]
 act = "0.2.89"
