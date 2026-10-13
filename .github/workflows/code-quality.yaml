@@ -25,6 +25,17 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            os-endpoints: >-
+              *.aaplimg.com:443
+              *.apple-cloudkit.com:443
+              *.apple-dns.net:443
+              *.apple.com:443
+              *.mzstatic.com:443
+              *.safebrowsing.apple:443
+              cp10.cloudflare.com:443
+              safebrowsing.googleapis.com:443
     runs-on: ${{ matrix.os }}
     # The slowest matrix leg observed is under 5 minutes; 30 absorbs a cold cache.
     timeout-minutes: 30
@@ -49,6 +60,7 @@ jobs:
             release-assets.githubusercontent.com:443
             static.crates.io:443
             static.rust-lang.org:443
+            ${{ matrix.os-endpoints }}
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
