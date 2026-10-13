@@ -28,13 +28,16 @@ jobs:
         include:
           - os: macos-latest
             os-endpoints: >-
-              *.aaplimg.com:443
-              *.apple-cloudkit.com:443
-              *.apple-dns.net:443
-              *.apple.com:443
-              *.mzstatic.com:443
-              *.safebrowsing.apple:443
+              *.aaplimg.com:*
+              *.apple-cloudkit.com:*
+              *.apple-dns.net:*
+              *.apple.com:*
+              *.digicert.com:80
+              *.mzstatic.com:*
+              *.safebrowsing.apple:*
               cp10.cloudflare.com:443
+              ocsp.comodoca.com:80
+              ocsp.usertrust.com:80
               safebrowsing.googleapis.com:443
     runs-on: ${{ matrix.os }}
     # The slowest matrix leg observed is under 5 minutes; 30 absorbs a cold cache.
