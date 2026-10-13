@@ -32,12 +32,9 @@ jobs:
               *.apple-cloudkit.com:*
               *.apple-dns.net:*
               *.apple.com:*
-              *.digicert.com:80
               *.mzstatic.com:*
               *.safebrowsing.apple:*
               cp10.cloudflare.com:443
-              ocsp.comodoca.com:80
-              ocsp.usertrust.com:80
               safebrowsing.googleapis.com:443
     runs-on: ${{ matrix.os }}
     # The slowest matrix leg observed is under 5 minutes; 30 absorbs a cold cache.
@@ -51,13 +48,16 @@ jobs:
           disable-telemetry: ${{ runner.os == 'Windows' }}
           allowed-endpoints: >
             *.c.lencr.org:80
+            *.digicert.com:80
             c.pki.goog:80
             crl.globalsign.com:80
             crl.sectigo.com:80
             index.crates.io:443
             mise.jdx.dev:443
+            ocsp.comodoca.com:80
             ocsp.globalsign.com:80
             ocsp.sectigo.com:80
+            ocsp.usertrust.com:80
             ocsp2.globalsign.com:80
             pkg-containers.githubusercontent.com:443
             release-assets.githubusercontent.com:443
