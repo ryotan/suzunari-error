@@ -1,5 +1,6 @@
 [settings]
 auto_install = false
+use_versions_host = false
 
 # Mitigate supply-chain attacks: only resolve tool versions that have been released for at least 7 days. Mirrors
 # `minimumReleaseAge` in `.github/renovate.json5`. Pinned versions in [tools] below bypass this filter (they are
