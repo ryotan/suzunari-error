@@ -30,19 +30,22 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Harden Runner
-        # Block unexpected egress and process activity on the runner. The allowed-endpoints list below was
-        # baselined from the audit-mode log of Linux runs, so block mode is Linux-only for now; macOS and
-        # Windows stay in audit until their own egress has been baselined the same way.
-        #
-        # A step-level `if:` cannot gate this action — its `pre` step has no `pre-if`, so it defaults to
-        # always() and applies the policy even when the step itself is skipped. Since v2.20.0 that policy
-        # is actually enforced on macOS and Windows, so the egress policy itself has to carry the condition.
+        # Block unexpected egress and process activity on the runner.
         uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
-          egress-policy: ${{ runner.os == 'Linux' && 'block' || 'audit' }}
+          egress-policy: block
+          disable-telemetry: true
           allowed-endpoints: >
+            *.c.lencr.org:80
+            c.pki.goog:80
+            crl.globalsign.com:80
+            crl.sectigo.com:80
             index.crates.io:443
             mise.jdx.dev:443
+            ocsp.globalsign.com:80
+            ocsp.sectigo.com:80
+            ocsp2.globalsign.com:80
+            pkg-containers.githubusercontent.com:443
             release-assets.githubusercontent.com:443
             static.crates.io:443
             static.rust-lang.org:443
