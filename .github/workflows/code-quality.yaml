@@ -59,9 +59,6 @@ jobs:
         with:
           cache-workspaces: . -> target
 
-      - name: Install additional problem matchers
-        run: echo "::add-matcher::.github/problem-matchers.json"
-
       - name: Install cargo-hack
         uses: jdx/mise-action@94c60b39bc2d90ab2f9bab27f38d3cc4812c1834 # v5.1.0
         env:
