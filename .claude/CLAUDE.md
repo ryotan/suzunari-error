@@ -10,13 +10,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Git Conventions
 
-GitMoji + Conventional Commits format: `<emoji>: <summary>`
+GitMoji + Conventional Commits format: `<emoji>(<scope>): <summary>`
 
 Emojis: ✨ feature, 🐛 bugfix, ♻️ refactor, ✅ test, 📝 docs, 🎨 structure, ⚡️ perf, 🔥 remove, 🚧 WIP
 
+- The scope is required and names the area changed (e.g. `ci`, `mise`, `deps`)
 - Commit messages should describe the **purpose/intent** of the change, not what was changed
 - PRs are squash-merged — the title becomes the commit subject and the body becomes the commit body
-- PR title: follow the `<emoji>: <summary>` format
+- PR title: follow the `<emoji>(<scope>): <summary>` format
 - PR body: explain the purpose and context of the change
 - Do NOT add Co-Authored-By trailers
 - Do NOT add "Generated with Claude Code" footers to PR bodies

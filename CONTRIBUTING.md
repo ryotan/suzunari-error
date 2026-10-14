@@ -69,12 +69,12 @@ chore/update-dependencies
 
 ### Commits
 
-GitMoji + Conventional Commits:
+GitMoji + Conventional Commits, with a required scope:
 
 ```
-✨: Add suzunari_error attribute macro
-🐛: Fix column tracking in nested calls
-♻️: Simplify StackError trait bounds
+✨(macro): Add suzunari_error attribute macro
+🐛(stack-error): Fix column tracking in nested calls
+♻️(stack-error): Simplify StackError trait bounds
 ```
 
 ## Pull Requests
