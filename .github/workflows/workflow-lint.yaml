@@ -62,7 +62,7 @@ jobs:
           # See .config/mise/config.toml.
           MISE_PARANOID: 'true'
         with:
-          version: '2026.10.7'
+          version: '2026.10.8'
           install_args: 'ghalint pinact zizmor'
           cache: false
 

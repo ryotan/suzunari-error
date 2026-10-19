@@ -77,7 +77,7 @@ jobs:
           # One path on every OS: actions/cache cannot expand %TEMP%, mise's default on Windows.
           MISE_CACHE_DIR: ${{ runner.temp }}/mise
         with:
-          version: '2026.10.7'
+          version: '2026.10.8'
           install_args: 'github:taiki-e/cargo-hack'
           cache: false
 
