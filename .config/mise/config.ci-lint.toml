@@ -1,0 +1,2 @@
+[settings]
+enable_tools = ["github:taiki-e/cargo-hack"]

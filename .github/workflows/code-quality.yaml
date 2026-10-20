@@ -28,6 +28,9 @@ jobs:
     runs-on: ${{ matrix.os }}
     # The slowest matrix leg observed is under 5 minutes; 30 absorbs a cold cache.
     timeout-minutes: 30
+    env:
+      # Selects tools by file rather than install_args, so the cache key can hash them.
+      MISE_ENV: ci-lint
     steps:
       - name: Harden Runner
         # Block unexpected egress and process activity on the runner.
@@ -65,8 +68,9 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ runner.temp }}/mise/downloads-cas
-          # Per job, because the jobs install different tools (`install_args`).
-          key: mise-downloads-${{ github.job }}-${{ runner.os }}-${{ hashFiles('.config/mise/mise.lock') }}
+          key: >-
+            mise-downloads-${{ runner.os }}-${{ runner.arch }}-${{ env.MISE_ENV }}-${{
+            hashFiles('.config/mise/config*.toml', '.config/mise/mise*.lock') }}
 
       - name: Install cargo-hack
         uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
@@ -78,7 +82,6 @@ jobs:
           MISE_CACHE_DIR: ${{ runner.temp }}/mise
         with:
           version: '2026.10.8'
-          install_args: 'github:taiki-e/cargo-hack'
           cache: false
 
       - name: Check formatting
