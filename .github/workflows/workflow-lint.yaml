@@ -66,7 +66,7 @@ jobs:
           # See .config/mise/config.toml.
           MISE_PARANOID: 'true'
         with:
-          version: '2026.10.9'
+          version: '2026.10.11'
           cache: false
 
       - name: ghalint
