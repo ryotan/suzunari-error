@@ -74,7 +74,7 @@ jobs:
             hashFiles('.config/mise/config*.toml', '.config/mise/mise*.lock') }}
 
       - name: Install cargo-hack
-        uses: jdx/mise-action@9b200bcecbfd6303e69a4a261b2e09e3757440a7 # v5.2.0
+        uses: jdx/mise-action@8418fedb1110381a0d3ba51a7a415d7c1b884550 # v5.2.2
         env:
           # mise ignores `paranoid` outside the global config, so CI asks for it with this variable.
           # See .config/mise/config.toml.
