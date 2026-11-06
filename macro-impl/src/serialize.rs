@@ -128,11 +128,12 @@ impl RequiredBounds {
         // A field whose type *is* an associated type of a parameter is bounded
         // as that whole path. `S::Key` is what reaches `Serialize`; `S` never
         // does, and demanding it of `S` turns away every marker type.
-        if let Type::Path(ty) = ungroup(&field.ty)
-            && let Some(Pair::Punctuated(first, _)) = ty.path.segments.pairs().next()
-            && all.contains(&first.ident)
-        {
-            self.associated.push(ty.clone());
+        if let Type::Path(ty) = ungroup(&field.ty) {
+            if let Some(Pair::Punctuated(first, _)) = ty.path.segments.pairs().next() {
+                if all.contains(&first.ident) {
+                    self.associated.push(ty.clone());
+                }
+            }
         }
         self.visit_type(&field.ty, all);
     }

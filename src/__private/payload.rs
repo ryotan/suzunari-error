@@ -43,38 +43,30 @@ impl<E: ?Sized + Display> Serialize for SerializeDisplay<'_, E> {
 // Location — serialized through a serde `remote` definition
 // ---------------------------------------------------------------------------
 
-/// serde `remote` definition for [`core::panic::Location`].
+/// Serializable fields of the [`Location`] reference alias.
 ///
-/// This is `remote`'s on-label use: the fields are private and reachable only
-/// through `file()` / `line()` / `column()`, which is what `getter` is for.
-///
-/// The `rename` is required: a def's own identifier is what reaches
-/// `serialize_struct` as the struct name, so without it the data model would
-/// carry `LocationDef`.
+/// Targeting the reference alias preserves its static receiver on the MSRV,
+/// where `file()` returns a borrow of that receiver.
+/// The rename preserves the `Location` struct name in the serde data model.
 #[derive(Serialize)]
-#[serde(remote = "core::panic::Location", rename = "Location")]
-struct LocationDef<'a> {
+#[serde(remote = "Location", rename = "Location")]
+struct LocationDef {
     #[serde(getter = "core::panic::Location::file")]
-    file: &'a str,
+    file: &'static str,
     #[serde(getter = "core::panic::Location::line")]
     line: u32,
     #[serde(getter = "core::panic::Location::column")]
     column: u32,
 }
 
-/// Bridges the [`Location`] alias — which is itself a reference — to
-/// [`LocationDef`], whose generated `serialize` takes `&core::panic::Location`.
+/// Applies the remote definition to both direct and optional locations.
 ///
 /// A named type rather than a `serialize_with` function, because the sparse
 /// shapes carry a location and the uniform one carries `Option<_>`; a
 /// `serialize_with` would have to be written twice, once per level of `Option`.
-struct SerializeLocation(Location);
-
-impl Serialize for SerializeLocation {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        LocationDef::serialize(self.0, serializer)
-    }
-}
+#[derive(Serialize)]
+#[serde(transparent)]
+struct SerializeLocation(#[serde(with = "LocationDef")] Location);
 
 // ---------------------------------------------------------------------------
 // Error node shapes
