@@ -10,12 +10,12 @@ pub(crate) fn stack_error_impl(stream: TokenStream) -> Result<TokenStream, Error
     let input: DeriveInput = syn::parse2(stream)?;
     let name = &input.ident;
     let generics = &input.generics;
-
     let crate_path = get_crate_path("suzunari-error");
+    validate_stack_attributes(&input)?;
 
-    match &input.data {
+    let stack_impl = match &input.data {
         Data::Struct(data_struct) => match &data_struct.fields {
-            Fields::Named(fields) => Ok(generate_struct_impl(name, fields, &crate_path, generics)?),
+            Fields::Named(fields) => generate_struct_impl(name, fields, &crate_path, generics),
             _ => Err(Error::new(
                 data_struct.fields.span(),
                 "StackError can only be derived for structs with named fields",
@@ -28,7 +28,29 @@ pub(crate) fn stack_error_impl(stream: TokenStream) -> Result<TokenStream, Error
             input.ident.span(),
             "StackError cannot be derived for unions",
         )),
+    }?;
+    let boxed_impl = boxed_stack_error_impl(name, &crate_path, generics);
+    Ok(quote! { #stack_impl #boxed_impl })
+}
+
+fn validate_stack_attributes(input: &DeriveInput) -> Result<(), Error> {
+    let variants = match &input.data {
+        Data::Enum(data) => Some(&data.variants),
+        _ => None,
+    };
+    let mut attributes = input.attrs.iter().chain(
+        variants
+            .into_iter()
+            .flatten()
+            .flat_map(|variant| &variant.attrs),
+    );
+    if let Some(attribute) = attributes.find(|attribute| attribute.path().is_ident("stack")) {
+        return Err(Error::new(
+            attribute.span(),
+            "#[stack(...)] is only supported on fields",
+        ));
     }
+    Ok(())
 }
 
 /// Generates the StackError implementation for a struct
@@ -62,8 +84,6 @@ fn generate_struct_impl(
         None => quote! {},
     };
 
-    let boxed_impl = boxed_stack_error_impl(name, crate_path, generics);
-
     Ok(quote! {
         impl #impl_generics #crate_path::StackError for #name #ty_generics #where_clause {
             fn location(&self) -> #crate_path::Location {
@@ -74,7 +94,6 @@ fn generate_struct_impl(
             }
             #stack_source_impl
         }
-        #boxed_impl
     })
 }
 
@@ -131,7 +150,6 @@ fn generate_enum_impl(
     // a reference, which stays inhabited even when the enum is not, and rustc
     // rejects it as a non-exhaustive pattern.
     if variant_infos.is_empty() {
-        let boxed_impl = boxed_stack_error_impl(name, crate_path, generics);
         return Ok(quote! {
             impl #impl_generics #crate_path::StackError for #name #ty_generics #where_clause {
                 fn location(&self) -> #crate_path::Location {
@@ -141,7 +159,6 @@ fn generate_enum_impl(
                     match *self {}
                 }
             }
-            #boxed_impl
         });
     }
 
@@ -185,8 +202,6 @@ fn generate_enum_impl(
         quote! {}
     };
 
-    let boxed_impl = boxed_stack_error_impl(name, crate_path, generics);
-
     Ok(quote! {
         impl #impl_generics #crate_path::StackError for #name #ty_generics #where_clause {
             fn location(&self) -> #crate_path::Location {
@@ -201,18 +216,13 @@ fn generate_enum_impl(
             }
             #stack_source_impl
         }
-        #boxed_impl
     })
 }
 
-/// Generates `From<T> for BoxedStackError` only when the alloc feature is enabled.
+/// Marks derived errors for the library's bounded boxed conversion.
 ///
-/// Uses `cfg!(feature = "alloc")` on the proc-macro crate's own feature flag,
-/// NOT the expansion-site's cfg. This is correct because:
-/// - `suzunari-error-macro-impl/alloc` is only activated via `suzunari-error/alloc`
-/// - Adding `#[cfg(feature = "alloc")]` to generated code would check the
-///   downstream crate's features, which is incorrect — downstream crates
-///   do not declare their own `alloc` feature
+/// The proc-macro's own alloc feature controls expansion. A generated cfg would
+/// inspect the downstream crate's feature names instead of this library's.
 fn boxed_stack_error_impl(
     name: &Ident,
     crate_path: &TokenStream,
@@ -221,26 +231,9 @@ fn boxed_stack_error_impl(
     if !cfg!(feature = "alloc") {
         return quote! {};
     }
-
-    let (impl_generics, ty_generics, _) = generics.split_for_impl();
-
-    // For generic types, add explicit bounds required by BoxedStackError::new.
-    // For non-generic types, the where clause is redundant but harmless.
-    let existing_predicates: Vec<_> = generics
-        .where_clause
-        .iter()
-        .flat_map(|wc| wc.predicates.iter())
-        .collect();
-
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
     quote! {
-        impl #impl_generics From<#name #ty_generics> for #crate_path::BoxedStackError
-        where
-            #(#existing_predicates,)*
-            #name #ty_generics: #crate_path::StackError + Send + Sync + 'static,
-        {
-            fn from(error: #name #ty_generics) -> Self {
-                #crate_path::BoxedStackError::new(error)
-            }
-        }
+        impl #impl_generics #crate_path::__private::DerivedStackError
+            for #name #ty_generics #where_clause {}
     }
 }

@@ -27,6 +27,27 @@ use core::error::Error;
 /// `Location`-typed field. Manual impl is only needed for wrapper types like
 /// `BoxedStackError`.
 ///
+/// With `alloc`, derived errors implement `Into<BoxedStackError>` when they
+/// implement `Send + Sync + 'static`. Errors with local state or borrowed
+/// context need no special annotation. Their `StackError` implementation
+/// remains available even when conversion to `BoxedStackError` is not:
+///
+/// ```
+/// use suzunari_error::*;
+///
+/// #[suzunari_error]
+/// #[suzu(display("invalid value: {value}"))]
+/// struct BorrowedError<'a> {
+///     value: &'a str,
+/// }
+///
+/// let value = String::from("local value");
+/// let error = None::<()>
+///     .context(BorrowedSnafu { value: value.as_str() })
+///     .unwrap_err();
+/// assert_eq!(error.type_name(), "BorrowedError");
+/// ```
+///
 /// # Example
 ///
 /// ```

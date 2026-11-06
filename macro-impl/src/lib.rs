@@ -6,7 +6,8 @@
 //!   `#[suzu(...)]` attributes, resolves/injects location fields, and appends
 //!   `#[derive(Debug, Snafu, StackError)]`.
 //! - [`#[derive(StackError)]`](derive_stack_error) — Generates `StackError` impl
-//!   and `From<T> for BoxedStackError` (when `alloc` enabled). Finds location field
+//!   and enables conversion to `BoxedStackError` for `Send + Sync + 'static` errors
+//!   (when `alloc` enabled). Finds location field
 //!   via `#[stack(location)]` marker or `Location` type.
 //! - [`#[report]`](report) — Transforms `fn() -> Result<(), E>` into
 //!   `fn() -> StackReport<E>` for formatted error output on failure (`std` only).
@@ -34,7 +35,10 @@ use proc_macro::TokenStream;
 /// When using `#[suzunari_error]`, `#[suzu(location)]` on a field becomes
 /// `#[stack(location)]` + `#[snafu(implicit)]`.
 ///
-/// Also generates `From<T> for BoxedStackError` when the `alloc` feature is enabled.
+/// With `alloc`, derived errors implement `Into<BoxedStackError>` when they
+/// implement `Send + Sync + 'static`. Errors with local state or borrowed
+/// context remain usable without those bounds; only an incompatible conversion
+/// is rejected. No conversion option is needed.
 #[proc_macro_derive(StackError, attributes(stack))]
 pub fn derive_stack_error(input: TokenStream) -> TokenStream {
     stack_error_impl(input.into())

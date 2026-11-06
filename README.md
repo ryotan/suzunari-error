@@ -111,8 +111,6 @@ fn main() -> Result<(), RetrieveFailed> {
 }
 ```
 
-This is equivalent to `snafu::report` but uses `StackReport` for location-aware output.
-
 ### `BoxedStackError` — Uniform error handling across module boundaries
 
 ```rust
@@ -140,6 +138,12 @@ fn run() -> Result<(), DbError> {
     Ok(())
 }
 ```
+
+With `alloc` enabled, errors defined with `#[suzunari_error]` or
+`#[derive(StackError)]` can convert into `BoxedStackError` when they implement
+`Send + Sync + 'static`. Those bounds apply to conversion, including
+`BoxedStackError::new(error)`, not error definition. Errors with local state or
+borrowed context need no extra annotation.
 
 ### `DisplayError` — Wrapping non-`Error` types
 
@@ -213,18 +217,21 @@ struct FetchError {
 
 See the `_payload` module docs for the structures to read either shape back, plus a JSON Schema and a CDDL.
 
-## `#[suzu(...)]` vs `#[snafu(...)]`
+## `#[suzu(...)]` Attributes
 
-`#[suzu(...)]` is a superset of `#[snafu(...)]`. All snafu keywords (`display`, `source`, `implicit`, etc.) work inside `#[suzu(...)]` and are passed through to snafu. Additionally, `#[suzu(...)]` supports `from` and `location` extensions.
+`#[suzu(...)]` accepts SNAFU settings such as `display`, `source` and `implicit`, and provides
+the `from` and `location` extensions.
 
-When using `#[suzunari_error]`, prefer `#[suzu(...)]` over `#[snafu(...)]` for consistency. `#[snafu(...)]` also works but mixing the two styles is discouraged.
+Use `#[suzu(...)]` to configure error types declared with `#[suzunari_error]`.
+
+See `examples/` for runnable demonstrations.
 
 ## Feature Flags
 
 | Feature | Default | Description |
 |---------|---------|-------------|
 | `std`   | Yes     | Enables `alloc` + `snafu/std` + `StackReport`'s `Termination` impl + `#[report]` macro |
-| `alloc` | No      | Enables `BoxedStackError` and `From<T> for BoxedStackError` macro generation |
+| `alloc` | No      | Enables `BoxedStackError` and conditional conversion for derived errors |
 | `serde` | No      | Enables `#[suzunari_error(serialize)]` |
 | _(none)_ | —      | Core-only: `Location`, `StackError`, `StackReport` (formatting only), `DisplayError` |
 
@@ -236,23 +243,8 @@ For `no_std` usage, disable default features:
 
 ```toml
 [dependencies]
-suzunari-error = { version = "0.3", default-features = false }
+suzunari-error = { version = "0.4", default-features = false }
 ```
-
-## Why suzunari-error?
-
-Standard Rust error approaches have a tradeoff between traceability and ergonomics:
-
-| Approach | Per-level location | Auto-capture | Type-safe chain | `no_std` |
-|----------|:-:|:-:|:-:|:-:|
-| `thiserror` | - | - | Yes | Yes |
-| `anyhow`/`eyre` | Single backtrace | Yes | - | - |
-| `snafu` alone | Manual | Manual | Yes | Yes |
-| **suzunari-error** | **Automatic** | **Yes** | **Yes** | **Yes (3 tiers)** |
-
-suzunari-error builds on snafu to add what's missing: **automatic per-error-level location tracking** via `#[track_caller]`, a structured `StackReport` formatter that shows type names and locations at each level, and ergonomic macros (`#[suzunari_error]`, `#[suzu(from)]`) that reduce boilerplate.
-
-See `examples/` for runnable demonstrations.
 
 ## Known Issues
 

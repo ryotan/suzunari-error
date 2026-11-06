@@ -64,7 +64,7 @@ mod alloc_tests {
         let _: BoxedStackError = BoxedStackError::new(e);
     }
 
-    // Derive macro generates From<T> for BoxedStackError
+    // Derived errors satisfying the bounds convert automatically.
     fn _use_from(e: super::CoreOnlyError) {
         let _: BoxedStackError = e.into();
     }

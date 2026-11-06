@@ -26,6 +26,13 @@ pub mod payload;
 #[cfg(feature = "serde")]
 pub use serde;
 
+/// Marks derived errors for conditional conversion to BoxedStackError.
+///
+/// BoxedStackError must stay unmarked so the conversion does not overlap with
+/// core's identity implementation of From<T> for T.
+#[cfg(feature = "alloc")]
+pub trait DerivedStackError: StackError {}
+
 // ---------------------------------------------------------------------------
 // StackSourceResolver — resolves StackError::stack_source()
 // ---------------------------------------------------------------------------

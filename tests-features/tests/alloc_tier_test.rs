@@ -1,6 +1,6 @@
 //! Verifies alloc-tier features work correctly without std.
 //!
-//! Tests BoxedStackError, From<T> for BoxedStackError generation, and
+//! Tests BoxedStackError, conditional conversion for derived errors, and
 //! DisplayError source chain delegation, which require alloc but not std.
 #![cfg(all(feature = "test-alloc", not(feature = "test-std")))]
 

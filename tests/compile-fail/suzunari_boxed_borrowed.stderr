@@ -1,0 +1,19 @@
+error[E0597]: `value` does not live long enough
+  --> tests/compile-fail/suzunari_boxed_borrowed.rs:12:41
+   |
+10 |     let value = String::from("borrowed");
+   |         ----- binding `value` declared here
+11 |     let error = None::<()>
+12 |         .context(BorrowedSnafu { value: value.as_str() })
+   |                                         ^^^^^ borrowed value does not live long enough
+13 |         .unwrap_err();
+14 |     let _: BoxedStackError = error.into();
+   |                              ------------ argument requires that `value` is borrowed for `'static`
+15 | }
+   | - `value` dropped here while still borrowed
+   |
+note: requirement that the value outlives `'static` introduced here
+  --> $CARGO/snafu-$VERSION/src/lib.rs
+   |
+   |         C: IntoError<E, Source = NoneError>,
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
