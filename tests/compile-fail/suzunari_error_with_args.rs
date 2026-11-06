@@ -1,4 +1,4 @@
-// #[suzunari_error] does not accept arguments.
+// Unknown #[suzunari_error] options are rejected.
 use suzunari_error::suzunari_error;
 
 #[suzunari_error(skip_location)]

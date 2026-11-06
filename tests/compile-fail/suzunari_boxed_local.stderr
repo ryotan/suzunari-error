@@ -1,0 +1,29 @@
+error[E0277]: `Rc<()>` cannot be sent between threads safely
+  --> tests/compile-fail/suzunari_boxed_local.rs:14:36
+   |
+14 |     let _: BoxedStackError = error.into();
+   |                                    ^^^^ `Rc<()>` cannot be sent between threads safely
+   |
+   = help: within `LocalError<Rc<()>>`, the trait `Send` is not implemented for `Rc<()>`
+note: required because it appears within the type `LocalError<Rc<()>>`
+  --> tests/compile-fail/suzunari_boxed_local.rs:6:8
+   |
+ 6 | struct LocalError<T: std::fmt::Debug> {
+   |        ^^^^^^^^^^
+   = note: required for `suzunari_error::BoxedStackError` to implement `From<LocalError<Rc<()>>>`
+   = note: required for `LocalError<Rc<()>>` to implement `Into<suzunari_error::BoxedStackError>`
+
+error[E0277]: `Rc<()>` cannot be shared between threads safely
+  --> tests/compile-fail/suzunari_boxed_local.rs:14:36
+   |
+14 |     let _: BoxedStackError = error.into();
+   |                                    ^^^^ `Rc<()>` cannot be shared between threads safely
+   |
+   = help: within `LocalError<Rc<()>>`, the trait `Sync` is not implemented for `Rc<()>`
+note: required because it appears within the type `LocalError<Rc<()>>`
+  --> tests/compile-fail/suzunari_boxed_local.rs:6:8
+   |
+ 6 | struct LocalError<T: std::fmt::Debug> {
+   |        ^^^^^^^^^^
+   = note: required for `suzunari_error::BoxedStackError` to implement `From<LocalError<Rc<()>>>`
+   = note: required for `LocalError<Rc<()>>` to implement `Into<suzunari_error::BoxedStackError>`

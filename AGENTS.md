@@ -43,7 +43,9 @@ A snafu-based error handling library with automatic location tracking. `#![no_st
 Provides 3 proc-macros:
 
 - **`#[suzunari_error]`** — The main entry point. Processes `#[suzu(...)]` attributes, resolves/injects location fields, and appends `#[derive(Debug, Snafu, StackError)]`. Use this by default
-- **`#[derive(StackError)]`** — Generates `StackError` impl and `From<T> for BoxedStackError` (when alloc enabled). Does NOT generate `Debug` — use `#[derive(Debug)]` or `#[suzunari_error]`
+- **`#[derive(StackError)]`** — Generates `StackError` and enables conversion to `BoxedStackError`
+  for derived errors satisfying `Send + Sync + 'static` when alloc is enabled.
+  Does NOT generate `Debug`; use `#[derive(Debug)]` or `#[suzunari_error]`.
 - **`#[suzunari_error::report]`** — Transforms `fn main() -> Result<(), E>` into `fn main() -> StackReport<E>` for formatted error output on failure (std only)
 
 Key source files in `macro-impl/src/`:
@@ -54,7 +56,11 @@ Key source files in `macro-impl/src/`:
 - `helper.rs` — Shared utilities (`lookup_location_field`, `find_location_field`, `find_source_field`, `combine_errors`, etc.)
 - `serialize.rs` — `#[suzunari_error(serialize)]` codegen: the context definition, the source-field dispatch, and the serde bound inference
 
-The `macro-impl` crate has its own `alloc` feature flag. `cfg!(feature = "alloc")` controls whether `From<T> for BoxedStackError` impl is generated.
+The `macro-impl` crate has its own `alloc` feature flag. Under alloc, derive generates an internal
+marker; one library-owned `From` implementation requires that marker and `Send + Sync + 'static`.
+Local and borrowed errors remain usable without conversion options. `BoxedStackError` must not
+implement the marker because that would overlap with core's identity conversion.
+Explicit `BoxedStackError::new(error)` retains the same bounds and accepts manual `StackError` implementations.
 
 ### `#[suzu(...)]` Attribute
 
@@ -82,7 +88,7 @@ Attribute ownership: each attribute is consumed by a specific macro.
 ### Feature Flags
 
 - `std` (default) → `alloc` + `snafu/std` + `StackReport` `Termination` impl + `#[report]` macro. Note: `StackReport` itself uses only `core::fmt` and is available in all tiers; only `Termination` impl and `#[report]` require `std`
-- `alloc` → `snafu/alloc` + `BoxedStackError` + macro generates `From<T> for BoxedStackError`
+- `alloc` → `snafu/alloc` + `BoxedStackError` + conditional conversion for derived errors
 - `serde` → `#[suzunari_error(serialize)]` and `impl Serialize for BoxedStackError`. Does not imply `alloc`: it works in all three tiers
 
 ### Test Structure
@@ -120,4 +126,5 @@ This is a **personal library**, not targeting broad crates.io discoverability. B
 
 ## Toolchain
 
-Rust 1.98.1 (pinned in `rust-toolchain.toml`). Edition 2024. The crate's MSRV is 1.85 (`rust-version` in `Cargo.toml`).
+Use the toolchain pinned in [rust-toolchain.toml](rust-toolchain.toml). Edition 2024.
+The crate's MSRV is declared by `rust-version` in [Cargo.toml](Cargo.toml).

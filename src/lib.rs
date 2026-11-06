@@ -32,7 +32,7 @@
 //! | Feature | Default | Provides |
 //! |---------|---------|----------|
 //! | `std`   | Yes     | `alloc` + [`StackReport`]'s [`Termination`](std::process::Termination) impl + [`#[report]`](macro@report) macro |
-//! | `alloc` | via `std` | [`BoxedStackError`] + `From<T> for BoxedStackError` generation |
+//! | `alloc` | via `std` | [`BoxedStackError`] + conditional conversion for derived errors |
 //! | `serde` | No      | `impl Serialize` for types opted in with [`#[suzunari_error(serialize)]`](macro@suzunari_error), and for [`BoxedStackError`] |
 //! | _(none)_ | —      | Core-only: [`Location`], [`StackError`], [`StackReport`] (formatting only), [`DisplayError`] |
 //!

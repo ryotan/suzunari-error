@@ -1,4 +1,4 @@
-error: unknown #[suzunari_error] option; the only option is `serialize`. Field- and type-level configuration goes in #[suzu(...)]
+error: unknown #[suzunari_error] option; supported option is `serialize`. Field- and type-level configuration goes in #[suzu(...)]
  --> tests/compile-fail/suzunari_error_with_args.rs:4:18
   |
 4 | #[suzunari_error(skip_location)]

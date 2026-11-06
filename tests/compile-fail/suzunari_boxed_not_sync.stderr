@@ -1,0 +1,15 @@
+error[E0277]: `Cell<u8>` cannot be shared between threads safely
+  --> tests/compile-fail/suzunari_boxed_not_sync.rs:14:36
+   |
+14 |     let _: BoxedStackError = error.into();
+   |                                    ^^^^ `Cell<u8>` cannot be shared between threads safely
+   |
+   = help: within `NonSyncError`, the trait `Sync` is not implemented for `Cell<u8>`
+   = note: if you want to do aliasing and mutation between multiple threads, use `std::sync::RwLock` or `std::sync::atomic::AtomicU8` instead
+note: required because it appears within the type `NonSyncError`
+  --> tests/compile-fail/suzunari_boxed_not_sync.rs:6:8
+   |
+ 6 | struct NonSyncError {
+   |        ^^^^^^^^^^^^
+   = note: required for `suzunari_error::BoxedStackError` to implement `From<NonSyncError>`
+   = note: required for `NonSyncError` to implement `Into<suzunari_error::BoxedStackError>`

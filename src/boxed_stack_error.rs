@@ -9,7 +9,8 @@ use core::fmt::{Debug, Display, Formatter, Result};
 /// Provides uniform handling of heterogeneous `StackError` types while
 /// preserving location tracking through the error chain. Use this instead
 /// of `Box<dyn StackError + Send + Sync>` for shorter type signatures
-/// and automatic `From` generation by the derive macro.
+/// and automatic conversion for derived errors that implement
+/// `Send + Sync + 'static`.
 ///
 /// Note: downcasting to the concrete type is not supported through this
 /// wrapper. Use `into_inner()` if you need the raw trait object.
@@ -104,6 +105,15 @@ impl StackError for BoxedStackError {
     }
 }
 
+impl<E> From<E> for BoxedStackError
+where
+    E: crate::__private::DerivedStackError + Send + Sync + 'static,
+{
+    fn from(inner: E) -> Self {
+        Self::new(inner)
+    }
+}
+
 impl From<Box<dyn StackError + Send + Sync>> for BoxedStackError {
     fn from(inner: Box<dyn StackError + Send + Sync>) -> Self {
         Self { inner }
@@ -141,6 +151,22 @@ mod tests {
         fn type_name(&self) -> &'static str {
             "TestError"
         }
+    }
+
+    impl From<TestError> for BoxedStackError {
+        fn from(error: TestError) -> Self {
+            Self::new(error)
+        }
+    }
+
+    #[test]
+    fn manual_stack_errors_can_define_their_own_conversion() {
+        let error = TestSnafu { message: "manual" }.build();
+        let location = error.location();
+        let boxed: BoxedStackError = error.into();
+        assert_eq!(boxed.location(), location);
+        assert_eq!(boxed.type_name(), "TestError");
+        assert_eq!(format!("{boxed}"), "Test error: manual");
     }
 
     #[test]

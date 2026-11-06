@@ -1,0 +1,17 @@
+error: #[stack(...)] is only supported on fields
+ --> tests/compile-fail/stack_on_type_or_variant.rs:4:1
+  |
+4 | #[stack(location)]
+  | ^
+
+error: #[stack(...)] is only supported on fields
+ --> tests/compile-fail/stack_on_type_or_variant.rs:8:1
+  |
+8 | #[stack(location)]
+  | ^
+
+error: #[stack(...)] is only supported on fields
+  --> tests/compile-fail/stack_on_type_or_variant.rs:15:5
+   |
+15 |     #[stack(location)]
+   |     ^

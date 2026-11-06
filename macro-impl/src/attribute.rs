@@ -141,7 +141,7 @@ impl Options {
                 Error::new(
                     Span::call_site(),
                     "#[suzunari_error] expects a comma-separated option list; \
-                     the only option is `serialize`",
+                     supported option is `serialize`",
                 )
             })?;
 
@@ -158,7 +158,7 @@ impl Options {
                 }
                 _ => Some(Error::new(
                     meta.span(),
-                    "unknown #[suzunari_error] option; the only option is `serialize`. \
+                    "unknown #[suzunari_error] option; supported option is `serialize`. \
                      Field- and type-level configuration goes in #[suzu(...)]",
                 )),
             })
